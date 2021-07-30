@@ -25,6 +25,7 @@
 #include "postgres.h"
 
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/executormgr.h"
 #include "cdb/poolmgr.h"
 
@@ -281,7 +282,7 @@ executormgr_get_statistics(QueryExecutor *executor,
 
 void
 executormgr_get_executor_connection_info(QueryExecutor *executor,
-							char **address, int *port, int *pid)
+							char **address, int *port, int *myPort, int *pid)
 {
 	if (address)
 		*address = pstrdup(executor->desc->segment->hostip);
@@ -290,6 +291,8 @@ executormgr_get_executor_connection_info(QueryExecutor *executor,
 		*port = (executor->desc->motionListener >> 16) & 0x0ffff;
 	else
 		*port = (executor->desc->motionListener & 0x0ffff);
+
+	*myPort = (executor->desc->my_listener & 0x0ffff);
 
 	*pid = executor->desc->backendPid;
 }
@@ -351,6 +354,12 @@ executormgr_cancel(QueryExecutor *executor)
 	MemSet(errbuf, 0, sizeof(errbuf));
 
 	success = (PQcancel(cn, errbuf, sizeof(errbuf)) != 0);
+	if(!success){
+	  write_log("executormgr_cancel cancel (seg%d %s:%d) failed",
+	            executor->desc->segment->segindex,
+	            executor->desc->segment->hostname,
+	            executor->desc->segment->port);
+	}
 
 #if 0
 	if (success)
@@ -445,6 +454,7 @@ executormgr_dispatch_and_run(struct DispatchData *data, QueryExecutor *executor)
 								NULL, 0,
 								executor->identity_msg, executor->identity_msg_len,
 								parms->serializedQueryResource, parms->serializedQueryResourcelen,
+								parms->serializedCommonPlan, parms->serializedCommonPlanLen,
 								0,
 								gp_command_count,
 								executormgr_get_executor_slice_id(executor),
@@ -467,6 +477,7 @@ executormgr_dispatch_and_run(struct DispatchData *data, QueryExecutor *executor)
     INSTR_TIME_SET_CURRENT(time);
     write_log("The time after dispatching : %s to conn %s, isNonBlocking %d, number of chars waiting"
         "in buffer %d", query, conn->gpqeid, PQisnonblocking(conn), conn->outCount);
+    write_log("Size to dispatch: %.3f KB", (double)query_len / 1024);
   }
 
 	TIMING_END(executor->time_dispatch_end);
@@ -633,37 +644,42 @@ executormgr_catch_error(QueryExecutor *executor)
 
 	msg = PQerrorMessage(conn);
 
-	if (msg && (strcmp("", msg) != 0) && (executor->refResult->errcode == 0)) {
-		errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
+	/* In order to avoid executor errcode != 0, but executor errormsg is null */
+	// if (msg && (strcmp("", msg) != 0) && (executor->refResult->errcode == 0)) {
+	if (msg && (strcmp("", msg) != 0)) {
+		if (executor->refResult->errcode == 0)
+			errCode = ERRCODE_GP_INTERCONNECTION_ERROR;
+
+		PQExpBufferData selfDesc;
+		initPQExpBuffer(&selfDesc);
+		appendPQExpBuffer(&selfDesc, "(seg%d %s:%d)",
+		                  executor->desc->segment->segindex,
+		                  executor->desc->segment->hostname,
+		                  executor->desc->segment->port);
+
+		if (!executor->refResult->error_message) {
+			cdbdisp_appendMessage(
+					executor->refResult, LOG, errCode,
+					"%s %s: %s",
+					(executor->state == QES_DISPATCHABLE ?
+						"Error dispatching to" :
+						(executor->state == QES_RUNNING ?
+							"Query Executor Error in" : "Error in ")),
+					(executor->desc->whoami && strcmp(executor->desc->whoami, "") != 0) ?
+						executor->desc->whoami : selfDesc.data,
+					msg ? msg : "unknown error");
+		}
+		termPQExpBuffer(&selfDesc);
+		executor->health = QEH_ERROR;  // there is one error collected
+	}
+	else
+	{
+		executor->health = QEH_CANCEL;  // no error found, set as normal cancel
 	}
 
-	PQExpBufferData selfDesc;
-	initPQExpBuffer(&selfDesc);
-	appendPQExpBuffer(&selfDesc, "(seg%d %s:%d)",
-	                  executor->desc->segment->segindex,
-	                  executor->desc->segment->hostname,
-	                  executor->desc->segment->port);
-
-	if (!executor->refResult->error_message) {
-		cdbdisp_appendMessage(
-				executor->refResult, LOG, errCode,
-				"%s %s: %s",
-				(executor->state == QES_DISPATCHABLE ?
-					"Error dispatching to" :
-					(executor->state == QES_RUNNING ?
-						"Query Executor Error in" : "Error in ")),
-				(executor->desc->whoami && strcmp(executor->desc->whoami, "") != 0) ?
-					executor->desc->whoami : selfDesc.data,
-				msg ? msg : "unknown error");
-				  }
-
-	termPQExpBuffer(&selfDesc);
 	PQfinish(conn);
-
 	executor->desc->conn = NULL;
-
 	executor->state = QES_STOP;
-	executor->health = QEH_ERROR;
 }
 
 void
@@ -808,8 +824,8 @@ executormgr_free_executor(SegmentDatabaseDescriptor *desc)
 	executor_cache.cached_num++;
 }
 
-static bool
-executormgr_add_address(SegmentDatabaseDescriptor *segdbDesc, PQExpBuffer str)
+bool
+executormgr_add_address(SegmentDatabaseDescriptor *segdbDesc, bool skipHost, PQExpBuffer str)
 {
 	Segment	*segment = segdbDesc->segment;
 
@@ -830,7 +846,7 @@ executormgr_add_address(SegmentDatabaseDescriptor *segdbDesc, PQExpBuffer str)
 	 * On the master, we must use UNIX domain sockets for security -- as it can
 	 * be authenticated. See MPP-15802.
 	 */
-	if (!segment->master)
+	if (!segment->master && !skipHost)
 	{
 		/*
 		 * First we pick the cached hostip if we have it.
@@ -880,7 +896,7 @@ executormgr_add_address(SegmentDatabaseDescriptor *segdbDesc, PQExpBuffer str)
 static bool
 addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 {
-	Assert(guc && (guc->flags & GUC_GPDB_ADDOPT));
+	Assert(guc && (guc->flags & (GUC_GPDB_ADDOPT | GUC_NEW_DISP)));
 	switch (guc->vartype)
 	{
 		case PGC_BOOL:
@@ -955,8 +971,26 @@ addOneOption(PQExpBufferData *buffer, struct config_generic * guc)
 	return false;
 }
 
+bool executormgr_addDispGuc(PQExpBuffer str, bool isSuperUser) {
+  struct config_generic **gucs = get_guc_variables();
+  int ngucs = get_num_guc_variables();
 
-static bool
+  appendPQExpBufferStr(str, "options='");
+
+  for (int i = 0; i < ngucs; ++i) {
+    struct config_generic *guc = gucs[i];
+
+    if ((guc->flags & GUC_NEW_DISP) &&
+        (guc->context == PGC_USERSET || isSuperUser)) {
+      if (!addOneOption(str, guc)) return false;
+    }
+  }
+  appendPQExpBuffer(str, "' ");
+
+  return true;
+}
+
+bool
 executormgr_add_guc(PQExpBuffer str, bool is_superuser)
 {
 	struct config_generic **gucs = get_guc_variables();
@@ -1006,7 +1040,7 @@ executormgr_add_guc(PQExpBuffer str, bool is_superuser)
 	return true;
 }
 
-static bool
+bool
 executormgr_add_static_state(PQExpBuffer str, bool is_writer)
 {
 	char	*master_host;
@@ -1064,7 +1098,7 @@ executormgr_connect(SegmentDatabaseDescriptor *desc, QueryExecutor *executor,
 	if (buffer.maxlen == 0)
 		goto error;
 
-	if (!executormgr_add_address(desc, &buffer))
+	if (!executormgr_add_address(desc, false, &buffer))
 		goto error;
 
 	if (!executormgr_add_guc(&buffer, is_superuser))
@@ -1098,25 +1132,25 @@ executormgr_destory(SegmentDatabaseDescriptor *desc)
 
 bool executormgr_has_cached_executor()
 {
-    return executor_cache.cached_num > 0;
+  return executor_cache.cached_num > 0;
 }
 
 bool executormgr_clean_cached_executor_filter(PoolItem item)
 {
-    SegmentDatabaseDescriptor *desc = (SegmentDatabaseDescriptor *)item;
-    return desc->conn->asyncStatus == PGASYNC_IDLE;
+  SegmentDatabaseDescriptor *desc = (SegmentDatabaseDescriptor *)item;
+  return desc->conn->asyncStatus == PGASYNC_IDLE;
 }
 
 void executormgr_clean_cached_executor()
 {
-    /* go through each cached executor */
-    int cleaned = 0;
-    if (!executor_cache.init)
-    {
-        return;
-    }
+  /* go through each cached executor */
+  int cleaned = 0;
+  if (!executor_cache.init)
+  {
+    return;
+  }
 
-    cleaned = poolmgr_clean(executor_cache.pool, (PoolMgrIterateFilter) executormgr_clean_cached_executor_filter);
-    elog(DEBUG5, "cleaned %d idle executors", cleaned);
+  cleaned = poolmgr_clean(executor_cache.pool, (PoolMgrIterateFilter) executormgr_clean_cached_executor_filter);
+  cleaned += poolmgr_clean(executor_cache.entrydb_pool, (PoolMgrIterateFilter) executormgr_clean_cached_executor_filter);
+  elog(DEBUG5, "cleaned %d idle executors", cleaned);
 }
-

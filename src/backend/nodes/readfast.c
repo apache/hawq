@@ -108,6 +108,18 @@
 		} \
 		local_node->fldname = nn;  }
 
+/* Read a character-string field */
+#define READ_NSTRING_FIELD(fldname, fldlen) \
+	{ int slen = (local_node->fldlen); char * nn = NULL; \
+		memcpy(&slen, *str, sizeof(int)); \
+		(*str)+=sizeof(int); \
+		if (slen>0) { \
+		    nn = palloc(slen+1); \
+		    memcpy(nn,*str,slen); \
+		    (*str)+=(slen); nn[slen]='\0'; \
+		} \
+		local_node->fldname = nn;  }
+
 /* Read a Node field */
 #define READ_NODE_FIELD(fldname) \
 	local_node->fldname = readNodeBinary(str)
@@ -330,6 +342,8 @@ _readSingleRowErrorDesc(const char ** str)
 	READ_BOOL_FIELD(is_keep);
 	READ_BOOL_FIELD(is_limit_in_rows);
 	READ_BOOL_FIELD(reusing_existing_errtable);
+	READ_BOOL_FIELD(is_hdfs_protocol_text);
+	READ_STRING_FIELD(hdfsLoc);
 
 	READ_DONE();
 }
@@ -927,6 +941,7 @@ _readAlterTableStmt(const char ** str)
 			READ_OID_FIELD(oidInfo[m].aoblkdirComptypeOid);
 		}
 	}
+	READ_BOOL_FIELD(greenWay);
 
 	READ_DONE();
 }
@@ -966,7 +981,7 @@ _readAlterPartitionCmd(const char ** str)
 	READ_NODE_FIELD(arg2);
 	READ_NODE_FIELD(scantable_splits);
 	READ_NODE_FIELD(newpart_aosegnos);
-
+	READ_STRING_FIELD(format);
 	READ_DONE();
 }
 
@@ -2281,7 +2296,8 @@ _readSegFileSplitMapNode(const char **str)
 
 	READ_OID_FIELD(relid);
 	READ_NODE_FIELD(splits);
-
+	READ_INT_FIELD(serializeSchemaLen);
+	READ_NSTRING_FIELD(serializeSchema, serializeSchemaLen);
 	READ_DONE();
 }
 
@@ -2291,6 +2307,8 @@ _readFileSplitNode(const char **str)
 	READ_LOCALS(FileSplitNode);
 
 	READ_INT_FIELD(segno);
+	READ_INT_FIELD(range_id);
+	READ_INT_FIELD(replicaGroup_id);
 	READ_INT64_FIELD(logiceof);
 	READ_INT64_FIELD(offsets);
 	READ_INT64_FIELD(lengths);
@@ -2808,6 +2826,7 @@ _readCopyStmt(const char ** str)
 	READ_NODE_FIELD(err_aosegnos);
 	READ_NODE_FIELD(err_aosegfileinfos);
 	READ_NODE_FIELD(scantable_splits);
+	READ_NODE_FIELD(planTree);
 
 	READ_DONE();
 
@@ -2907,6 +2926,7 @@ _readPlannedStmt(const char ** str)
 	READ_NODE_FIELD(result_segfileinfos);
 	READ_NODE_FIELD(scantable_splits);
 	READ_NODE_FIELD(into_aosegnos);
+	READ_NODE_FIELD(relFileNodeInfo);
 	READ_NODE_FIELD(queryPartOids);
 	READ_NODE_FIELD(queryPartsMetadata);
 	READ_NODE_FIELD(numSelectorsPerScanId);
@@ -2924,7 +2944,10 @@ _readPlannedStmt(const char ** str)
 
 	READ_NODE_FIELD(contextdisp);
 
-	READ_NODE_FIELD(resource);
+	/* resource not serialized in outfast.c */
+
+	READ_STRING_FIELD(hiveUrl);
+	READ_ENUM_FIELD(originNodeType, NodeTag);
 
 	READ_DONE();
 }
@@ -3122,6 +3145,7 @@ _readExternalScan(const char ** str)
 	READ_NODE_FIELD(err_aosegfileinfos);
 	READ_INT_FIELD(encoding);
 	READ_INT_FIELD(scancounter);
+	READ_STRING_FIELD(hiveUrl);
 
 	READ_DONE();
 }
@@ -3203,6 +3227,48 @@ _readBitmapHeapScan(const char ** str)
 
 	READ_NODE_FIELD(bitmapqualorig);
 
+	READ_DONE();
+}
+
+static MagmaIndexScan *
+_readMagmaIndexScan(const char ** str)
+{
+	READ_LOCALS(MagmaIndexScan);
+	readScanInfo(str, (Scan *)local_node);
+	READ_STRING_FIELD(indexname);
+	READ_NODE_FIELD(indexqualorig);
+	READ_ENUM_FIELD(indexorderdir, ScanDirection);
+	READ_NODE_FIELD(uriList);
+	READ_NODE_FIELD(fmtOpts);
+	READ_CHAR_FIELD(fmtType);
+	READ_INT_FIELD(rejLimit);
+	READ_BOOL_FIELD(rejLimitInRows);
+	READ_OID_FIELD(fmterrtbl);
+	READ_NODE_FIELD(errAosegnos);
+	READ_NODE_FIELD(err_aosegfileinfos);
+	READ_INT_FIELD(encoding);
+	READ_INT_FIELD(scancounter);
+	READ_DONE();
+}
+
+static MagmaIndexOnlyScan *
+_readMagmaIndexOnlyScan(const char ** str)
+{
+	READ_LOCALS(MagmaIndexOnlyScan);
+	readScanInfo(str, (Scan *)local_node);
+	READ_NODE_FIELD(uriList);
+	READ_NODE_FIELD(fmtOpts);
+	READ_CHAR_FIELD(fmtType);
+	READ_INT_FIELD(rejLimit);
+	READ_BOOL_FIELD(rejLimitInRows);
+	READ_OID_FIELD(fmterrtbl);
+	READ_STRING_FIELD(indexname);
+	READ_NODE_FIELD(indexqualorig);
+	READ_ENUM_FIELD(indexorderdir, ScanDirection);
+	READ_NODE_FIELD(errAosegnos);
+	READ_NODE_FIELD(err_aosegfileinfos);
+	READ_INT_FIELD(encoding);
+	READ_INT_FIELD(scancounter);
 	READ_DONE();
 }
 
@@ -3827,7 +3893,6 @@ void readPlanInfo(const char ** str, Plan *local_node)
     READ_NODE_FIELD(initPlan);
     
     READ_UINT64_FIELD(operatorMemKB);
-    READ_BOOL_FIELD(vectorized);
 }
 
 void readJoinInfo(const char ** str, Join *local_node)
@@ -4260,6 +4325,12 @@ readNodeBinary(const char ** str)
 				break;
 			case T_IndexScan:
 				return_value = _readIndexScan(str);
+				break;
+			case T_MagmaIndexScan:
+				return_value = _readMagmaIndexScan(str);
+				break;
+			case T_MagmaIndexOnlyScan:
+				return_value = _readMagmaIndexOnlyScan(str);
 				break;
 			case T_DynamicIndexScan:
 				return_value = _readDynamicIndexScan(str);

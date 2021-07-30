@@ -27,6 +27,11 @@ override CPPFLAGS += -DPLPERL_HAVE_UID_GID
 override CFLAGS += -Wno-comment
 endif
 
+perl_privlibexp_map := $(perl_privlibexp)
+# ifeq ($(PORTNAME), linux)
+# perl_privlibexp := $(perl_privlibexp)/vendor_perl
+# endif
+
 override CPPFLAGS := -I$(srcdir) $(CPPFLAGS) -I$(perl_archlibexp)/CORE
 
 rpathdir = $(perl_archlibexp)/CORE

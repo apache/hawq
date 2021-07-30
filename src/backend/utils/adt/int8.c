@@ -571,7 +571,7 @@ int8mul(PG_FUNCTION_ARGS)
 	result = arg1 * arg2;
 
 	/*
-	 * Overflow check.	We basically check to see if result / arg2 gives arg1
+	 * Overflow check.  We basically check to see if result / arg2 gives arg1
 	 * again.  There are two cases where this fails: arg2 = 0 (which cannot
 	 * overflow) and arg1 = INT64_MIN, arg2 = -1 (where the division itself
 	 * will overflow and thus incorrectly match).
@@ -579,16 +579,17 @@ int8mul(PG_FUNCTION_ARGS)
 	 * Since the division is likely much more expensive than the actual
 	 * multiplication, we'd like to skip it where possible.  The best bang for
 	 * the buck seems to be to check whether both inputs are in the int32
-	 * range; if so, no overflow is possible.  (But that only works if we
-	 * really have a 64-bit int64 datatype...)
+	 * range; if so, no overflow is possible.
 	 */
-
-	if (arg2 != 0 &&
-		(result / arg2 != arg1 || (arg2 == -1 && arg1 < 0 && result < 0)))
-		ereport(ERROR,
-				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("bigint out of range"),
-						 errOmitLocation(true)));
+	if (arg1 != (int64) ((int32) arg1) || arg2 != (int64) ((int32) arg2))
+	{
+		if (arg2 != 0 &&
+			((arg2 == -1 && arg1 < 0 && result < 0) ||
+			 result / arg2 != arg1))
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("bigint out of range")));
+	}
 	PG_RETURN_INT64(result);
 }
 
@@ -600,24 +601,35 @@ int8div(PG_FUNCTION_ARGS)
 	int64		result;
 
 	if (arg2 == 0)
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DIVISION_BY_ZERO),
-				 errmsg("division by zero"),
-						 errOmitLocation(true)));
+				 errmsg("division by zero")));
+		/* ensure compiler realizes we mustn't reach the division (gcc bug) */
+		PG_RETURN_NULL();
+	}
+
+	/*
+	 * INT64_MIN / -1 is problematic, since the result can't be represented on
+	 * a two's-complement machine.  Some machines produce INT64_MIN, some
+	 * produce zero, some throw an exception.  We can dodge the problem by
+	 * recognizing that division by -1 is the same as negation.
+	 */
+	if (arg2 == -1)
+	{
+		result = -arg1;
+		/* overflow check (needed for INT64_MIN) */
+		if (arg1 != 0 && SAMESIGN(result, arg1))
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("bigint out of range")));
+		PG_RETURN_INT64(result);
+	}
+
+	/* No overflow is possible */
 
 	result = arg1 / arg2;
 
-	/*
-	 * Overflow check.	The only possible overflow case is for arg1 =
-	 * INT64_MIN, arg2 = -1, where the correct result is -INT64_MIN, which
-	 * can't be represented on a two's-complement machine.	Most machines
-	 * produce INT64_MIN but it seems some produce zero.
-	 */
-	if (arg2 == -1 && arg1 < 0 && result <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("bigint out of range"),
-						 errOmitLocation(true)));
 	PG_RETURN_INT64(result);
 }
 
@@ -650,10 +662,22 @@ int8mod(PG_FUNCTION_ARGS)
 	int64		arg2 = PG_GETARG_INT64(1);
 
 	if (arg2 == 0)
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DIVISION_BY_ZERO),
-				 errmsg("division by zero"),
-						 errOmitLocation(true)));
+				 errmsg("division by zero")));
+		/* ensure compiler realizes we mustn't reach the division (gcc bug) */
+		PG_RETURN_NULL();
+	}
+
+	/*
+	 * Some machines throw a floating-point exception for INT64_MIN % -1,
+	 * which is a bit silly since the correct answer is perfectly
+	 * well-defined, namely zero.
+	 */
+	if (arg2 == -1)
+		PG_RETURN_INT64(0);
+
 	/* No overflow is possible */
 
 	PG_RETURN_INT64(arg1 % arg2);
@@ -821,24 +845,35 @@ int84div(PG_FUNCTION_ARGS)
 	int64		result;
 
 	if (arg2 == 0)
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DIVISION_BY_ZERO),
-				 errmsg("division by zero"),
-						 errOmitLocation(true)));
+				 errmsg("division by zero")));
+		/* ensure compiler realizes we mustn't reach the division (gcc bug) */
+		PG_RETURN_NULL();
+	}
+
+	/*
+	 * INT64_MIN / -1 is problematic, since the result can't be represented on
+	 * a two's-complement machine.  Some machines produce INT64_MIN, some
+	 * produce zero, some throw an exception.  We can dodge the problem by
+	 * recognizing that division by -1 is the same as negation.
+	 */
+	if (arg2 == -1)
+	{
+		result = -arg1;
+		/* overflow check (needed for INT64_MIN) */
+		if (arg1 != 0 && SAMESIGN(result, arg1))
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("bigint out of range")));
+		PG_RETURN_INT64(result);
+	}
+
+	/* No overflow is possible */
 
 	result = arg1 / arg2;
 
-	/*
-	 * Overflow check.	The only possible overflow case is for arg1 =
-	 * INT64_MIN, arg2 = -1, where the correct result is -INT64_MIN, which
-	 * can't be represented on a two's-complement machine.	Most machines
-	 * produce INT64_MIN but it seems some produce zero.
-	 */
-	if (arg2 == -1 && arg1 < 0 && result <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("bigint out of range"),
-						 errOmitLocation(true)));
 	PG_RETURN_INT64(result);
 }
 
@@ -1014,24 +1049,35 @@ int82div(PG_FUNCTION_ARGS)
 	int64		result;
 
 	if (arg2 == 0)
+	{
 		ereport(ERROR,
 				(errcode(ERRCODE_DIVISION_BY_ZERO),
-				 errmsg("division by zero"),
-						 errOmitLocation(true)));
+				 errmsg("division by zero")));
+		/* ensure compiler realizes we mustn't reach the division (gcc bug) */
+		PG_RETURN_NULL();
+	}
+
+	/*
+	 * INT64_MIN / -1 is problematic, since the result can't be represented on
+	 * a two's-complement machine.  Some machines produce INT64_MIN, some
+	 * produce zero, some throw an exception.  We can dodge the problem by
+	 * recognizing that division by -1 is the same as negation.
+	 */
+	if (arg2 == -1)
+	{
+		result = -arg1;
+		/* overflow check (needed for INT64_MIN) */
+		if (arg1 != 0 && SAMESIGN(result, arg1))
+			ereport(ERROR,
+					(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
+					 errmsg("bigint out of range")));
+		PG_RETURN_INT64(result);
+	}
+
+	/* No overflow is possible */
 
 	result = arg1 / arg2;
 
-	/*
-	 * Overflow check.	The only possible overflow case is for arg1 =
-	 * INT64_MIN, arg2 = -1, where the correct result is -INT64_MIN, which
-	 * can't be represented on a two's-complement machine.	Most machines
-	 * produce INT64_MIN but it seems some produce zero.
-	 */
-	if (arg2 == -1 && arg1 < 0 && result <= 0)
-		ereport(ERROR,
-				(errcode(ERRCODE_NUMERIC_VALUE_OUT_OF_RANGE),
-				 errmsg("bigint out of range"),
-						 errOmitLocation(true)));
 	PG_RETURN_INT64(result);
 }
 

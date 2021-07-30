@@ -35,6 +35,7 @@
 #include "access/heapam.h"
 #include "access/xact.h"
 #include "access/aosegfiles.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/dependency.h"
 #include "catalog/heap.h"
@@ -176,6 +177,24 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 				(AttrNumber) Anum_pg_aoseg_eofuncompressed,
 				"eofuncompressed", FLOAT8OID, -1, 0);
 	}
+	else if (RelationIsOrc(rel)) {
+    snprintf(aoseg_relname, sizeof(aoseg_relname), "pg_orcseg_%u",
+             relOid);
+    snprintf(aoseg_idxname, sizeof(aoseg_idxname), "pg_orcseg_%u_index",
+             relOid);
+
+    tupdesc = CreateTemplateTupleDesc(Natts_pg_orcseg, false);
+
+    TupleDescInitEntry(tupdesc, (AttrNumber)Anum_pg_orcseg_segno, "segno",
+                       INT4OID, -1, 0);
+    TupleDescInitEntry(tupdesc, (AttrNumber)Anum_pg_orcseg_eof, "eof",
+                       FLOAT8OID, -1, 0);
+    TupleDescInitEntry(tupdesc, (AttrNumber)Anum_pg_orcseg_tupcount,
+                       "tupcount", FLOAT8OID, -1, 0);
+    TupleDescInitEntry(tupdesc,
+                       (AttrNumber)Anum_pg_orcseg_eofuncompressed,
+                       "eofuncompressed", FLOAT8OID, -1, 0);
+  }
 	else
 	{
 
@@ -229,7 +248,8 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 										   true,
 										   comptypeOid,
 						 				   /* persistentTid */ NULL,
-						 				   /* persistentSerialNum */ NULL);
+						 				   /* persistentSerialNum */ NULL,
+						 				   /* formattername */ NULL);
 
 	/* make the toast relation visible, else index creation will fail */
 	CommandCounterIncrement();
@@ -296,7 +316,7 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 static bool
 needs_aoseg_table(Relation rel)
 {
-	return (RelationIsAoRows(rel) || RelationIsParquet(rel));
+	return RelationIsAo(rel);
 }
 
 

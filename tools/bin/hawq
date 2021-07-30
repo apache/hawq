@@ -20,7 +20,7 @@ try:
     import os
     import json
     import sys
-    import subprocess
+    import subprocess, signal
     from hawqpylib.HAWQ_HELP import *
     from hawqpylib.hawqlib import *
     from gppylib.gplog import get_default_logger
@@ -210,6 +210,32 @@ def main():
         result = local_run(cmd)
     elif hawq_command == "version" or hawq_command == "--version":
         print_version()
+    elif hawq_command == "sql":
+        signal.signal(signal.SIGINT, signal.SIG_IGN) # use the ignore handler
+        cmd = "%s; psql -P pager=off -v ON_ERROR_STOP=1 -v \"file_format=FORMAT 'orc'\" %s " % (source_hawq_env, sub_args)
+        result = local_run(cmd)
+    elif hawq_command == "ps":
+        cmd = '''ps -eo pid,ppid,start,%cpu,rss,command|
+              sort -k3,1|
+              grep --color -E '[p]ostgres[ :]|[m]agma_server |[p]sql '
+              '''
+        result = local_run(cmd)
+    elif hawq_command == "remove-oushu-python":
+        cmd = 'test -f /usr/local/hawq/bin/python && mv /usr/local/hawq/bin/python /usr/local/hawq/share'
+        result = local_run(cmd)
+        cmd = 'test -f /usr/local/hawq/lib/libpython2.7.so && mv /usr/local/hawq/lib/libpython* /usr/local/hawq/share'
+        result = local_run(cmd)
+        cmd = 'test -d /usr/local/hawq/lib/python2.7 && mv /usr/local/hawq/lib/python2.7 /usr/local/hawq/share'
+        result = local_run(cmd)
+        print "Remove Oushu's Python successfully."
+    elif hawq_command == "install-oushu-python":
+        cmd = 'test -f /usr/local/hawq/share/python && mv /usr/local/hawq/share/python /usr/local/hawq/bin'
+        result = local_run(cmd)
+        cmd = 'test -f /usr/local/hawq/share/libpython2.7.so && mv /usr/local/hawq/share/libpython* /usr/local/hawq/lib'
+        result = local_run(cmd)
+        cmd = 'test -d /usr/local/hawq/share/python2.7 && mv /usr/local/hawq/share/python2.7 /usr/local/hawq/lib'
+        result = local_run(cmd)
+        print "Install Oushu's Python successfully."
     else:
         print COMMON_HELP
         sys.exit(1)

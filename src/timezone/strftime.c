@@ -25,7 +25,8 @@
 
 #include "private.h"
 #include "tzfile.h"
-
+#include "miscadmin.h"
+#include "utils/timestamp.h"
 
 struct lc_time_T
 {
@@ -94,6 +95,8 @@ static char *_fmt(const char *, const struct pg_tm *, char *,
 	 const char *, int *);
 static char * _yconv(const int, const int, const int, const int, 
 	 char *, const char * const);
+static void
+EncodeTimezone(char *str, int tz, int style);
 
 #define IN_NONE 0
 #define IN_SOME 1
@@ -417,9 +420,14 @@ _fmt(const char *format, const struct pg_tm * t, char *pt, const char *ptlim,
 								pt, ptlim);
 					continue;
 				case 'Z':
-					if (t->tm_zone != NULL)
-						pt = _add(t->tm_zone, pt, ptlim);
-
+					if (t->tm_gmtoff)
+					{
+					  int tzp = (int) -t->tm_gmtoff;
+					  char str[128];
+					  str[0] = '\0';
+					  EncodeTimezone(str, tzp, USE_XSD_DATES);
+					  pt = _add(str, pt, ptlim);
+					}
 					/*
 					 * C99 says that %Z must be replaced by the empty string
 					 * if the time zone is not determinable.
@@ -525,3 +533,27 @@ _yconv(const int a, const int b, const int convert_top,
 	return pt;
 }
  
+static void
+EncodeTimezone(char *str, int tz, int style)
+{
+  int     hour,
+        min,
+        sec;
+
+  sec = abs(tz);
+  min = sec / SECS_PER_MINUTE;
+  sec -= min * SECS_PER_MINUTE;
+  hour = min / MINS_PER_HOUR;
+  min -= hour * MINS_PER_HOUR;
+
+  str += strlen(str);
+  /* TZ is negated compared to sign we wish to display ... */
+  *str++ = (tz <= 0 ? '+' : '-');
+
+  if (sec != 0)
+    sprintf(str, "%02d:%02d:%02d", hour, min, sec);
+  else if (min != 0 || style == USE_XSD_DATES)
+    sprintf(str, "%02d:%02d", hour, min);
+  else
+    sprintf(str, "%02d", hour);
+}

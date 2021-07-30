@@ -350,7 +350,7 @@ static void *gp_malloc_internal(int64 sz1, int64 sz2, bool ismalloc)
 	if(!ismalloc)
 		sz *= sz2;
 
-	Assert(sz >=0 && sz <= 0x7fffffff);
+	// Assert(sz >=0 && sz <= 0x7fffffff);
 
 	MemoryAllocationStatus stat = VmemTracker_ReserveVmem(sz);
 	if (MemoryAllocation_Success == stat)

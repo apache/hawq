@@ -30,6 +30,8 @@
 #include "nodes/pg_list.h"
 #include "nodes/value.h"
 #include "utils/rel.h"
+#include "utils/uri.h"
+#include "magma/cwrapper/magma-client-c.h"
 
 /* ------------------------- I/O function API -----------------------------*/
 
@@ -97,22 +99,62 @@ typedef enum ValidatorAction
  */
 typedef struct ExtProtocolValidatorData
 {
-	NodeTag				 type;            /* see T_ExtProtocolValidatorData */
-	List 		  		*url_list;
-	List 		  		*format_opts;
-	ValidatorDirection 	 direction;  /* validating read or write? */
-	char				*errmsg;		  /* the validation error upon return, if any */
-	ValidatorAction		 action;	/* indicate what action should be done. */
-	bool				forceCreateDir;
+  NodeTag            type;        /* see T_ExtProtocolValidatorData */
+  char              *dbname;
+  char              *schemaname;
+  char              *tablename;
+  MagmaSnapshot      snapshot;
+  List              *url_list;
+  List              *format_opts;
+  ValidatorDirection direction;   /* validating read or write? */
+  char              *errmsg;		  /* the validation error upon return, if any */
+  ValidatorAction    action;	    /* indicate what action should be done. */
+  bool               forceCreateDir;
+  bool               useClientCacheDirectly;
 } ExtProtocolValidatorData;
+
+typedef struct ExtProtocolRenameData
+{
+  NodeTag            type;
+  Uri *olduri;
+  Uri *newduri;
+  char *oldlocation;
+  char *newlocation;
+}ExtProtocolRenameData;
+
+typedef struct ExtProtocolTableSizeData
+{
+  NodeTag        type;
+  int64_t       tablesize;
+} ExtProtocolTableSizeData;
+
+typedef struct ExtProtocolDatabaseSizeData
+{
+  NodeTag        type;
+  int64_t       dbsize;
+} ExtProtocolDatabaseSizeData;
+
+
+typedef struct ExtProtocolMagmaStatusData
+{
+  NodeTag   type;
+  int       size;
+  MagmaNodeC *magmaNodes;  // ExtProtocolMagmaNode
+} ExtProtocolMagmaStatusData;
 
 typedef struct ExtProtocolBlockLocationData
 {
-	NodeTag				 type;
-	List				*files;		/* List of blocklocation_file*/
+	NodeTag			type;
+	char				*serializeSchema;
+	int				serializeSchemaLen;
+	List				*files; /* List of blocklocation_file*/
 } ExtProtocolBlockLocationData;
 
 typedef ExtProtocolValidatorData *ExtProtocolValidator;
+typedef ExtProtocolTableSizeData *ExtProtocolTableSize;
+typedef ExtProtocolDatabaseSizeData *ExtProtocolDatabaseSize;
+typedef ExtProtocolBlockLocationData *ExtProtocolBlockLocation;
+typedef ExtProtocolMagmaStatusData *ExtProtocolMagmaInfo;
 
 #define CALLED_AS_EXTPROTOCOL_VALIDATOR(fcinfo) \
 	((fcinfo->context != NULL && IsA((fcinfo)->context, ExtProtocolValidatorData)))

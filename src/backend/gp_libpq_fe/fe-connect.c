@@ -2184,11 +2184,13 @@ makeEmptyPGconn(void)
 	conn->outBuffer_shared = false;
 	initPQExpBuffer(&conn->errorMessage);
 	initPQExpBuffer(&conn->workBuffer);
+	initPQExpBuffer(&conn->dispBuffer);
 
 	if (conn->inBuffer == NULL ||
 		conn->outBuffer == NULL ||
 		PQExpBufferBroken(&conn->errorMessage) ||
-		PQExpBufferBroken(&conn->workBuffer))
+		PQExpBufferBroken(&conn->workBuffer) ||
+		PQExpBufferBroken(&conn->dispBuffer))
 	{
 		/* out of memory already :-( */
 		freePGconn(conn);
@@ -2301,6 +2303,7 @@ freePGconn(PGconn *conn)
 		free(conn->outBuffer);
 	termPQExpBuffer(&conn->errorMessage);
 	termPQExpBuffer(&conn->workBuffer);
+	termPQExpBuffer(&conn->dispBuffer);
 	free(conn);
 
 #ifdef WIN32
@@ -3498,6 +3501,34 @@ PQoptions(const PGconn *conn)
 	return conn->pgoptions;
 }
 
+int PQgetQEsDetail(PGconn *conn, char *connMsg, int connMsgLen) {
+  if (!conn || (PQstatus(conn) == CONNECTION_BAD))
+      return -1;
+  pqPacketSend(conn, 'V', connMsg, connMsgLen+1);
+
+  resetPQExpBuffer(&conn->dispBuffer);
+
+  /* wait for a response. */
+  if (PG_PROTOCOL_MAJOR(conn->pversion) >= 3)
+    pqParseInput3(conn);
+  else
+    return -1;
+
+  while (!conn->dispBuffer.len)
+  {
+    pqWait(TRUE, FALSE, conn);
+    if (pqReadData(conn) < 0)
+      return -1;
+
+    if (PG_PROTOCOL_MAJOR(conn->pversion) >= 3)
+      pqParseInput3(conn);
+    else
+      return -1;
+  }
+
+  return 0;
+}
+
 /* GPDB function to retrieve QE-backend details (motion listener) */
 int	PQgetQEdetail(PGconn *conn, bool alwaysFetch)
 {
@@ -3514,8 +3545,6 @@ int	PQgetQEdetail(PGconn *conn, bool alwaysFetch)
 	/* send a request to fetch the motion listener port. */
 	pqPacketSend(conn, 'W', NULL, 0 );
 
-	conn->asyncStatus = PGASYNC_BUSY;	
-	
 	/* wait for a response. */
 	if (PG_PROTOCOL_MAJOR(conn->pversion) >= 3)
 		pqParseInput3(conn);

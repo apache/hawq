@@ -14,6 +14,7 @@
 #ifndef XACT_H
 #define XACT_H
 
+#include "fmgr.h"
 #include "access/xlog.h"
 #include "nodes/pg_list.h"
 #include "storage/relfilenode.h"
@@ -21,6 +22,8 @@
 #include "access/persistentendxactrec.h"
 
 #include "cdb/cdbpublic.h"
+
+#include "magma/cwrapper/magma-client-c.h"
 
 /*
  * Xact isolation levels
@@ -172,6 +175,56 @@ typedef struct XidBuffer
 
 extern XidBuffer subxbuf;
 extern File subxip_file;
+
+/*
+ * PlugStorageTransactionData is used to represent transaction information.
+ */
+typedef enum PlugStorageTransactionStatus
+{
+	PS_TXN_STS_DEFAULT = 0,
+	PS_TXN_STS_STARTED = 1,
+	PS_TXN_STS_INVALID = 2
+} PlugStorageTransactionStatus;
+
+typedef enum PlugStorageTransactionCommand
+{
+	PS_TXN_CMD_BEGIN   = 0,
+	PS_TXN_CMD_COMMIT  = 1,
+	PS_TXN_CMD_ABORT   = 2,
+	PS_TXN_CMD_INVALID = 3
+} PlugStorageTransactionCommand;
+
+typedef struct PlugStorageTransactionData
+{
+	NodeTag                        type; /* see T_PlugStorageTransactionData */
+	Oid                            pst_proc_oid;
+	FmgrInfo                       pst_transaction_fmgr_info;
+	TransactionId                  pst_transaction_id;
+	PlugStorageTransactionStatus   pst_transaction_status;
+	PlugStorageTransactionCommand  pst_transaction_command;
+	MagmaSnapshot                 *pst_transaction_dist;     /* magma format */
+} PlugStorageTransactionData;
+
+typedef PlugStorageTransactionData *PlugStorageTransaction;
+
+extern int queryCmdId;
+
+extern bool isCleanupAbortTransaction;
+
+/* ----------------
+ *      extern definitions for magma transaction
+ * ----------------
+ */
+extern PlugStorageTransaction PlugStorageGetTransaction(void);
+extern PlugStorageTransactionStatus PlugStorageGetTransactionStatus(void);
+extern MagmaSnapshot *PlugStorageGetTransactionSnapshot(void);
+extern void PlugStorageSetTransactionSnapshot(MagmaSnapshot *snapshot);
+extern void PlugStorageBeginTransaction(List* magmaTableFullNames);
+extern void PlugStorageCommitTransaction(void);
+extern void PlugStorageAbortTransaction(void);
+extern void PlugStorageSetIsCleanupAbort(bool isCleanup);
+extern bool PlugStorageGetIsCleanupAbort(void);
+
 
 /* ----------------
  *		extern definitions

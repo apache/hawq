@@ -103,6 +103,7 @@ extern int64 HdfsFileSeek(File file, int64 offset, int whence);
 extern int64 HdfsFileTell(File file);
 extern int HdfsFileSync(File file);
 extern int HdfsRemovePath(FileName fileName, int recursive);
+extern int HdfsRemoveFilesInDir(const char * dir);
 extern int HdfsFileTruncate(File file, int64 offset);
 extern int HdfsMakeDirectory(const char *path, mode_t mode);
 extern char *HdfsGetDelegationToken(const char *uri, void **fs);
@@ -114,6 +115,9 @@ extern char *DeserializeDelegationToken(void *binary, int size);
 extern void cleanup_lru_opened_files(void);
 extern void cleanup_filesystem_handler(void);
 extern void cleanup_hdfs_handlers_for_dropping(void);
+
+typedef bool (*HdfsIterateCallback)(const char *name, tOffset size, void *arg);
+extern int HdfsIterateFilesInDir(const char * dir, HdfsIterateCallback callback, void *arg);
 
 /* abstract file system */
 extern File FileNameOpenFile(FileName fileName, const char *temp_dir, int fileFlags, int fileMode);

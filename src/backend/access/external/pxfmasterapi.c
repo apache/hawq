@@ -44,7 +44,7 @@ static List*
 parse_datanodes_response(List *rest_srvrs, StringInfo rest_buf)
 {
 	struct json_object *whole = json_tokener_parse(rest_buf->data);
-	if ((whole == NULL) || is_error(whole))
+	if (whole == NULL)
 	{
 		elog(ERROR, "Failed to parse datanode list from PXF");
 	}
@@ -161,7 +161,7 @@ static PxfFragmentStatsElem *parse_get_frag_stats_response(StringInfo rest_buf)
 {
 	PxfFragmentStatsElem* statsElem = (PxfFragmentStatsElem*)palloc0(sizeof(PxfFragmentStatsElem));
 	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
-	if ((whole == NULL) || is_error(whole))
+	if (whole == NULL)
 	{
 		elog(ERROR, "Failed to parse statistics data from PXF");
 	}
@@ -311,7 +311,7 @@ static List*
 parse_get_fragments_response(List *fragments, StringInfo rest_buf)
 {
 	struct json_object	*whole	= json_tokener_parse(rest_buf->data);
-	if ((whole == NULL) || is_error(whole))
+	if (whole == NULL)
 	{
 		elog(ERROR, "Failed to parse fragments list from PXF");
 	}

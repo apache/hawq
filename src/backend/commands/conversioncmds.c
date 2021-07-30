@@ -121,7 +121,8 @@ CreateConversionCommand(CreateConversionStmt *stmt)
 					 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	      errmsg("Cannot support CreateConversionCommand")));
 	}
 }
 
@@ -164,7 +165,8 @@ DropConversionCommand(List *name, DropBehavior behavior, bool missing_ok)
 		stmt->removeType = OBJECT_CONVERSION;
 		stmt->behavior=behavior;
 		stmt->missing_ok = true;
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+		    errmsg("Cannot support DropConversionCommand")));
 	}
 }
 

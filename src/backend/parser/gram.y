@@ -74,6 +74,7 @@
 #include "catalog/index.h"
 #include "catalog/namespace.h"
 #include "commands/defrem.h"
+#include "miscadmin.h"
 #include "nodes/makefuncs.h"
 #include "nodes/nodeFuncs.h"
 #include "nodes/print.h"
@@ -83,6 +84,7 @@
 #include "utils/datetime.h"
 #include "utils/guc.h"
 #include "utils/numeric.h"
+#include "utils/uri.h"
 #include "cdb/cdbvars.h" /* CDB *//* gp_enable_partitioned_tables */
 
 #include "resourcemanager/resourcemanager.h"
@@ -115,6 +117,9 @@
 #define YYFREE   pfree
 
 extern List *parsetree;			/* final parse result is delivered here */
+
+extern char *default_table_format;
+extern char *default_tablespace;
 
 static bool QueryIsRule = FALSE;
 
@@ -245,7 +250,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 				ext_on_clause_list format_opt format_opt_list transaction_mode_list
 				ext_opt_encoding_list
 %type <defelt>	createdb_opt_item alterdb_opt_item copy_opt_item
-				ext_on_clause_item format_opt_item transaction_mode_item
+				ext_on_clause_item format_opt_item2 transaction_mode_item
 				ext_opt_encoding_item
 
 %type <ival>	opt_lock lock_type cast_context
@@ -366,7 +371,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <istmt>	insert_rest
 
 %type <vsetstmt> set_rest
-%type <node>	TableElement ExtTableElement ConstraintElem TableFuncElement
+%type <node>	TableElement ExtTableElement ConstraintElem ExtConstraintElem TableFuncElement
 %type <node>	columnDef ExtcolumnDef
 %type <node>	cdb_string
 %type <defelt>	def_elem old_aggr_elem keyvalue_pair
@@ -434,7 +439,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <keyword> col_name_keyword reserved_keyword format_opt_keyword
 %type <keyword> keywords_ok_in_alias_no_as
 
-%type <node>	TableConstraint TableLikeClause 
+%type <node>	TableConstraint ExtTableConstraint TableLikeClause 
 %type <list>	TableLikeOptionList
 %type <ival>	TableLikeOption
 %type <list>	ColQualList
@@ -577,7 +582,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	UPDATE USER USING
 
 	VACUUM VALID VALIDATION VALIDATOR VALUE_P VALUES VARCHAR VARYING
-	VERBOSE VERSION_P VIEW VOLATILE
+	VERBOSE VERSION_P VIEW VOLATILE VARIADIC
 
 	WEB WHEN WHERE WINDOW WITH WITHIN WITHOUT WORK WRAPPER WRITABLE WRITE
 
@@ -3309,28 +3314,123 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 			OptInherit OptWith OnCommitOption OptTableSpace OptDistributedBy 
 			OptTabPartitionBy
 				{
-					CreateStmt *n = makeNode(CreateStmt);
-					
-					$4->istemp = $2;
-					n->base.relation = $4;
-					n->base.tableElts = $6;
-					n->base.inhRelations = $8;
-					n->base.constraints = NIL;
-					n->base.options = $9;
-					n->base.oncommit = $10;
-					n->base.tablespacename = $11;
-					n->base.distributedBy = $12;
-					n->base.partitionBy = $13;
-					n->oidInfo.relOid = 0;
-					n->oidInfo.comptypeOid = 0;
-					n->oidInfo.toastOid = 0;
-					n->oidInfo.toastIndexOid = 0;
-					n->oidInfo.toastComptypeOid = 0;
-					n->base.relKind = RELKIND_RELATION;
-					n->policy = 0;
-					n->base.postCreate = NULL;
-					
-					$$ = (Node *)n;
+					/* default table format is dertemined by the value of guc named 
+					 * default_table_format, if table format is explicitly set in query,
+					 * it should be this one.*/
+					bool isExternal = false;
+					bool isHeap = false;
+					if (pg_strcasecmp("appendonly", default_table_format) == 0)
+					{
+						isExternal = false;
+					}
+					else if (pg_strcasecmp("magmatp", default_table_format) == 0 ||
+					pg_strcasecmp("magmaap", default_table_format) == 0)
+					{
+						isExternal = true;
+					} 
+					else 
+					{
+						ereport(ERROR,
+							(errcode(ERRCODE_SYNTAX_ERROR),
+								errmsg("default_table_format is not set correctly."),
+								errOmitLocation(true)));
+					}
+					List *options = $9;
+					ListCell *cell;
+					foreach (cell, options)
+					{
+						DefElem    *def = lfirst(cell);
+						char *value = NULL;
+						if(pg_strcasecmp("appendonly", def->defname) == 0)
+						{
+							bool need_free_value = false;
+							value = defGetString(def, &need_free_value);
+							if (pg_strcasecmp("true", value) == 0)
+							{
+								isExternal = false;
+							} 
+							if (need_free_value)
+							{
+								pfree(value);
+								value = NULL;
+							}
+							break;
+						}
+						/* 
+						 * When magma mode is enabled, creating heap tables are not allowed
+						 * because they have oid column automatically created within which
+						 * is not compatible with the underlying kernel implementation. However,
+						 * in init phase, i.e. IsUnderPostmaster is false, this limitation
+						 * has to be temporarily disabled to allow the kernel to create some
+						 * indispensable heap tables.
+						 */
+						if (pg_strcasecmp("oids", def->defname) == 0 && !IsUnderPostmaster)
+						{
+							isExternal = false;
+							break;
+						}
+					}
+
+					if (!IsNormalProcessingMode()) {
+						isExternal = false;
+					}
+
+					if (!isExternal) {
+						CreateStmt *n = makeNode(CreateStmt);
+						$4->istemp = $2;
+						n->base.relation = $4;
+						n->base.tableElts = $6;
+						n->base.inhRelations = $8;
+						n->base.constraints = NIL;
+						n->base.options = $9;
+						n->base.oncommit = $10;
+						n->base.tablespacename = $11;
+						n->base.distributedBy = $12;
+						n->base.partitionBy = $13;
+						n->oidInfo.relOid = 0;
+						n->oidInfo.comptypeOid = 0;
+						n->oidInfo.toastOid = 0;
+						n->oidInfo.toastIndexOid = 0;
+						n->oidInfo.toastComptypeOid = 0;
+						n->base.relKind = RELKIND_RELATION;
+						n->policy = 0;
+						n->base.postCreate = NULL;
+						$$ = (Node *)n;
+					} else {
+					  List *inhRelations = $8;
+					  if (inhRelations != NIL) {
+					    ereport(ERROR,
+					    		(errcode(ERRCODE_SYNTAX_ERROR),
+					    				errmsg("do not support Inherit table with magmatp format"),
+											errhint("change default table format to appendonly"),
+											errOmitLocation(true)));
+					  }
+					  OnCommitAction oncommit = $10;
+					  if (oncommit != 0) {
+					    ereport(ERROR,
+					    		(errcode(ERRCODE_SYNTAX_ERROR),
+					    				errmsg("do not support commit options with magmatp format"),
+											errhint("change default table format to appendonly"),
+											errOmitLocation(true)));
+					  }
+						CreateExternalStmt *n = makeNode(CreateExternalStmt);
+						n->iswritable = TRUE;
+						n->isexternal = FALSE;
+						n->isweb = FALSE;
+						$4->istemp = $2;
+						n->base.relation = $4;
+						n->base.tableElts = $6;
+						n->exttypedesc = makeNode(ExtTableTypeDesc);
+						((ExtTableTypeDesc *) n->exttypedesc)->exttabletype = EXTTBL_TYPE_UNKNOWN;
+						n->format = pstrdup(default_table_format);
+						n->base.options = $9;
+						n->encoding = NIL;
+						n->sreh = NULL;
+						n->base.distributedBy = $12;
+						n->base.partitionBy = $13;
+						n->policy = 0;
+						$$ = (Node *)n;
+					}
 				}
 		| CREATE OptTemp TABLE qualified_name OF qualified_name
 			'(' OptTableElementList ')' OptWith OnCommitOption OptTableSpace OptDistributedBy OptTabPartitionBy
@@ -3356,7 +3456,7 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 					n->oidInfo.toastComptypeOid = 0;
 					n->base.relKind = RELKIND_RELATION;
 					n->policy = 0;
-                    n->base.postCreate = NULL;
+					n->base.postCreate = NULL;
 					
 					$$ = (Node *)n;
 				}
@@ -3399,9 +3499,26 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 		  					{
 		  						if (((ColumnDef *)node)->constraints != NIL)
 		  						{
-									ereport(ERROR,
-									  (errcode(ERRCODE_SYNTAX_ERROR),
-									  errmsg("Do not support column constraint")));
+		  							/*
+		  							 * in order to supppot
+		  							 * "create table table_name(column_name type primary key);"
+		  							 */
+		  							if (!(pg_strncasecmp(n->format, "magma", strlen("magma")) == 0))
+		  							{
+		  							  ereport(ERROR,
+		  							    (errcode(ERRCODE_SYNTAX_ERROR),
+		  							    errmsg("Do not support column constraint")));
+		  							}
+		  							ListCell   *cell;
+		  							foreach(cell, ((ColumnDef *)node)->constraints)
+		  							{
+		  							  Constraint *elem = (Constraint *) lfirst(cell);
+		  							  if (elem->contype == CONSTR_DEFAULT)
+		  							  {
+		  							    ereport(ERROR, (errcode(ERRCODE_SYNTAX_ERROR),
+		  							      errmsg("Do not support column default constraint")));
+		  							  }
+		  							}
 		  						}
 		  					}
 		  					break;
@@ -3495,6 +3612,7 @@ columnDef:	ColId Typename ColQualList opt_storage_encoding
 					n->constraints = $3;
 					n->is_local = true;
 					n->encoding = $4;
+
 					$$ = (Node *)n;
 				}
 		;
@@ -3819,6 +3937,7 @@ columnList:
 			columnElem								{ $$ = list_make1($1); }
 			| columnList ',' columnElem				{ $$ = lappend($1, $3); }
 		;
+
 columnListPlus:
 			columnElem ',' columnElem	
 			{
@@ -3968,6 +4087,17 @@ OptTabPartitionStorageAttr: WITH definition TABLESPACE name
                     pc->arg1 = NULL;
                     pc->arg2 = (Node *)makeString($2);
                     pc->location = @1;
+					$$ = (Node *)pc;
+				}
+			| WITH '(' FORMAT Sconst format_opt ')'
+				{
+					/* re-use alterpartitioncmd struct here... */
+					AlterPartitionCmd *pc = makeNode(AlterPartitionCmd);
+					pc->partid = NULL;
+					pc->arg1 = (Node *)$5;
+					pc->arg2 = NULL;
+					pc->format = $4;
+					pc->location = @1;
 					$$ = (Node *)pc;
 				}
 			| /*EMPTY*/ { $$ = NULL; }
@@ -4655,8 +4785,8 @@ CreateForeignStmt: CREATE FOREIGN OptTemp TABLE qualified_name '(' OptExtTableEl
  *
  *****************************************************************************/
 	
-CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_name '(' OptExtTableElementList ')' 
-					ExtTypedesc FORMAT Sconst format_opt ext_opt_encoding_list OptSingleRowErrorHandling OptDistributedBy
+CreateExternalStmt: CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_name '(' OptExtTableElementList ')'
+                    ExtTypedesc FORMAT Sconst format_opt ext_opt_encoding_list OptSingleRowErrorHandling OptDistributedBy
 						{
 							CreateExternalStmt *n = makeNode(CreateExternalStmt);
 							n->iswritable = $2;
@@ -4672,18 +4802,28 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 							n->sreh = $16;
 							n->base.distributedBy = $17;
 							n->policy = 0;
-							
+
+							/* various syntax checks for external table without location specification */
+							if(((ExtTableTypeDesc *) n->exttypedesc)->exttabletype == EXTTBL_TYPE_UNKNOWN)
+							{
+								ereport(ERROR,
+								        (errcode(ERRCODE_SYNTAX_ERROR),
+								         errmsg("External table must use LOCATION or EXECUTE"),
+								         errhint("Use CREATE EXTERNAL TABLE LOCATION or EXECUTE instead"),
+								         errOmitLocation(true)));
+							}
+
 							/* various syntax checks for EXECUTE external table */
 							if(((ExtTableTypeDesc *) n->exttypedesc)->exttabletype == EXTTBL_TYPE_EXECUTE)
 							{
 								ExtTableTypeDesc *extdesc = (ExtTableTypeDesc *) n->exttypedesc;
-								
+
 								if(!n->isweb)
 									ereport(ERROR,
 											(errcode(ERRCODE_SYNTAX_ERROR),
 										 	 errmsg("EXECUTE may not be used with a regular external table"),
 										 	 errhint("Use CREATE EXTERNAL WEB TABLE instead"),
-										 	 errOmitLocation(true)));							
+									         errOmitLocation(true)));
 								
 								/* if no ON clause specified, default to "ON ALL" */
 								if(extdesc->on_clause == NIL)
@@ -4695,19 +4835,20 @@ CreateExternalStmt:	CREATE OptWritable EXTERNAL OptWeb OptTemp TABLE qualified_n
 										errOmitLocation(true)));
 								}
 							}
-
+/*
 							if(n->sreh && n->iswritable)
 								ereport(ERROR,
 										(errcode(ERRCODE_SYNTAX_ERROR),
 										 errmsg("Single row error handling may not be used with a writable external table")));							
-							
+*/
+
 							$$ = (Node *)n;							
 						}
 						;
 
 OptWritable:	WRITABLE				{ $$ = TRUE; }
 				| READABLE				{ $$ = FALSE; }
-				| /*EMPTY*/				{ $$ = FALSE; }
+				| /*EMPTY*/				{ $$ = TRUE; }
 				;
 
 OptWeb:		WEB						{ $$ = TRUE; }
@@ -4722,8 +4863,8 @@ ExtTypedesc:
 				n->location_list = $3; 
 				n->on_clause = NIL;
 				n->command_string = NULL;
+
 				$$ = (Node *)n;
-	
 			}
 			| EXECUTE Sconst ext_on_clause_list
 			{
@@ -4786,11 +4927,11 @@ format_opt:
 			;
 
 format_opt_list:
-			format_opt_item	
+			format_opt_item2		
 			{ 
 				$$ = list_make1($1);
 			}
-			| format_opt_list format_opt_item		
+			| format_opt_list format_opt_item2		
 			{ 
 				$$ = lappend($1, $2); 
 			}
@@ -4812,8 +4953,7 @@ format_opt_keyword:
 			| NEWLINE
 			;
 
-
-format_opt_item:
+format_opt_item2:
 			IDENT
 			{
 				$$ = makeDefElem("#ident", (Node *)makeString($1));
@@ -4835,6 +4975,50 @@ format_opt_item:
 				$$ = makeDefElem("#collist", (Node *)$1);
 			}
 			;
+/*			
+format_opt_item:
+			DELIMITER opt_as Sconst
+			{
+				$$ = makeDefElem("delimiter", (Node *)makeString($3));
+			}
+			| NULL_P opt_as Sconst
+			{
+				$$ = makeDefElem("null", (Node *)makeString($3));
+			}
+			| CSV
+			{
+				$$ = makeDefElem("csv", (Node *)makeInteger(TRUE));
+			}
+			| HEADER_P
+			{
+				$$ = makeDefElem("header", (Node *)makeInteger(TRUE));
+			}
+			| QUOTE opt_as Sconst
+			{
+				$$ = makeDefElem("quote", (Node *)makeString($3));
+			}
+			| ESCAPE opt_as Sconst
+			{
+				$$ = makeDefElem("escape", (Node *)makeString($3));
+			}
+			| FORCE NOT NULL_P columnList
+			{
+				$$ = makeDefElem("force_notnull", (Node *)$4);
+			}
+			| FORCE QUOTE columnList
+			{
+				$$ = makeDefElem("force_quote", (Node *)$3);
+			}
+			| FILL MISSING FIELDS
+			{
+				$$ = makeDefElem("fill_missing_fields", (Node *)makeInteger(TRUE));
+			}
+			| NEWLINE opt_as Sconst
+			{
+				$$ = makeDefElem("newline", (Node *)makeString($3));
+			}
+			;
+*/
 
 OptExtTableElementList:
 			ExtTableElementList				{ $$ = $1; }
@@ -4855,6 +5039,7 @@ ExtTableElementList:
 ExtTableElement:
 			ExtcolumnDef					{ $$ = $1; }
 			| TableLikeClause				{ $$ = $1; }
+			| ExtTableConstraint			{ $$ = $1; }
 			;
 
 /* column def for ext table - doesn't have room for constraints */
@@ -4931,6 +5116,23 @@ ext_opt_encoding_item:
 		| ENCODING opt_equal Iconst
 		{
 			$$ = makeDefElem("encoding", (Node *)makeInteger($3));
+		}
+		;
+
+ExtTableConstraint:
+		ExtConstraintElem	{ $$ = $1; }
+		;
+
+ExtConstraintElem:
+		PRIMARY KEY '(' columnList ')'
+		{
+			Constraint *n = makeNode(Constraint);
+			n->contype = CONSTR_PRIMARY;
+			n->name = NULL;
+			n->raw_expr = NULL;
+			n->cooked_expr = NULL;
+			n->keys = $4;
+			$$ = (Node *)n;
 		}
 		;
 
@@ -6981,6 +7183,7 @@ arg_class:	IN_P									{ $$ = FUNC_PARAM_IN; }
 			| OUT_P									{ $$ = FUNC_PARAM_OUT; }
 			| INOUT									{ $$ = FUNC_PARAM_INOUT; }
 			| IN_P OUT_P							{ $$ = FUNC_PARAM_INOUT; }
+			| VARIADIC							{ $$ = FUNC_PARAM_VARIADIC; }
 		;
 
 /*
@@ -10537,6 +10740,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @2;
 					$$ = (Node *) n;
@@ -10597,6 +10801,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @4;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "~~", $1, (Node *) n, @2);
@@ -10611,6 +10816,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @5;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "!~~", $1, (Node *) n, @2);
@@ -10625,6 +10831,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @4;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "~~*", $1, (Node *) n, @2);
@@ -10639,6 +10846,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @5;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "!~~*", $1, (Node *) n, @2);
@@ -10654,6 +10862,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @2;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "~", $1, (Node *) n, @2);
@@ -10666,6 +10875,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @5;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "~", $1, (Node *) n, @2);
@@ -10680,6 +10890,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @5;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "!~", $1, (Node *) n, @2);
@@ -10692,6 +10903,7 @@ a_expr:		c_expr									{ $$ = $1; }
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @6;
 					$$ = (Node *) makeSimpleA_Expr(AEXPR_OP, "!~", $1, (Node *) n, @2);
@@ -11121,6 +11333,7 @@ simple_func: 	func_name '(' ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->agg_filter = NULL;
 					n->location = @1;
 					n->over = NULL;
@@ -11134,6 +11347,7 @@ simple_func: 	func_name '(' ')'
                     n->agg_order = $4;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->agg_filter = NULL;
 					n->location = @1;
 					n->over = NULL;
@@ -11147,6 +11361,7 @@ simple_func: 	func_name '(' ')'
                     n->agg_order = $5;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->agg_filter = NULL;
 					/* Ideally we'd mark the FuncCall node to indicate
 					 * "must be an aggregate", but there's no provision
@@ -11187,6 +11402,35 @@ simple_func: 	func_name '(' ')'
                     n->agg_order = NIL;
 					n->agg_star = TRUE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
+					n->agg_filter = NULL;
+					n->location = @1;
+					n->over = NULL;
+					$$ = (Node *)n;
+				}
+			| func_name '(' VARIADIC a_expr ')'
+				{
+					FuncCall *n = makeNode(FuncCall);
+					n->funcname = $1;
+					n->args = list_make1($4);
+					n->agg_order = NIL;
+					n->agg_star = FALSE;
+					n->agg_distinct = FALSE;
+					n->func_variadic = TRUE;
+					n->agg_filter = NULL;
+					n->location = @1;
+					n->over = NULL;
+					$$ = (Node *)n;
+				}
+			| func_name '(' expr_list ',' VARIADIC a_expr ')'
+				{
+					FuncCall *n = makeNode(FuncCall);
+					n->funcname = $1;
+					n->args = lappend($3, $6);
+					n->agg_order = NIL;
+					n->agg_star = FALSE;
+					n->agg_distinct = FALSE;
+					n->func_variadic = TRUE;
 					n->agg_filter = NULL;
 					n->location = @1;
 					n->over = NULL;
@@ -11297,6 +11541,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11435,6 +11680,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11447,6 +11693,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11459,6 +11706,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11471,6 +11719,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11483,7 +11732,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
-					/*n->func_variadic = FALSE;*/
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11496,7 +11745,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
-					/*n->func_variadic = FALSE;*/
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11511,6 +11760,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11528,6 +11778,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11541,6 +11792,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11556,6 +11808,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11577,6 +11830,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11592,6 +11846,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11604,6 +11859,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11616,6 +11872,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11628,6 +11885,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11645,6 +11903,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -11657,6 +11916,7 @@ func_expr:	simple_func FILTER '(' WHERE a_expr ')'
                     n->agg_order = NIL;
 					n->agg_star = FALSE;
 					n->agg_distinct = FALSE;
+					n->func_variadic = FALSE;
 					n->over = NULL;
 					n->location = @1;
 					$$ = (Node *)n;
@@ -13283,6 +13543,7 @@ reserved_keyword:
 			| UNIQUE
 			| USER
 			| USING
+			| VARIADIC
 			| WINDOW
 			| WITH
 			| WHEN
@@ -13317,31 +13578,31 @@ static Node *
 makeAddPartitionCreateStmt(Node *n, Node *subSpec)
 {
     AlterPartitionCmd *pc_StAttr = (AlterPartitionCmd *)n;
-	CreateStmt        *ct        = makeNode(CreateStmt);
     PartitionBy       *pBy       = NULL;
+    CreateStmtBase base;
 
-    ct->base.relation = makeRangeVar(NULL /*catalogname*/, NULL, "fake_partition_name", -1);
+    base.relation = makeRangeVar(NULL /*catalogname*/, NULL, "fake_partition_name", -1);
 
     /* in analyze.c, fill in tableelts with a list of inhrelation of
        the partition parent table, and fill in inhrelations with copy
        of rangevar for parent table */
 
-    ct->base.tableElts    = NIL; /* fill in later */
-    ct->base.inhRelations = NIL; /* fill in later */
+    base.tableElts    = NIL; /* fill in later */
+    base.inhRelations = NIL; /* fill in later */
 
-    ct->base.constraints = NIL;
+    base.constraints = NIL;
 
     if (pc_StAttr)
-        ct->base.options = (List *)pc_StAttr->arg1;
+        base.options = (List *)pc_StAttr->arg1;
     else
-        ct->base.options = NIL;
+        base.options = NIL;
 
-    ct->base.oncommit = ONCOMMIT_NOOP;
+    base.oncommit = ONCOMMIT_NOOP;
         
     if (pc_StAttr && pc_StAttr->arg2)
-        ct->base.tablespacename = strVal(pc_StAttr->arg2);
+        base.tablespacename = strVal(pc_StAttr->arg2);
     else
-        ct->base.tablespacename = NULL;
+        base.tablespacename = NULL;
 
     if (subSpec) /* treat subspec as partition by... */
 	{
@@ -13352,21 +13613,32 @@ makeAddPartitionCreateStmt(Node *n, Node *subSpec)
 		pBy->partQuiet = PART_VERBO_NODISTRO;
         pBy->location  = -1;
         pBy->partDefault = NULL;
-        pBy->parentRel = copyObject(ct->base.relation);
+        pBy->parentRel = copyObject(base.relation);
     }
 
-    ct->base.distributedBy = NULL;
-    ct->base.partitionBy = (Node *)pBy;
-    ct->oidInfo.relOid = 0;
-    ct->oidInfo.comptypeOid = 0;
-    ct->oidInfo.toastOid = 0;
-    ct->oidInfo.toastIndexOid = 0;
-    ct->oidInfo.toastComptypeOid = 0;
-    ct->base.relKind = RELKIND_RELATION;
-    ct->policy = 0;
-    ct->base.postCreate = NULL;
-
-    return (Node *)ct;
+    base.distributedBy = NULL;
+    base.partitionBy = (Node *)pBy;
+    base.postCreate = NULL;
+    base.relKind = RELKIND_RELATION;
+    
+    if (pc_StAttr && pc_StAttr->format) {
+        CreateExternalStmt *ct = makeNode(CreateExternalStmt);
+        ct->base = base;
+        ct->format = pc_StAttr->format;
+        ct->iswritable = true;
+        ct->exttypedesc = makeNode(ExtTableTypeDesc);
+        return (Node *)ct;
+    } else {
+        CreateStmt *ct = makeNode(CreateStmt);
+        ct->base = base;
+        ct->oidInfo.relOid = 0;
+        ct->oidInfo.comptypeOid = 0;
+        ct->oidInfo.toastOid = 0;
+        ct->oidInfo.toastIndexOid = 0;
+        ct->oidInfo.toastComptypeOid = 0;
+        ct->policy = 0;
+        return (Node *)ct;
+    }
 }
 
 static Node *
@@ -13532,6 +13804,7 @@ makeOverlaps(List *largs, List *rargs, int location)
     n->agg_order = NIL;
 	n->agg_star = FALSE;
 	n->agg_distinct = FALSE;
+	n->func_variadic = FALSE;
 	n->over = NULL;
 	n->location = location;
 	return n;
@@ -13592,7 +13865,7 @@ extractArgTypes(List *parameters)
 	{
 		FunctionParameter *p = (FunctionParameter *) lfirst(i);
 
-		/* keep if IN or INOUT */
+		/* keep if IN, INOUT, VARIADIC*/
 		if (p->mode != FUNC_PARAM_OUT && p->mode != FUNC_PARAM_TABLE)
 			result = lappend(result, p->argType);
 	}

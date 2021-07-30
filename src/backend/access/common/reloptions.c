@@ -319,6 +319,8 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		"orientation",
 		"errortable",
 		"bucketnum",
+		"dicthreshold",
+		"bloomfilter",
 	};
 
 	char	   *values[ARRAY_SIZE(default_keywords)];
@@ -364,7 +366,6 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		forceHeap = !appendonly;
 	}
 
-	/* columnstore, judge whether parquet/column store */
 	if (values[8] != NULL)
 	{
 		if (relkind != RELKIND_RELATION && validate)
@@ -380,7 +381,15 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
-		if (!(pg_strcasecmp(values[8], "column") == 0 ||
+		if (pg_strcasecmp(values[8], "orc") == 0)
+		{
+      ereport(ERROR,
+          (errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+           errmsg("orc table format is not supported in this version."),
+                     errOmitLocation(true)));
+		}
+
+		if (!(pg_strcasecmp(values[8], "orc") == 0 ||
 			  pg_strcasecmp(values[8], "row") == 0 ||
 			  pg_strcasecmp(values[8], "parquet") == 0) &&
 			validate)
@@ -392,30 +401,10 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 									   errOmitLocation(true)));
 		}
 
-		if ((pg_strcasecmp(values[8], "column") == 0) && validate)
-		{
-		  bool gp_enable_column_oriented_table = false;
-			if (!gp_enable_column_oriented_table)
-			{
-				ereport(ERROR,
-						(errcode(ERRCODE_WARNING_DEPRECATED_FEATURE),
-						 errmsg("Column oriented tables are deprecated. "
-								 "Not support it any more."),
-										   errOmitLocation(true)));
-			}
-		}
-
-		/*should add special operation for parquet*/
 		if (pg_strcasecmp(values[8], "row") == 0)
 			columnstore = RELSTORAGE_AOROWS;
-		else if (pg_strcasecmp(values[8], "column") == 0)
-		{
-            ereport(ERROR,
-                    (errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-                     errmsg("orientation option \"column\" is deprecated. Not support it any more."),
-                     errhint("valid orientation option is \"row\" or \"parquet\""),
-                                             errOmitLocation(true)));
-		}
+		else if (pg_strcasecmp(values[8], "orc") == 0)
+		  columnstore = RELSTORAGE_ORC;
 		else if (pg_strcasecmp(values[8], "parquet") == 0)
 			columnstore = RELSTORAGE_PARQUET;
 
@@ -435,11 +424,12 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	/* fillfactor */
 	if (values[0] != NULL)
 	{
-		if((columnstore == RELSTORAGE_PARQUET) && validate)
+		if((columnstore == RELSTORAGE_PARQUET
+		    || columnstore == RELSTORAGE_ORC) && validate)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("invalid option \'fillfactor\' for parquet table"),
+					 errmsg("invalid option \'fillfactor\'"),
 					 errOmitLocation(true)));
 		}
 		fillfactor = pg_atoi(values[0], sizeof(int32), 0);
@@ -473,11 +463,12 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
-		if((columnstore == RELSTORAGE_PARQUET) && validate)
+		if((columnstore == RELSTORAGE_PARQUET
+		    || columnstore == RELSTORAGE_ORC) && validate)
 		{
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
-					 errmsg("invalid option \'blocksize\' for parquet table"),
+					 errmsg("invalid option \'blocksize\'"),
 					 errOmitLocation(true)));
 		}
 
@@ -548,6 +539,27 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 						 errmsg("non-parquet table doesn't support compress type: \'%s\'", compresstype),
 						 errOmitLocation(true)));
 		}
+
+		if ((columnstore == RELSTORAGE_ORC) && (strcmp(compresstype, "snappy") != 0)
+		        && (strcmp(compresstype, "lz4") != 0)
+		        // XXX(changyong): The default zlib compression level of ORC table is Z_DEFAULT_COMPRESSION,
+		        // and this is different from hive of which default compression level is (Z_BEST_SPEED + 1).
+		        && (strcmp(compresstype, "zlib") != 0)
+		        && (strcmp(compresstype, "none") != 0))
+    {
+      ereport(ERROR,
+            (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+             errmsg("orc table doesn't support compress type: \'%s\'", compresstype),
+             errOmitLocation(true)));
+    }
+
+		if (!(columnstore == RELSTORAGE_ORC) && (strcmp(compresstype, "lz4") == 0))
+    {
+      ereport(ERROR,
+            (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+             errmsg("non-orc table doesn't support compress type: \'%s\'", compresstype),
+             errOmitLocation(true)));
+    }
 	}
 
 	/* compression level */
@@ -628,6 +640,14 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		compresslevel = setDefaultCompressionLevel(compresstype);
 	}
 
+	if (columnstore == RELSTORAGE_ORC && compresstype) {
+    StringInfoData option;
+    initStringInfo(&option);
+    appendStringInfo(&option, "\"compresstype\":\"%s\"",
+                           compresstype);
+    compresstype = pstrdup(option.data);
+  }
+
 	/* checksum */
 	if (values[7] != NULL)
 	{
@@ -644,10 +664,11 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 							"Only valid for Append Only relations"),
 									   errOmitLocation(true)));
 
-		if ((columnstore == RELSTORAGE_PARQUET) && validate)
+		if ((columnstore == RELSTORAGE_PARQUET
+		    || columnstore == RELSTORAGE_ORC) && validate)
 			ereport(ERROR,
 					(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-					 errmsg("invalid option \'checksum\' for parquet table. "
+					 errmsg("invalid option \'checksum\'. "
 							"Default value is false"),
 					errOmitLocation(true)));
 
@@ -785,6 +806,51 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 					", pagesize %d", rowgroupsize, pagesize),
 					 errOmitLocation(true)));
 	}
+
+	// dicthreshold
+	if (values[11] != NULL) {
+	  if(!(columnstore == RELSTORAGE_ORC)){
+      ereport(ERROR,
+          (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+           errmsg("invalid option \'dicthreshold\' for non-orc table"),
+           errOmitLocation(true)));
+    }
+	  char *end;
+	  double threshold = strtod(values[11], &end);
+	  if (end == values[11] || *end != '\0' || threshold < 0 || threshold > 1)
+	    ereport(ERROR,
+        (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+         errmsg("\'dicthreshold\' must be within [0-1]"),
+             errOmitLocation(true)));
+	  StringInfoData option;
+	  initStringInfo(&option);
+	  if (compresstype != NULL)
+	    appendStringInfo(&option, "%s,",compresstype);
+	  appendStringInfo(&option, "\"dicthreshold\": \"%s\"",
+	                   values[11]);
+	  compresstype = pstrdup(option.data);
+	}
+
+	// bloomfilter
+	if (values[12] != NULL) {
+    if(!(columnstore == RELSTORAGE_ORC)){
+      ereport(ERROR,
+          (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+           errmsg("invalid option \'bloomfilter\' for non-orc table"),
+           errOmitLocation(true)));
+    }
+    ereport(ERROR,
+        (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+         errmsg("option \'bloomfilter\' for orc table not supported yet"),
+         errOmitLocation(true)));
+    StringInfoData option;
+    initStringInfo(&option);
+    if (compresstype != NULL)
+      appendStringInfo(&option, "%s",compresstype);
+    appendStringInfo(&option, ",\"bloomfilter\": \"%s\"",
+                     values[12]);
+    compresstype = pstrdup(option.data);
+  }
 
 	result = (StdRdOptions *) palloc(sizeof(StdRdOptions));
 	SET_VARSIZE(result, sizeof(StdRdOptions));

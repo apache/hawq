@@ -186,7 +186,7 @@ enable_snmp			= @enable_snmp@
 enable_email		= @enable_email@
 enable_connectemc	= @enable_connectemc@
 enable_orca			= @enable_orca@
-enable_gphdfs		= @enable_gphdfs@
+with_magma_sanitize = @with_magma_sanitize@
 
 python_includespec	= @python_includespec@
 python_libdir		= @python_libdir@
@@ -220,9 +220,8 @@ COLLATEINDEX	= @COLLATEINDEX@
 # Compilers
 
 CPP = @CPP@
-CPPFLAGS = -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include
-CPPFLAGS += -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
-CPPFLAGS += @CPPFLAGS@
+CPPFLAGS = @CPPFLAGS@
+CPPFLAGS += -I$(DEPENDENCY_PATH)/include
 
 ifdef PGXS
 override CPPFLAGS := -I$(includedir_server) -I$(includedir_internal) $(CPPFLAGS)
@@ -236,10 +235,29 @@ endif # not PGXS
 CC = @CC@
 GCC = @GCC@
 SUN_STUDIO_CC = @SUN_STUDIO_CC@
-CFLAGS = -I$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/include
-CFLAGS += -I$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/include
-CFLAGS += @CFLAGS@
+CFLAGS = @CFLAGS@
+CFLAGS += -g
+ifeq ($(findstring clang, $(shell $(CC) --version)), clang)
+CFLAGS += -fno-limit-debug-info
+CFLAGS += -glldb
+
+ifeq ($(shell uname), Darwin)
+	CFLAGS += -flat_namespace -Wl,-undefined,suppress
+else ifeq ($(shell uname), Linux)
+	CFLAGS += -Wl,--unresolved-symbols=ignore-all
+endif
+
+endif
+CFLAGS += -fno-omit-frame-pointer
 CFLAGS_SSE42 = @CFLAGS_SSE42@
+CXXFLAGS = @CXXFLAGS@
+CXXFLAGS += -g
+ifeq ($(findstring clang, $(shell $(CXX) --version)), clang)
+CXXFLAGS += -stdlib=libc++
+CXXFLAGS += -fno-limit-debug-info
+CXXFLAGS += -glldb
+endif
+CXXFLAGS += -fno-omit-frame-pointer
 
 # Kind-of compilers
 
@@ -273,9 +291,8 @@ ifdef PGXS
 else
   LDFLAGS = -L$(top_builddir)/src/port
 endif
-LDFLAGS += -L$(abs_top_srcdir)/depends/libhdfs3/build/install$(prefix)/lib
-LDFLAGS += -L$(abs_top_srcdir)/depends/libyarn/build/install$(prefix)/lib
 LDFLAGS += @LDFLAGS@
+LDFLAGS += -L$(DEPENDENCY_PATH)/lib
 
 LDFLAGS_EX = @LDFLAGS_EX@
 # LDFLAGS_SL might have already been assigned by calling makefile
@@ -553,6 +570,17 @@ LIBS := $(LIBS) -framework CoreServices -framework IOKit
 endif
 
 LIBS := $(LIBS) -lyarn -lkrb5
+
+##########################################################################
+# Add uuid support
+
+LIBS := $(LIBS) -luuid
+
+##########################################################################
+# Add sanitize check option in linkage flag
+ifeq ($(with_magma_sanitize),yes)
+LIBASAN = -fno-optimize-sibling-calls -fno-omit-frame-pointer -fsanitize=address
+endif
 
 ##########################################################################
 #

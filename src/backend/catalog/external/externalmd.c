@@ -70,14 +70,14 @@ const int maxNumTypeModifiers = 2;
 List *ParsePxfEntries(StringInfo json, char *profile, Oid dboid)
 {
 	struct json_object *jsonObj = json_tokener_parse(json->data);
-	if ((NULL == jsonObj ) || is_error(jsonObj))
+	if (NULL == jsonObj)
 	{
 		return NIL;
 	}
 	
 	List *tables = NIL;
 	struct json_object *jsonItems = json_object_object_get(jsonObj, "PXFMetadata");
-	if ((jsonItems == NULL) || is_error(jsonItems))
+	if (jsonItems == NULL)
 	{
 		return NIL;
 	}

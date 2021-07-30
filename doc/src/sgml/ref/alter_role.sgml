@@ -33,7 +33,7 @@ where option can be:
       [ ( attribute='value'[, ...] ) ]
            where attributes and values are:
            type='readable'|'writable'
-           protocol='gpfdist'|'http'|'gphdfs'
+           protocol='gpfdist'|'http'|'hdfs'
 | INHERIT | NOINHERIT
     | LOGIN | NOLOGIN
     | CONNECTION LIMIT connlimit

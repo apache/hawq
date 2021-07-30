@@ -47,6 +47,7 @@
 #include "utils/fmgroids.h"
 #include "utils/lsyscache.h"
 #include "utils/syscache.h"
+#include "utils/hsearch.h"
 #include "cdb/cdbhash.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
@@ -83,6 +84,16 @@ int			inet_getkey(inet *addr, unsigned char *inet_key, int key_size);
 int			ignoreblanks(char *data, int len);
 int			ispowof2(int numsegs);
 
+/* global map for range and replica_group of magma tables */
+#define MAX_JUMP_HASH_MAP_NUM 20
+typedef struct jump_hash_map_data
+{
+  int bucket_num;
+  int jump_hash_map[JUMP_HASH_MAP_LENGTH];
+} jump_hash_map_data;
+HTAB * jump_hash_maps = NULL;
+LWLockId *jump_hash_maps_lock = NULL;
+jump_hash_map_data jump_hash_maps_local = {-1};
 
 /*================================================================
  *
@@ -658,7 +669,63 @@ cdbhashnokey(CdbHash *h)
 	h->rrindex++; /* increment for next time around */
 }
 
+int32 jumpConsistentHash(uint64 key, int32 num_buckets) {
+  int64 b = -1, j = 0;
+  while (j < num_buckets) {
+    b = j;
+    key = key * 2862933555777941757ULL + 1;
+    j = (b + 1) * ((double)(1LL << 31) / (double)((key >> 33) + 1));
+  }
+  return b;
+}
 
+void InitJumpHashMap() {
+  HASHCTL ctl;
+  ctl.keysize = sizeof(int);
+  ctl.entrysize = sizeof(jump_hash_map_data);
+  ctl.hcxt = TopMemoryContext;
+  bool found;
+  jump_hash_maps_lock =
+      ShmemInitStruct("Jump Hash Map Hash Lock", sizeof(LWLockId), &found);
+  *jump_hash_maps_lock = LWLockAssign();
+  jump_hash_maps = ShmemInitHash("Jump Hash Map Hash", MAX_JUMP_HASH_MAP_NUM,
+                                 MAX_JUMP_HASH_MAP_NUM, &ctl, HASH_ELEM);
+
+  if (!jump_hash_maps)
+    elog(FATAL, "could not initialize shared buffer hash table");
+}
+
+int *get_jump_hash_map(int bucketNum) {
+  /* copy jump hash map from shared memory to local memory to avoid access shared lock.
+   * keep only one jump hash map to save memory usage.*/
+  if (jump_hash_maps_local.bucket_num == bucketNum) {
+    return jump_hash_maps_local.jump_hash_map;
+  }
+
+  Assert(jump_hash_maps != NULL);
+
+  LWLockAcquire(*jump_hash_maps_lock, LW_SHARED);
+  bool found;
+  jump_hash_map_data *entry = (jump_hash_map_data *)hash_search(
+      jump_hash_maps, &bucketNum, HASH_FIND, &found);
+  if (!found) {
+    LWLockRelease(*jump_hash_maps_lock);
+    LWLockAcquire(*jump_hash_maps_lock, LW_EXCLUSIVE);
+    entry = (jump_hash_map_data *)hash_search(jump_hash_maps, &bucketNum,
+                                              HASH_FIND, &found);
+    if (!found) {
+      entry = (jump_hash_map_data *)hash_search(jump_hash_maps, &bucketNum,
+                                                HASH_ENTER, &found);
+      for (int i = 0; i < JUMP_HASH_MAP_LENGTH; i++) {
+        entry->jump_hash_map[i] = jumpConsistentHash(i, bucketNum);
+      }
+    }
+  }
+  memcpy(jump_hash_maps_local.jump_hash_map, entry->jump_hash_map, sizeof(int) * JUMP_HASH_MAP_LENGTH);
+  LWLockRelease(*jump_hash_maps_lock);
+  jump_hash_maps_local.bucket_num = bucketNum;
+  return jump_hash_maps_local.jump_hash_map;
+}
 
 /*
  * Reduce the hash to a segment number.
@@ -691,6 +758,15 @@ cdbhashreduce(CdbHash *h)
 
 	return result;
 }
+
+unsigned int magichashreduce(CdbHash *h, int *map, int nmap)
+{
+  int *jumpHashMap = get_jump_hash_map(nmap);
+  Assert(jumpHashMap);
+  int result = jumpHashMap[h->hash % JUMP_HASH_MAP_LENGTH];
+  return map[result];
+}
+
 
 bool
 typeIsArrayType(Oid typeoid)

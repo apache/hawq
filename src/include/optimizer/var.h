@@ -47,7 +47,7 @@ bool        cdb_walk_vars(Node                         *node,
                           int                           levelsup);
 
 extern Relids pull_varnos(Node *node);
-
+extern void pull_varattnos(Node *node, Index varno, Bitmapset **varattnos);
 extern bool contain_ctid_var_reference(Scan *scan);
 extern bool contain_var_clause(Node *node);
 extern bool contain_vars_of_level(Node *node, int levelsup);

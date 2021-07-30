@@ -464,7 +464,8 @@ CreateForeignDataWrapper(CreateFdwStmt *stmt)
 
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	          errmsg("Cannot support CreateForeignDataWrapper")));
 }
 
 
@@ -582,7 +583,8 @@ AlterForeignDataWrapper(AlterFdwStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	      errmsg("Cannot support AlterForeignDataWrapper")));
 
 }
 
@@ -634,8 +636,8 @@ RemoveForeignDataWrapper(DropFdwStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
-
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	                errmsg("Cannot support RemoveForeignDataWrapper")));
 }
 
 
@@ -765,8 +767,8 @@ CreateForeignServer(CreateForeignServerStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
-
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	      errmsg("Cannot support CreateForeignServer")));
 }
 
 
@@ -869,7 +871,8 @@ AlterForeignServer(AlterForeignServerStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	          errmsg("Cannot support AlterForeignServer")));
 
 }
 
@@ -915,8 +918,8 @@ RemoveForeignServer(DropForeignServerStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
-
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	      errmsg("Cannot support RemoveForeignServer")));
 }
 
 
@@ -1064,7 +1067,8 @@ CreateUserMapping(CreateUserMappingStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	          errmsg("Cannot support CreateUserMapping")));
 }
 
 
@@ -1166,8 +1170,8 @@ AlterUserMapping(AlterUserMappingStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
-
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	              errmsg("Cannot support AlterUserMapping")));
 }
 
 
@@ -1246,7 +1250,8 @@ RemoveUserMapping(DropUserMappingStmt *stmt)
 	
 	/* dispatch to QEs */
 	if (Gp_role == GP_ROLE_DISPATCH)
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+	  ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+	          errmsg("Cannot support RemoveUserMapping")));
 }
 
 

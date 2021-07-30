@@ -43,6 +43,7 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_partition_encoding.h"
 #include "catalog/namespace.h"
+#include "cdb/cdbdatalocality.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbvars.h"
 #include "commands/defrem.h"
@@ -173,7 +174,7 @@ atpxPart_validate_spec(
 					   PartitionBy 			*pBy,
 					   CreateStmtContext   	*pcxt,
 					   Relation 		 		 rel,
-					   CreateStmt 				*ct,
+						 CreateStmtBase     *stmt,
 					   PartitionElem 			*pelem,
 					   PartitionNode 			*pNode,
 					   Node 					*partName,
@@ -4785,11 +4786,11 @@ get_part_rule(Relation rel,
 } /* end get_part_rule */
 
 static void
-fixup_table_storage_options(CreateStmt *ct)
+fixup_table_storage_options(CreateStmtBase    *stmt)
 {
-	if (!ct->base.options)
+	if (!stmt->options)
 	{
-    	ct->base.options = list_make2(makeDefElem("appendonly",
+		stmt->options = list_make2(makeDefElem("appendonly",
 											 (Node *)makeString("true")),
 								 makeDefElem("orientation",
 											 (Node *)makeString("column")));
@@ -4804,7 +4805,7 @@ fixup_table_storage_options(CreateStmt *ct)
  * PartitionSpec as if this was CREATE TABLE.
  */
 static void
-apply_template_storage_encodings(CreateStmt *ct, Oid relid, Oid paroid,
+apply_template_storage_encodings(CreateStmtBase *stmt, Oid relid, Oid paroid,
 								 PartitionSpec *tmpl)
 {
 	List *encs = get_deparsed_partition_encodings(relid, paroid);
@@ -4815,7 +4816,7 @@ apply_template_storage_encodings(CreateStmt *ct, Oid relid, Oid paroid,
 		 * If the user didn't specify WITH (...) at create time,
 		 * we need to force the new partitions to be AO/CO.
 		 */
-		fixup_table_storage_options(ct);
+		fixup_table_storage_options(stmt);
 		tmpl->partElem = list_concat(tmpl->partElem,
 									 encs);
 	}
@@ -4832,7 +4833,7 @@ atpxPart_validate_spec(
 					   PartitionBy 			*pBy,
 					   CreateStmtContext   	*pcxt,
 					   Relation 		 		 rel,
-					   CreateStmt 				*ct,
+						 CreateStmtBase    *stmt,
 					   PartitionElem 			*pelem,
 					   PartitionNode 			*pNode,
 					   Node 					*partName,
@@ -5144,7 +5145,7 @@ atpxPart_validate_spec(
 						}
 
 						/* apply storage encoding for this template */
-						apply_template_storage_encodings(ct,
+						apply_template_storage_encodings(stmt,
 												 RelationGetRelid(rel),
 												 pNode_tmpl->part->partid,
 												 spec_tmpl);
@@ -5190,7 +5191,7 @@ atpxPart_validate_spec(
 	}
 	
 	pstate = make_parsestate(NULL);
-	result = validate_partition_spec(pstate, pcxt, ct, pBy, "", -1);
+	result = validate_partition_spec(pstate, pcxt, stmt, pBy, "", -1);
 	free_parsestate(&pstate);
 	
 	return result;
@@ -5210,7 +5211,6 @@ atpxPartAddList(Relation rel,
 				bool bSetTemplate,
 				Oid ownerid)
 {
-	CreateStmt 			*ct    	   = NULL;
 	DestReceiver 		*dest  	   = None_Receiver;
 	int 				 partno    = 0;
 	int 				 maxpartno = 0;
@@ -5240,14 +5240,25 @@ atpxPartAddList(Relation rel,
 	
 	Assert(IsA(pUtl, List));
 	
-	ct = (CreateStmt *)linitial((List *)pUtl);
-	Assert(IsA(ct, CreateStmt));
+	Node *nStmt = linitial((List *)pUtl);
+	CreateStmtBase *base;
+	if (IsA(nStmt, CreateStmt)) {
+		CreateStmt *ct = (CreateStmt *)nStmt;
+		ct->base.is_add_part = true; /* subroutines need to know this */
+		ct->ownerid = ownerid;
+		if (!ct->base.distributedBy)
+			ct->base.distributedBy = make_dist_clause(rel);
+		base = &ct->base;
+	} else {
+		Assert(IsA(nStmt, CreateExternalStmt));
+		CreateExternalStmt *ct = (CreateExternalStmt *)nStmt;
+		ct->base.is_add_part = true; /* subroutines need to know this */
+		if (!ct->base.distributedBy)
+			ct->base.distributedBy = make_dist_clause(rel);
+		base = &ct->base;
+	}
 	
-	ct->base.is_add_part = true; /* subroutines need to know this */
-	ct->ownerid = ownerid;
 	
-	if (!ct->base.distributedBy)
-		ct->base.distributedBy = make_dist_clause(rel);
 	
 	if (bSetTemplate)
 	/* if creating a template, silence partition name messages */
@@ -6301,7 +6312,7 @@ atpxPartAddList(Relation rel,
 	partno = atpxPart_validate_spec(pBy,
 									&cxt,
 									rel,
-									ct,
+									&base,
 									pelem,
 									pNode,
 									partName,
@@ -6377,7 +6388,7 @@ atpxPartAddList(Relation rel,
 	 * name of the parent relation
 	 */
 	
-	ct->base.relation = makeRangeVar(
+	base->relation = makeRangeVar(
 								NULL /*catalogname*/, 
 								get_namespace_name(RelationGetNamespace(par_rel)),
 								RelationGetRelationName(par_rel), -1);
@@ -6429,7 +6440,7 @@ atpxPartAddList(Relation rel,
 		Oid 			 skipTableRelid	 	 = InvalidOid; 
 		List			*attr_encodings		 = NIL;
 		
-		ct->base.partitionBy = (Node *)pBy;
+		base->partitionBy = (Node *)pBy;
 
 		/* this parse_analyze expands the phony create of a partitioned table
 		 * that we just build into the constituent commands we need to create
@@ -6437,13 +6448,15 @@ atpxPartAddList(Relation rel,
 		 * we don't need, since the parent already exists.)
 		 */
 		
-		l1 = parse_analyze((Node *)ct, NULL, NULL, 0);
+		l1 = parse_analyze(nStmt, NULL, NULL, 0);
 		
 		/* 
 		 * Must reference ct->attr_encodings after parse_analyze() since that
 		 * stage by change the attribute encodings via expansion.
 		 */
-		attr_encodings = ct->attr_encodings;
+		if (IsA(nStmt, CreateStmt)) {
+			attr_encodings = ((CreateStmt*)nStmt)->attr_encodings;
+		}
 
 		/*
 		 * Look for the first CreateStmt and generate a GrantStmt
@@ -6622,12 +6635,29 @@ atpxPartAddList(Relation rel,
 			{
 				/* propagate owner */
 				((CreateStmt *)q->utilityStmt)->ownerid = ownerid;
-				/* child partition should have the same bucket number with parent partition */
+				/*
+				 * child partition should have the same bucket number with parent partition.
+				 * However, when parent partition is magma table and child partition is not, bucket
+				 * number of child partition should be default_hash_table_bucket_number. This is
+				 * because computation and storage are separated for magma hash table and binded for hash
+				 * table in other format. ie, appendonly hash table with 8 bucket number has to be inserted
+				 * by 8 QE.
+				 */
 				if (parPolicy && ((CreateStmt *)q->utilityStmt)->policy
 				    && ((CreateStmt *)q->utilityStmt)->policy->nattrs > 0
 				    && ((CreateStmt *)q->utilityStmt)->policy->ptype ==
 				        POLICYTYPE_PARTITIONED) {
-				  ((CreateStmt *)q->utilityStmt)->policy->bucketnum = parPolicy->bucketnum;
+					bool isParentTableMagma = dataStoredInMagma(par_rel);
+					if (isParentTableMagma)
+					{
+						((CreateStmt *) q->utilityStmt)->policy->bucketnum =
+								default_hash_table_bucket_number;
+					}
+					else
+					{
+						((CreateStmt *) q->utilityStmt)->policy->bucketnum =
+								parPolicy->bucketnum;
+					}
 				}
 			}
 			
@@ -8362,7 +8392,7 @@ ChooseConstraintNameForPartitionEarly(Relation rel, ConstrType contype, Node *ex
  * to the parts of a partitioned table.
  */
 void
-fixCreateStmtForPartitionedTable(CreateStmt *stmt)
+fixCreateStmtForPartitionedTable(CreateStmtBase *stmt)
 {
 	ListCell *lc_elt;
 	Constraint *con;
@@ -8374,9 +8404,9 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 	int i;
 	
 	/* Caller should check this! */
-	Assert(stmt->base.partitionBy && !stmt->base.is_part_child);
+	Assert(stmt->partitionBy && !stmt->is_part_child);
 	
-	foreach( lc_elt, stmt->base.tableElts )
+	foreach( lc_elt, stmt->tableElts )
 	{
 		Node * elt = lfirst(lc_elt);
 		
@@ -8512,7 +8542,7 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 				FkConstraint *fcon = list_nth(unnamed_cons, i);
 			
 				fcon->constr_name = 
-					ChooseConstraintNameForPartitionCreate(stmt->base.relation->relname,
+					ChooseConstraintNameForPartitionCreate(stmt->relation->relname,
 														   colname,
 														   label,
 														   used_names);
@@ -8528,7 +8558,7 @@ fixCreateStmtForPartitionedTable(CreateStmt *stmt)
 				if ( 0 != strcmp(label, "pkey") )
 					colname = list_nth(unnamed_cons_col, i);
 				
-				con->name = ChooseConstraintNameForPartitionCreate(stmt->base.relation->relname,
+				con->name = ChooseConstraintNameForPartitionCreate(stmt->relation->relname,
 																   colname,
 																   label,
 																   used_names);

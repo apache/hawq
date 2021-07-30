@@ -138,6 +138,7 @@ extern List *GetSegmentList(void);
 extern void FreeSegment(Segment *segment);
 extern Segment *CopySegment(Segment *segment, MemoryContext cxt);
 extern List *GetVirtualSegmentList(void);
+extern const char *getSegmentKey(Segment *segment);
 
 /*
  * performs all necessary setup required for initializing Greenplum Database components.

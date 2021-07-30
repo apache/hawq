@@ -58,6 +58,7 @@
 #include "parser/parse_relation.h"
 #include "parser/parsetree.h"
 #include "parser/parse_oper.h"     /* ordering_oper_opid */
+#include "utils/acl.h"
 #include "utils/lsyscache.h"
 
 #include "cdb/cdbgroup.h"       /* adapt_flow_to_targetlist() */
@@ -73,6 +74,7 @@
 typedef struct CreatePlanContext
 {
     PlannerInfo    *root;
+    MagmaBitmapQual *bmqual;
 } CreatePlanContext;
 
 
@@ -100,6 +102,13 @@ static ParquetScan *create_parquetscan_plan(CreatePlanContext *ctx, Path *best_p
 static IndexScan *create_indexscan_plan(CreatePlanContext *ctx, IndexPath *best_path,
 					  List *tlist, List *scan_clauses,
 					  List **nonlossy_clauses);
+static MagmaIndexScan *create_magma_indexscan_plan(
+		CreatePlanContext *ctx, IndexPath *best_path,
+		List *tlist, List *scan_clauses,
+		List **nonlossy_clauses);
+static MagmaBitmapScan *create_magma_bitmap_scan_plan(CreatePlanContext *ctx,
+						BitmapHeapPath *best_path,
+						List *tlist, List *scan_clauses);
 static BitmapHeapScan *create_bitmap_scan_plan(CreatePlanContext *ctx,
 						BitmapHeapPath *best_path,
 						List *tlist, List *scan_clauses);
@@ -154,6 +163,31 @@ static IndexScan *make_indexscan(List *qptlist, List *qpqual, Index scanrelid,
 			   Oid indexid, List *indexqual, List *indexqualorig,
 			   List *indexstrategy, List *indexsubtype,
 			   ScanDirection indexscandir);
+static MagmaIndexScan *make_magma_indexscan(List *qptlist,
+			   List *qpqual,
+			   Index scanrelid,
+			   bool indexonly,
+			   Oid indexid,
+			   List *indexqualorig,
+			   List *urilist,
+			   List *fmtopts,
+			   char fmttype,
+			   int rejectlimit,
+			   bool rejectlimitinrows,
+			   Oid fmterrtableOid,
+			   int encoding,
+			   ScanDirection indexscandir);
+static MagmaBitmapScan *make_magma_bitmapscan(List *qptlist,
+			   List *qpqual,
+			   Index scanrelid,
+			   MagmaBitmapQual *indexqual,
+			   List *urilist,
+			   List *fmtopts,
+			   char fmttype,
+			   int rejectlimit,
+			   bool rejectlimitinrows,
+			   Oid fmterrtableOid,
+			   int encoding);
 static BitmapIndexScan *make_bitmap_indexscan(Index scanrelid, Oid indexid,
 					  List *indexqual,
 					  List *indexqualorig,
@@ -246,7 +280,10 @@ create_subplan(CreatePlanContext *ctx, Path *best_path)
 		case T_SubqueryScan:
 		case T_FunctionScan:
 		case T_TableFunctionScan:
-        case T_ValuesScan:
+		case T_ValuesScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+		case T_MagmaBitmapScan:
 		case T_CteScan:
 			plan = create_scan_plan(ctx, best_path);
 			break;
@@ -313,10 +350,18 @@ create_scan_plan(CreatePlanContext *ctx, Path *best_path)
 	 */
 	if (use_physical_tlist(ctx, rel))
 	{
-		tlist = build_physical_tlist(ctx->root, rel);
-		/* if fail because of dropped cols, use regular method */
-		if (tlist == NIL)
-			tlist = build_relation_tlist(rel);
+		if (best_path->pathtype == T_MagmaIndexOnlyScan)
+		{
+			/* For index-only scan, the preferred tlist is the index's */
+			tlist = copyObject(((IndexPath *) best_path)->indexinfo->indextlist);
+		}
+		else
+		{
+			tlist = build_physical_tlist(ctx->root, rel);
+			/* if fail because of dropped cols, use regular method */
+			if (tlist == NIL)
+				tlist = build_relation_tlist(rel);
+		}
 	}
 	else
 		tlist = build_relation_tlist(rel);
@@ -371,6 +416,20 @@ create_scan_plan(CreatePlanContext *ctx, Path *best_path)
 												(BitmapHeapPath *) best_path,
 													tlist,
 													scan_clauses);
+			break;
+
+		case T_MagmaBitmapScan:
+			plan = (Plan *) create_magma_bitmap_scan_plan(ctx,
+												(BitmapHeapPath *) best_path,
+													tlist,
+													scan_clauses);
+			break;
+
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+			plan = (Plan *) create_magma_indexscan_plan(ctx,
+                        (IndexPath *) best_path,
+                        tlist, scan_clauses, NULL);
 			break;
 
 		case T_TidScan:
@@ -553,6 +612,8 @@ disuse_physical_tlist(Plan *plan, Path *path)
 		case T_SubqueryScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 			{
 				plan->targetlist = build_relation_tlist(path->parent);
 				/**
@@ -1132,6 +1193,15 @@ bool is_hdfs_protocol(Uri *uri)
 	return uri->protocol == URI_HDFS;
 }
 
+bool is_magma_protocol(Uri *uri)
+{
+	return uri->protocol == URI_MAGMA;
+}
+
+bool is_hive_protocol(Uri *uri)
+{
+	return uri->protocol == URI_HIVE;
+}
 /*
  * create plan for pxf
  */
@@ -1293,6 +1363,18 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 		using_location = true;
 	}
 
+	/* various validations */
+
+	/* Block following logic is to enable reading writable external function */
+/*
+	if(rel->writable && allocatedResource)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				errmsg("it is not possible to read from a WRITABLE external table."),
+				errhint("Create the table as READABLE instead"),
+						 errOmitLocation(true)));
+*/
+
 	if(rel->rejectlimit != -1)
 	{
 		/* 
@@ -1439,7 +1521,15 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	}
 	else if (using_location && is_hdfs_protocol(uri))
 	{
-			// nothing to do
+		// nothing to do
+	}
+	else if (using_location && is_magma_protocol(uri))
+	{
+		// nothing to do
+	}
+	else if (using_location && is_hive_protocol(uri))
+	{
+		// nothing to do
 	}
 	/* (2) */
 	else if(using_location && (uri->protocol == URI_GPFDIST || 
@@ -1839,7 +1929,7 @@ create_externalscan_plan(CreatePlanContext *ctx, Path *best_path,
 	/* data encoding */
 	encoding = rel->ext_encoding;
 
-	if (using_location && (is_hdfs_protocol(uri)))
+	if (using_location && (is_hdfs_protocol(uri) || is_magma_protocol(uri) || is_hive_protocol(uri)))
 		scan_plan = make_externalscan(tlist,
 										  scan_clauses,
 										  scan_relid,
@@ -2047,6 +2137,160 @@ create_indexscan_plan(CreatePlanContext *ctx,
 
 	copy_path_costsize(ctx->root, &scan_plan->scan.plan, &best_path->path);
 
+	return scan_plan;
+}
+
+MagmaIndexScan *create_magma_indexscan_plan(
+		CreatePlanContext *ctx, IndexPath *best_path,
+		List *tlist, List *scan_clauses,
+		List **nonlossy_clauses)
+{
+	MagmaIndexScan	*scan_plan;
+
+	List		*indexquals = best_path->indexquals;
+	Index		baserelid = best_path->path.parent->relid;
+	Oid			indexoid = best_path->indexinfo->indexoid;
+	bool		indexonly = best_path->indexonly;
+	List		*qpqual;
+	List		*stripped_indexquals;
+	List		*fixed_indexquals;
+	List		*nonlossy_indexquals;
+	List		*indexstrategy;
+	List		*indexsubtype;
+	ListCell	*l;
+
+	RelOptInfo		*rel = best_path->path.parent;
+	Uri			*uri = NULL;
+	List		*filenames = NIL;
+	List		*fmtopts = NIL;
+	char		**segdb_file_map = NULL;
+	char		*first_uri_str = NULL;
+	bool		islimitinrows = false;
+	int			rejectlimit = -1;
+	int			encoding = -1;
+	int			i;
+	int			total_primaries = 1;
+	Oid			fmtErrTblOid = InvalidOid;
+	List		*segments = NIL;
+	bool		allocatedResource = (ctx->root->glob->resource != NULL);
+
+	/* get the total valid primary segdb count */
+	if (allocatedResource)
+	{
+		segments = ctx->root->glob->resource->segments;
+		total_primaries = list_length(segments);
+	}
+
+	/* it should be a base rel... */
+	Assert(baserelid > 0);
+	Assert(best_path->path.parent->rtekind == RTE_RELATION);
+
+	stripped_indexquals = get_actual_clauses(indexquals);
+	fix_indexqual_references(
+			indexquals, best_path,
+			&fixed_indexquals, &nonlossy_indexquals,
+			&indexstrategy, &indexsubtype);
+
+	if (nonlossy_clauses)
+		*nonlossy_clauses = nonlossy_indexquals;
+
+	if (best_path->isjoininner)
+		scan_clauses = list_union_ptr(scan_clauses, best_path->indexclauses);
+
+	qpqual = NIL;
+	foreach(l, scan_clauses)
+	{
+		RestrictInfo *rinfo = (RestrictInfo *) lfirst(l);
+
+		Assert(IsA(rinfo, RestrictInfo));
+		if (rinfo->pseudoconstant)
+			continue;
+		if (list_member_ptr(nonlossy_indexquals, rinfo))
+			continue;
+		if (!contain_mutable_functions((Node *) rinfo->clause))
+		{
+			List	   *clausel = list_make1(rinfo->clause);
+
+			if (predicate_implied_by(clausel, nonlossy_indexquals))
+				continue;
+			if (best_path->indexinfo->indpred)
+			{
+				if ((int)baserelid != ctx->root->parse->resultRelation &&
+					!list_member_int(ctx->root->parse->rowMarks, baserelid))
+					if (predicate_implied_by(clausel,
+											 best_path->indexinfo->indpred))
+						continue;
+			}
+		}
+		qpqual = lappend(qpqual, rinfo->clause);
+	}
+
+	qpqual = order_qual_clauses(ctx->root, qpqual);
+
+	/* parse external table info */
+	segdb_file_map = (char **) palloc(total_primaries * sizeof(char *));
+	MemSet(segdb_file_map, 0, total_primaries * sizeof(char *));
+	Assert(rel->locationlist != NIL);
+
+	if(rel->rejectlimit != -1)
+	{
+		VerifyRejectLimit(rel->rejectlimittype, rel->rejectlimit);
+	}
+
+	first_uri_str = (char *) strVal(lfirst(list_head(rel->locationlist)));
+	uri = ParseExternalTableUri(first_uri_str);
+	for (i = 0; i < total_primaries; i++)
+	{
+		if(segdb_file_map[i] != NULL)
+			filenames = lappend(filenames, makeString(segdb_file_map[i]));
+		else
+		{
+			/* no file for this segdb. add a null entry */
+			Value *n = makeNode(Value);
+			n->type = T_Null;
+			filenames = lappend(filenames, n);
+		}
+	}
+	Assert(rel->fmtopts);
+	fmtopts = lappend(fmtopts, makeString(pstrdup(rel->fmtopts)));
+	if(rel->rejectlimit != -1)
+	{
+		islimitinrows = (rel->rejectlimittype == 'r' ? true : false);
+		rejectlimit = rel->rejectlimit;
+		fmtErrTblOid = rel->fmterrtbl;
+	}
+	encoding = rel->ext_encoding;
+
+	scan_plan = make_magma_indexscan(tlist,
+                    qpqual,
+                    baserelid,
+                    indexonly,
+                    indexoid,
+                    stripped_indexquals,
+                    rel->locationlist,
+                    fmtopts,
+                    rel->fmttype,
+                    rejectlimit,
+                    islimitinrows,
+                    fmtErrTblOid,
+                    encoding,
+                    best_path->indexscandir);
+
+	copy_path_costsize(ctx->root, &scan_plan->scan.plan, &best_path->path);
+
+	return scan_plan;
+}
+
+/*
+ * create_magma_bitmap_scan_plan
+ *	  Returns a magma bitmap scan plan for the base relation scanned by 'best_path'
+ *	  with restriction clauses 'scan_clauses' and targetlist 'tlist'.
+ */
+static MagmaBitmapScan *create_magma_bitmap_scan_plan(CreatePlanContext *ctx,
+						BitmapHeapPath *best_path,
+						List *tlist, List *scan_clauses)
+{
+	MagmaBitmapScan *scan_plan;
 	return scan_plan;
 }
 
@@ -3592,6 +3836,84 @@ make_indexscan(List *qptlist,
 	return node;
 }
 
+static MagmaIndexScan *make_magma_indexscan(
+		List *qptlist, List *qpqual, Index scanrelid, bool indexonly,
+		Oid indexid, List *indexqualorig, List *urilist,
+		List *fmtopts, char fmttype,
+		int rejectlimit, bool rejectlimitinrows,
+		Oid fmterrtableOid, int encoding, ScanDirection indexscandir)
+{
+	MagmaIndexScan  *node = makeNode(MagmaIndexScan);
+	if (indexonly)
+	{
+		node->scan.plan.type = T_MagmaIndexOnlyScan;
+	}
+	Plan	   *plan = &node->scan.plan;
+	static uint32 scancounter = 0;
+
+	/* cost should be inserted by caller */
+	plan->targetlist = qptlist;
+	plan->qual = qpqual;
+	node->indexname = getIndexNameByOid(indexid);
+	node->indexqualorig = indexqualorig;
+	node->indexorderdir = indexscandir;
+	plan->lefttree = NULL;
+	plan->righttree = NULL;
+	node->scan.scanrelid = scanrelid;
+
+	/* external specifications */
+	node->uriList = urilist;
+	node->fmtOpts = fmtopts;
+	node->fmtType = fmttype;
+	node->rejLimit = rejectlimit;
+	node->rejLimitInRows = rejectlimitinrows;
+	node->fmterrtbl = fmterrtableOid;
+	node->encoding = encoding;
+	node->scancounter = scancounter++;
+
+	return node;
+}
+
+static MagmaBitmapScan *make_magma_bitmapscan(List *qptlist,
+			   List *qpqual,
+			   Index scanrelid,
+			   MagmaBitmapQual *indexqual,
+			   List *urilist,
+			   List *fmtopts,
+			   char fmttype,
+			   int rejectlimit,
+			   bool rejectlimitinrows,
+			   Oid fmterrtableOid,
+			   int encoding)
+{
+	MagmaBitmapScan *node = makeNode(MagmaBitmapScan);
+
+	Plan	   *plan = &node->scan.plan;
+	static uint32 scancounter = 0;
+
+	/* cost should be inserted by caller */
+	plan->targetlist = qptlist;
+	plan->qual = qpqual;
+	plan->lefttree = NULL;
+	plan->righttree = NULL;
+	node->scan.scanrelid = scanrelid;
+
+	/* external specifications */
+	node->uriList = urilist;
+	node->fmtOpts = fmtopts;
+	node->fmtType = fmttype;
+	node->rejLimit = rejectlimit;
+	node->rejLimitInRows = rejectlimitinrows;
+	node->fmterrtbl = fmterrtableOid;
+	node->encoding = encoding;
+	node->scancounter = scancounter++;
+
+	/* bitmap index info */
+	node->bitmapqual = indexqual;
+
+	return node;
+}
+
 static BitmapIndexScan *
 make_bitmap_indexscan(Index scanrelid,
 					  Oid indexid,
@@ -5133,5 +5455,3 @@ flatten_grouping_list(List *groupcls)
 
 	return result;
 }
-
-

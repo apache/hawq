@@ -394,7 +394,7 @@ internal_client_authentication(Port *port)
 			 * ident_unix(), which causes memory freed referenced by pw
 			 */
 
-			local_name[IDENT_USERNAME_MAX] = '\0';
+			local_name[IDENT_USERNAME_MAX] = 0;
 			strncpy(local_name, pw->pw_name, IDENT_USERNAME_MAX);
 
 			remote_name[0] = '\0';

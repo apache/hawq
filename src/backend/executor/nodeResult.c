@@ -326,9 +326,15 @@ static bool TupleMatchesHashFilter(Result *resultNode, TupleTableSlot *resultSlo
 				cdbhash(hash, hAttr, att_type);
 			}
 			else
+			{
 				cdbhashnull(hash);
+			}
 		}
-		int targetSeg = cdbhashreduce(hash);
+		// int targetSeg = cdbhashreduce(hash);
+		int *map = NULL;
+		int nmap = 0;
+		get_magma_range_vseg_map(&map, &nmap, GetQEGangNum());
+		int targetSeg = magichashreduce(hash, map, nmap);
 
 		pfree(hash);
 

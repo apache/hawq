@@ -77,10 +77,19 @@
 #define COPY_STRING_FIELD(fldname) \
 	(newnode->fldname = from->fldname ? pstrdup(from->fldname) : (char *) NULL)
 
+/* Copy a field that is a pointer to a C string, or perhaps NULL */
+#define COPY_NSTRING_FIELD(fldname, fldlen) \
+	do { \
+		Size	 _size = (from->fldlen); \
+		newnode->fldname = palloc((_size) + 1); \
+		memcpy(newnode->fldname, from->fldname, _size); \
+		newnode->fldname[_size] = '\0'; \
+	} while (0)
+
 /* Copy a field that is a pointer to a simple palloc'd object of size sz */
 #define COPY_POINTER_FIELD(fldname, sz) \
 	do { \
-		Size	_size = (sz); \
+		Size _size = (sz); \
 		newnode->fldname = palloc(_size); \
 		memcpy(newnode->fldname, from->fldname, _size); \
 	} while (0)
@@ -145,7 +154,6 @@ CopyPlanFields(Plan *from, Plan *newnode)
 	COPY_SCALAR_FIELD(directDispatch.isDirectDispatch);
 	COPY_NODE_FIELD(directDispatch.contentIds);
 	COPY_SCALAR_FIELD(operatorMemKB);
-	COPY_SCALAR_FIELD(vectorized);
 
 }
 
@@ -197,6 +205,7 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_NODE_FIELD(result_segfileinfos);
 	COPY_NODE_FIELD(scantable_splits);
 	COPY_NODE_FIELD(into_aosegnos);
+	COPY_NODE_FIELD(relFileNodeInfo);
 	COPY_NODE_FIELD(queryPartOids);
 	COPY_NODE_FIELD(queryPartsMetadata);
 	COPY_NODE_FIELD(numSelectorsPerScanId);
@@ -206,7 +215,8 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_SCALAR_FIELD(nCrossLevelParams);
 	COPY_SCALAR_FIELD(nMotionNodes);
 	COPY_SCALAR_FIELD(nInitPlans);
-	
+	COPY_STRING_FIELD(hiveUrl);
+
 	if (from->intoPolicy)
 	{
 		COPY_POINTER_FIELD(intoPolicy,sizeof(GpPolicy) + from->intoPolicy->nattrs*sizeof(from->intoPolicy->attrs[0]));
@@ -226,6 +236,8 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_SCALAR_FIELD(resource);
 
 	COPY_SCALAR_FIELD(planner_segments);
+
+	COPY_LOCATION_FIELD(originNodeType);
 
 	return newnode;
 }
@@ -497,6 +509,7 @@ _copyExternalScan(ExternalScan *from)
 	COPY_NODE_FIELD(err_aosegfileinfos);
 	COPY_SCALAR_FIELD(encoding);
 	COPY_SCALAR_FIELD(scancounter);
+	COPY_STRING_FIELD(hiveUrl);
 
 	return newnode;
 }
@@ -542,6 +555,60 @@ _copyIndexScan(IndexScan *from)
 
 	copyIndexScanFields(from, newnode);
 
+	return newnode;
+}
+
+static MagmaIndexScan *
+_copyMagmaIndexScan(MagmaIndexScan *from)
+{
+	MagmaIndexScan    *newnode = makeNode(MagmaIndexScan);
+	/*
+	 * copy node superclass fields
+	 */
+	CopyScanFields((Scan *) from, (Scan *) newnode);
+	/*
+	 * copy remainder of node
+	 */
+	COPY_NODE_FIELD(uriList);
+	COPY_NODE_FIELD(fmtOpts);
+	COPY_SCALAR_FIELD(fmtType);
+	COPY_SCALAR_FIELD(rejLimit);
+	COPY_SCALAR_FIELD(rejLimitInRows);
+	COPY_SCALAR_FIELD(fmterrtbl);
+	COPY_STRING_FIELD(indexname);
+	COPY_SCALAR_FIELD(indexorderdir);
+	COPY_NODE_FIELD(indexqualorig);
+	COPY_NODE_FIELD(errAosegnos);
+	COPY_NODE_FIELD(err_aosegfileinfos);
+	COPY_SCALAR_FIELD(encoding);
+	COPY_SCALAR_FIELD(scancounter);
+	return newnode;
+}
+
+static MagmaIndexOnlyScan *
+_copyMagmaIndexOnlyScan(MagmaIndexOnlyScan *from)
+{
+	MagmaIndexOnlyScan    *newnode = makeNode(MagmaIndexOnlyScan);
+	/*
+	 * copy node superclass fields
+	 */
+	CopyScanFields((Scan *) from, (Scan *) newnode);
+	/*
+	 * copy remainder of node
+	 */
+	COPY_NODE_FIELD(uriList);
+	COPY_NODE_FIELD(fmtOpts);
+	COPY_SCALAR_FIELD(fmtType);
+	COPY_SCALAR_FIELD(rejLimit);
+	COPY_SCALAR_FIELD(rejLimitInRows);
+	COPY_SCALAR_FIELD(fmterrtbl);
+	COPY_STRING_FIELD(indexname);
+	COPY_NODE_FIELD(indexqualorig);
+	COPY_SCALAR_FIELD(indexorderdir);
+	COPY_NODE_FIELD(errAosegnos);
+	COPY_NODE_FIELD(err_aosegfileinfos);
+	COPY_SCALAR_FIELD(encoding);
+	COPY_SCALAR_FIELD(scancounter);
 	return newnode;
 }
 
@@ -2342,6 +2409,7 @@ _copyFuncCall(FuncCall *from)
     COPY_NODE_FIELD(agg_order);
 	COPY_SCALAR_FIELD(agg_star);
 	COPY_SCALAR_FIELD(agg_distinct);
+	COPY_SCALAR_FIELD(func_variadic);
 	COPY_NODE_FIELD(over);
 	COPY_SCALAR_FIELD(location);
 	COPY_NODE_FIELD(agg_filter);
@@ -2723,6 +2791,7 @@ _copyAlterTableStmt(AlterTableStmt *from)
 	COPY_NODE_FIELD(relation);
 	COPY_NODE_FIELD(cmds);
 	COPY_SCALAR_FIELD(relkind);
+	COPY_SCALAR_FIELD(greenWay);
 	
 	/* No need to copy AT workspace fields. */
 
@@ -2767,6 +2836,7 @@ _copyAlterPartitionCmd(AlterPartitionCmd *from)
 	COPY_NODE_FIELD(arg2);
 	COPY_NODE_FIELD(scantable_splits);
 	COPY_NODE_FIELD(newpart_aosegnos);
+	COPY_STRING_FIELD(format);
 
 	return newnode;
 }
@@ -2900,6 +2970,8 @@ _copySingleRowErrorDesc(SingleRowErrorDesc *from)
 	COPY_SCALAR_FIELD(is_keep);
 	COPY_SCALAR_FIELD(is_limit_in_rows);
 	COPY_SCALAR_FIELD(reusing_existing_errtable);
+	COPY_SCALAR_FIELD(is_hdfs_protocol_text);
+	COPY_STRING_FIELD(hdfsLoc);
 
 	return newnode;
 }
@@ -2918,6 +2990,7 @@ _copyCopyStmt(CopyStmt *from)
 	COPY_NODE_FIELD(sreh);
 	COPY_NODE_FIELD(err_aosegnos);
 	COPY_NODE_FIELD(scantable_splits);
+	COPY_NODE_FIELD(planTree);
 
 	return newnode;
 }
@@ -4217,6 +4290,8 @@ _copySegFileSplitMapNode(SegFileSplitMapNode *from)
 
   COPY_SCALAR_FIELD(relid);
   COPY_NODE_FIELD(splits);
+  COPY_SCALAR_FIELD(serializeSchemaLen);
+  COPY_NSTRING_FIELD(serializeSchema, serializeSchemaLen);
 
   return newnode;
 }
@@ -4227,6 +4302,8 @@ _copyFileSplitNode(FileSplitNode *from)
   FileSplitNode *newnode = makeNode(FileSplitNode);
 
   COPY_SCALAR_FIELD(segno);
+  COPY_SCALAR_FIELD(range_id);
+  COPY_SCALAR_FIELD(replicaGroup_id);
   COPY_SCALAR_FIELD(logiceof);
   COPY_SCALAR_FIELD(offsets);
   COPY_SCALAR_FIELD(lengths);
@@ -4440,6 +4517,12 @@ copyObject(void *from)
 			break;
 		case T_DynamicIndexScan:
 			retval = _copyDynamicIndexScan(from);
+			break;
+		case T_MagmaIndexScan:
+			retval = _copyMagmaIndexScan(from);
+			break;
+		case T_MagmaIndexOnlyScan:
+			retval = _copyMagmaIndexOnlyScan(from);
 			break;
 		case T_BitmapIndexScan:
 			retval = _copyBitmapIndexScan(from);

@@ -581,8 +581,7 @@ RelationFetchGpRelationNode(
 			return; // The initdb process will load the persistent table once we out of bootstrap mode.
 		}
 
-		if (relation->rd_rel->relstorage != RELSTORAGE_AOROWS
-					&& relation->rd_rel->relstorage != RELSTORAGE_PARQUET)
+		if (!RelationIsAo(relation))
 		{
 			if (!ReadGpRelfileNode(
 						relation->rd_node.relNode,

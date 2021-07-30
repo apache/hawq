@@ -166,7 +166,8 @@ DefineFileSystem(List *name, List *parameters, Oid newOid, bool trusted)
 		stmt->shadowOid = 0;
 		stmt->ordered = false;
 		stmt->trusted = trusted;
-		dispatch_statement_node((Node *) stmt, NULL, NULL, NULL);
+		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+		                    errmsg("Cannot support DefineFileSystem")));
 	}
 }
 

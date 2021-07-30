@@ -262,6 +262,9 @@ ExecuteQuery(ExecuteStmt *stmt, const char *queryString,
 
 	create_filesystem_credentials(portal);
 
+	// disable read cache mechanism
+	resetReadCache(false);
+
 	/*
 	 * Run the portal to completion.
 	 */

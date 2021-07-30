@@ -139,7 +139,7 @@ initNextTableToScan(DynamicTableScanState *node)
 		 * relation.
 		 */
 		{
-			if (RelationIsAoRows(scanState->ss_currentRelation) || RelationIsParquet(scanState->ss_currentRelation))
+			if (RelationIsAo(scanState->ss_currentRelation))
 			{
 				scanState->splits = GetFileSplitsOfSegment(
 						estate->es_plannedstmt->scantable_splits,

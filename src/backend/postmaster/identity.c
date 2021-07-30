@@ -281,6 +281,30 @@ do { \
 	return str.data;
 }
 
+void newSerializeProcessIdentity(struct ProcessIdentity *id,
+                                 struct StringInfoData *str) {
+  unsigned char n8 = (unsigned char)id->is_writer;
+  appendBinaryStringInfo(str, (char *)&n8, 1);
+  uint32 n32 = htonl((uint32)id->slice_id);
+  appendBinaryStringInfo(str, (char *)&n32, 4);
+  n32 = htonl((uint32)id->id_in_slice);
+  appendBinaryStringInfo(str, (char *)&n32, 4);
+  n32 = htonl((uint32)id->gang_member_num);
+  appendBinaryStringInfo(str, (char *)&n32, 4);
+  n32 = htonl((uint32)id->command_count);
+  appendBinaryStringInfo(str, (char *)&n32, 4);
+}
+
+static bool newDeserializeProcessIdentity(ProcessIdentity *id,
+                                          const char *str) {
+  id->is_writer = (bool)(*str);
+  uint32 *newStr = (uint32 *)(str + 1);
+  id->slice_id = ntohl(*newStr);
+  id->id_in_slice = ntohl(*(newStr + 1));
+  id->gang_member_num = ntohl(*(newStr + 2));
+  id->command_count = ntohl(*(newStr + 3));
+}
+
 static bool
 DeserializeProcessIdentity(ProcessIdentity *id, const char *str)
 {
@@ -358,12 +382,15 @@ SetupDispatcherIdentity(int segmentNum)
 }
 
 bool
-SetupProcessIdentity(const char *str)
+SetupProcessIdentity(const char *str, bool newDisp)
 {
 	bool ret = false;
 
 	elog(DEBUG1, "SetupProcessIdentity: receive msg: %s", str);
-	ret = DeserializeProcessIdentity(&SegmentId.pid, str);
+	if (newDisp)
+	  ret = newDeserializeProcessIdentity(&SegmentId.pid, str);
+	else
+	  ret = DeserializeProcessIdentity(&SegmentId.pid, str);
 
 	DebugSegmentIdentity(&SegmentId);
 	DebugProcessIdentity(&SegmentId.pid);
@@ -501,7 +528,8 @@ int GetRelOpt_bucket_num_fromOptions(List *options, int default_val)
 
 			if (pg_strcasecmp(def->defname, "bucketnum") == 0)
 			{
-				bucketnum = (int) defGetInt64(def);
+				bool need_free_arg = false;
+        bucketnum = atoi(defGetString(def, &need_free_arg));
 				break;
 			}	
 		}
@@ -540,6 +568,12 @@ int
 GetDefaultPartitionNum(void)
 {
 	return default_hash_table_bucket_number;
+}
+
+int
+GetDefaultMagmaBucketNum(void)
+{
+	return 0; //dummy number for magma table
 }
 
 int

@@ -65,6 +65,12 @@ typedef struct
 
 typedef struct
 {
+	Bitmapset  *varattnos;
+	Index		varno;
+} pull_varattnos_context;
+
+typedef struct
+{
 	PlannerInfo *root;
 	int			sublevels_up;
 } flatten_join_alias_vars_context;
@@ -75,6 +81,7 @@ static bool pull_var_clause_walker(Node *node,
 static Node *flatten_join_alias_vars_mutator(Node *node,
 								flatten_join_alias_vars_context *context);
 static Relids alias_relid_set(PlannerInfo *root, Relids relids);
+static bool pull_varattnos_walker(Node *node, pull_varattnos_context *context);
 
 
 /*
@@ -194,6 +201,33 @@ Relids
 pull_varnos(Node *node)
 {
 	return pull_varnos_of_level(node, 0);
+}
+
+/*
+ * pull_varattnos
+ *		Find all the distinct attribute numbers present in an expression tree,
+ *		and add them to the initial contents of *varattnos.
+ *		Only Vars of the given varno and rtable level zero are considered.
+ *
+ * Attribute numbers are offset by FirstLowInvalidHeapAttributeNumber so that
+ * we can include system attributes (e.g., OID) in the bitmap representation.
+ *
+ * Currently, this does not support unplanned subqueries; that is not needed
+ * for current uses.  It will handle already-planned SubPlan nodes, though,
+ * looking into only the "testexpr" and the "args" list.  (The subplan cannot
+ * contain any other references to Vars of the current level.)
+ */
+void
+pull_varattnos(Node *node, Index varno, Bitmapset **varattnos)
+{
+	pull_varattnos_context context;
+
+	context.varattnos = *varattnos;
+	context.varno = varno;
+
+	(void) pull_varattnos_walker(node, &context);
+
+	*varattnos = context.varattnos;
 }
 
 
@@ -495,6 +529,28 @@ pull_var_clause(Node *node, bool includeUpperVars)
 
 	pull_var_clause_walker(node, &context);
 	return context.varlist;
+}
+
+static bool
+pull_varattnos_walker(Node *node, pull_varattnos_context *context)
+{
+	if (node == NULL)
+		return false;
+	if (IsA(node, Var))
+	{
+		Var		   *var = (Var *) node;
+
+		if (var->varno == context->varno && var->varlevelsup == 0)
+			context->varattnos = bms_add_member(context->varattnos,
+			  var->varattno - FirstLowInvalidHeapAttributeNumber);
+		return false;
+	}
+
+	/* Should not find an unplanned subquery */
+	Assert(!IsA(node, Query));
+
+	return expression_tree_walker(node, pull_varattnos_walker,
+								  (void *) context);
 }
 
 static bool

@@ -101,194 +101,198 @@ static int32 NextRecordTypmod = 0;		/* number of entries used */
 TypeCacheEntry *
 lookup_type_cache(Oid type_id, int flags)
 {
-	TypeCacheEntry *typentry;
-	bool		found;
+  TypeCacheEntry *typentry;
+  bool    found;
 
-	if (TypeCacheHash == NULL)
-	{
-		/* First time through: initialize the hash table */
-		HASHCTL		ctl;
+  if (TypeCacheHash == NULL)
+  {
+    /* First time through: initialize the hash table */
+    HASHCTL   ctl;
 
-		if (!CacheMemoryContext)
-			CreateCacheMemoryContext();
+    if (!CacheMemoryContext)
+      CreateCacheMemoryContext();
 
-		MemSet(&ctl, 0, sizeof(ctl));
-		ctl.keysize = sizeof(Oid);
-		ctl.entrysize = sizeof(TypeCacheEntry);
-		ctl.hash = oid_hash;
-		TypeCacheHash = hash_create("Type information cache", 64,
-									&ctl, HASH_ELEM | HASH_FUNCTION);
-	}
+    MemSet(&ctl, 0, sizeof(ctl));
+    ctl.keysize = sizeof(Oid);
+    ctl.entrysize = sizeof(TypeCacheEntry);
+    ctl.hash = oid_hash;
+    TypeCacheHash = hash_create("Type information cache", 64,
+                  &ctl, HASH_ELEM | HASH_FUNCTION);
+  }
 
-	/* Try to look up an existing entry */
-	typentry = (TypeCacheEntry *) hash_search(TypeCacheHash,
-											  (void *) &type_id,
-											  HASH_FIND, NULL);
-	if (typentry == NULL)
-	{
-		/*
-		 * If we didn't find one, we want to make one.  But first look up the
-		 * pg_type row, just to make sure we don't make a cache entry for an
-		 * invalid type OID.
-		 */
-		HeapTuple	tp;
-		Form_pg_type typtup;
-		cqContext	*pcqCtx;
+  /* Try to look up an existing entry */
+  typentry = (TypeCacheEntry *) hash_search(TypeCacheHash,
+                        (void *) &type_id,
+                        HASH_FIND, NULL);
+  if (typentry == NULL)
+  {
+    /*
+     * If we didn't find one, we want to make one.  But first look up the
+     * pg_type row, just to make sure we don't make a cache entry for an
+     * invalid type OID.
+     */
+    HeapTuple tp;
+    Form_pg_type typtup;
+    cqContext *pcqCtx;
 
-		pcqCtx = caql_beginscan(
-				NULL,
-				cql("SELECT * FROM pg_type "
-					" WHERE oid = :1 ",
-					ObjectIdGetDatum(type_id)));
+    pcqCtx = caql_beginscan(
+        NULL,
+        cql("SELECT * FROM pg_type "
+          " WHERE oid = :1 ",
+          ObjectIdGetDatum(type_id)));
 
-		tp = caql_getnext(pcqCtx);
+    tp = caql_getnext(pcqCtx);
 
-		if (!HeapTupleIsValid(tp))
-			elog(ERROR, "cache lookup failed for type %u", type_id);
-		typtup = (Form_pg_type) GETSTRUCT(tp);
-		if (!typtup->typisdefined)
-			ereport(ERROR,
-					(errcode(ERRCODE_UNDEFINED_OBJECT),
-					 errmsg("type \"%s\" is only a shell",
-							NameStr(typtup->typname))));
+    if (!HeapTupleIsValid(tp)){
+      elog(ERROR, "cache lookup failed for type %u", type_id);
+    }
 
-		/* Now make the typcache entry */
-		typentry = (TypeCacheEntry *) hash_search(TypeCacheHash,
-												  (void *) &type_id,
-												  HASH_ENTER, &found);
-		Assert(!found);			/* it wasn't there a moment ago */
+    typtup = (Form_pg_type) GETSTRUCT(tp);
+    if (!typtup->typisdefined){
+      ereport(ERROR,
+          (errcode(ERRCODE_UNDEFINED_OBJECT),
+           errmsg("type \"%s\" is only a shell",
+              NameStr(typtup->typname))));
+    }
 
-		MemSet(typentry, 0, sizeof(TypeCacheEntry));
-		typentry->type_id = type_id;
-		typentry->typlen = typtup->typlen;
-		typentry->typbyval = typtup->typbyval;
-		typentry->typalign = typtup->typalign;
-		typentry->typtype = typtup->typtype;
-		typentry->typrelid = typtup->typrelid;
+    /* Now make the typcache entry */
+    typentry = (TypeCacheEntry *) hash_search(TypeCacheHash,
+                          (void *) &type_id,
+                          HASH_ENTER, &found);
+    Assert(!found);     /* it wasn't there a moment ago */
 
-		caql_endscan(pcqCtx);
-	}
+    MemSet(typentry, 0, sizeof(TypeCacheEntry));
+    typentry->type_id = type_id;
+    typentry->typlen = typtup->typlen;
+    typentry->typbyval = typtup->typbyval;
+    typentry->typalign = typtup->typalign;
+    typentry->typtype = typtup->typtype;
+    typentry->typrelid = typtup->typrelid;
 
-	/* If we haven't already found the opclass, try to do so */
-	if ((flags & (TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
-				  TYPECACHE_CMP_PROC |
-				  TYPECACHE_EQ_OPR_FINFO | TYPECACHE_CMP_PROC_FINFO)) &&
-		typentry->btree_opc == InvalidOid)
-	{
-		typentry->btree_opc = GetDefaultOpClass(type_id,
-												BTREE_AM_OID);
-		/* Only care about hash opclass if no btree opclass... */
-		if (typentry->btree_opc == InvalidOid)
-		{
-			if (typentry->hash_opc == InvalidOid)
-				typentry->hash_opc = GetDefaultOpClass(type_id,
-													   HASH_AM_OID);
-		}
-		else
-		{
-			/*
-			 * If we find a btree opclass where previously we only found a
-			 * hash opclass, forget the hash equality operator so we can use
-			 * the btree operator instead.
-			 */
-			typentry->eq_opr = InvalidOid;
-			typentry->eq_opr_finfo.fn_oid = InvalidOid;
-		}
-	}
+    caql_endscan(pcqCtx);
+  }
 
-	/* Look for requested operators and functions */
-	if ((flags & (TYPECACHE_EQ_OPR | TYPECACHE_EQ_OPR_FINFO)) &&
-		typentry->eq_opr == InvalidOid)
-	{
-		if (typentry->btree_opc != InvalidOid)
-			typentry->eq_opr = get_opclass_member(typentry->btree_opc,
-												  InvalidOid,
-												  BTEqualStrategyNumber);
-		if (typentry->eq_opr == InvalidOid &&
-			typentry->hash_opc != InvalidOid)
-			typentry->eq_opr = get_opclass_member(typentry->hash_opc,
-												  InvalidOid,
-												  HTEqualStrategyNumber);
-	}
-	if ((flags & TYPECACHE_LT_OPR) && typentry->lt_opr == InvalidOid)
-	{
-		if (typentry->btree_opc != InvalidOid)
-			typentry->lt_opr = get_opclass_member(typentry->btree_opc,
-												  InvalidOid,
-												  BTLessStrategyNumber);
-	}
-	if ((flags & TYPECACHE_GT_OPR) && typentry->gt_opr == InvalidOid)
-	{
-		if (typentry->btree_opc != InvalidOid)
-			typentry->gt_opr = get_opclass_member(typentry->btree_opc,
-												  InvalidOid,
-												  BTGreaterStrategyNumber);
-	}
-	if ((flags & (TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO)) &&
-		typentry->cmp_proc == InvalidOid)
-	{
-		if (typentry->btree_opc != InvalidOid)
-			typentry->cmp_proc = get_opclass_proc(typentry->btree_opc,
-												  InvalidOid,
-												  BTORDER_PROC);
-	}
+  /* If we haven't already found the opclass, try to do so */
+  if ((flags & (TYPECACHE_EQ_OPR | TYPECACHE_LT_OPR | TYPECACHE_GT_OPR |
+          TYPECACHE_CMP_PROC |
+          TYPECACHE_EQ_OPR_FINFO | TYPECACHE_CMP_PROC_FINFO)) &&
+    typentry->btree_opc == InvalidOid)
+  {
+    typentry->btree_opc = GetDefaultOpClass(type_id,
+                        BTREE_AM_OID);
+    /* Only care about hash opclass if no btree opclass... */
+    if (typentry->btree_opc == InvalidOid)
+    {
+      if (typentry->hash_opc == InvalidOid)
+        typentry->hash_opc = GetDefaultOpClass(type_id,
+                             HASH_AM_OID);
+    }
+    else
+    {
+      /*
+       * If we find a btree opclass where previously we only found a
+       * hash opclass, forget the hash equality operator so we can use
+       * the btree operator instead.
+       */
+      typentry->eq_opr = InvalidOid;
+      typentry->eq_opr_finfo.fn_oid = InvalidOid;
+    }
+  }
 
-	/*
-	 * Set up fmgr lookup info as requested
-	 *
-	 * Note: we tell fmgr the finfo structures live in CacheMemoryContext,
-	 * which is not quite right (they're really in DynaHashContext) but this
-	 * will do for our purposes.
-	 */
-	if ((flags & TYPECACHE_EQ_OPR_FINFO) &&
-		typentry->eq_opr_finfo.fn_oid == InvalidOid &&
-		typentry->eq_opr != InvalidOid)
-	{
-		Oid			eq_opr_func;
+  /* Look for requested operators and functions */
+  if ((flags & (TYPECACHE_EQ_OPR | TYPECACHE_EQ_OPR_FINFO)) &&
+    typentry->eq_opr == InvalidOid)
+  {
+    if (typentry->btree_opc != InvalidOid)
+      typentry->eq_opr = get_opclass_member(typentry->btree_opc,
+                          InvalidOid,
+                          BTEqualStrategyNumber);
+    if (typentry->eq_opr == InvalidOid &&
+      typentry->hash_opc != InvalidOid)
+      typentry->eq_opr = get_opclass_member(typentry->hash_opc,
+                          InvalidOid,
+                          HTEqualStrategyNumber);
+  }
+  if ((flags & TYPECACHE_LT_OPR) && typentry->lt_opr == InvalidOid)
+  {
+    if (typentry->btree_opc != InvalidOid)
+      typentry->lt_opr = get_opclass_member(typentry->btree_opc,
+                          InvalidOid,
+                          BTLessStrategyNumber);
+  }
+  if ((flags & TYPECACHE_GT_OPR) && typentry->gt_opr == InvalidOid)
+  {
+    if (typentry->btree_opc != InvalidOid)
+      typentry->gt_opr = get_opclass_member(typentry->btree_opc,
+                          InvalidOid,
+                          BTGreaterStrategyNumber);
+  }
+  if ((flags & (TYPECACHE_CMP_PROC | TYPECACHE_CMP_PROC_FINFO)) &&
+    typentry->cmp_proc == InvalidOid)
+  {
+    if (typentry->btree_opc != InvalidOid)
+      typentry->cmp_proc = get_opclass_proc(typentry->btree_opc,
+                          InvalidOid,
+                          BTORDER_PROC);
+  }
 
-		eq_opr_func = get_opcode(typentry->eq_opr);
-		if (eq_opr_func != InvalidOid)
-			fmgr_info_cxt(eq_opr_func, &typentry->eq_opr_finfo,
-						  CacheMemoryContext);
-	}
-	if ((flags & TYPECACHE_CMP_PROC_FINFO) &&
-		typentry->cmp_proc_finfo.fn_oid == InvalidOid &&
-		typentry->cmp_proc != InvalidOid)
-	{
-		fmgr_info_cxt(typentry->cmp_proc, &typentry->cmp_proc_finfo,
-					  CacheMemoryContext);
-	}
+  /*
+   * Set up fmgr lookup info as requested
+   *
+   * Note: we tell fmgr the finfo structures live in CacheMemoryContext,
+   * which is not quite right (they're really in DynaHashContext) but this
+   * will do for our purposes.
+   */
+  if ((flags & TYPECACHE_EQ_OPR_FINFO) &&
+    typentry->eq_opr_finfo.fn_oid == InvalidOid &&
+    typentry->eq_opr != InvalidOid)
+  {
+    Oid     eq_opr_func;
 
-	/*
-	 * If it's a composite type (row type), get tupdesc if requested
-	 */
-	if ((flags & TYPECACHE_TUPDESC) &&
-		typentry->tupDesc == NULL &&
-		typentry->typtype == 'c')
-	{
-		Relation	rel;
+    eq_opr_func = get_opcode(typentry->eq_opr);
+    if (eq_opr_func != InvalidOid)
+      fmgr_info_cxt(eq_opr_func, &typentry->eq_opr_finfo,
+              CacheMemoryContext);
+  }
+  if ((flags & TYPECACHE_CMP_PROC_FINFO) &&
+    typentry->cmp_proc_finfo.fn_oid == InvalidOid &&
+    typentry->cmp_proc != InvalidOid)
+  {
+    fmgr_info_cxt(typentry->cmp_proc, &typentry->cmp_proc_finfo,
+            CacheMemoryContext);
+  }
 
-		if (!OidIsValid(typentry->typrelid))	/* should not happen */
-			elog(ERROR, "invalid typrelid for composite type %u",
-				 typentry->type_id);
-		rel = relation_open(typentry->typrelid, AccessShareLock);
-		Assert(rel->rd_rel->reltype == typentry->type_id);
+  /*
+   * If it's a composite type (row type), get tupdesc if requested
+   */
+  if ((flags & TYPECACHE_TUPDESC) &&
+    typentry->tupDesc == NULL &&
+    typentry->typtype == 'c')
+  {
+    Relation  rel;
 
-		/*
-		 * Link to the tupdesc and increment its refcount (we assert it's a
-		 * refcounted descriptor).	We don't use IncrTupleDescRefCount() for
-		 * this, because the reference mustn't be entered in the current
-		 * resource owner; it can outlive the current query.
-		 */
-		typentry->tupDesc = RelationGetDescr(rel);
+    if (!OidIsValid(typentry->typrelid))  {  /* should not happen */
+      elog(ERROR, "invalid typrelid for composite type %u",
+         typentry->type_id);
+    }
+    rel = relation_open(typentry->typrelid, AccessShareLock);
+    Assert(rel->rd_rel->reltype == typentry->type_id);
 
-		Assert(typentry->tupDesc->tdrefcount > 0);
-		typentry->tupDesc->tdrefcount++;
+    /*
+     * Link to the tupdesc and increment its refcount (we assert it's a
+     * refcounted descriptor).  We don't use IncrTupleDescRefCount() for
+     * this, because the reference mustn't be entered in the current
+     * resource owner; it can outlive the current query.
+     */
+    typentry->tupDesc = RelationGetDescr(rel);
 
-		relation_close(rel, AccessShareLock);
-	}
+    Assert(typentry->tupDesc->tdrefcount > 0);
+    typentry->tupDesc->tdrefcount++;
 
-	return typentry;
+    relation_close(rel, AccessShareLock);
+  }
+
+  return typentry;
 }
 
 /*

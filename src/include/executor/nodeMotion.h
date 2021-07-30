@@ -28,8 +28,6 @@ extern bool isMotionGatherToMaster(const Motion *m);
 extern bool isMotionGatherToSegment(const Motion *m);
 extern bool isMotionRedistributeFromMaster(const Motion *m);
 
-extern void setMotionStatsForGpmon(MotionState *node);
-extern void doSendEndOfStream(Motion * motion, MotionState * node);
 
 enum 
 {

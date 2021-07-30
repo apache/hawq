@@ -1,0 +1,16 @@
+.ctags_updated
+checksum
+columns.h
+distcomp
+dsdgen
+dsqgen
+mkheader
+streams.h
+tables.h
+tokenizer.c
+tpcds.idx
+tpcds.idx.h
+y.output
+y.tab.c
+y.tab.h
+parallel_dsdgen

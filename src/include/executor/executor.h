@@ -41,20 +41,6 @@
 
 #include "cdb/cdbdef.h"                 /* CdbVisitOpt */
 
-typedef struct vectorexe_t {
-	bool vectorized_executor_enable;
-	Plan* (*CheckPlanVectorized_Hook)(PlannerInfo *node, Plan *plan);
-	ExprState* (*ExecInitExpr_Hook)(Expr *node, PlanState *parent);
-	PlanState* (*ExecInitNode_Hook)(Plan *node, EState *eState,int eflags,bool isAlienPlanNode,MemoryAccount** pcurMemoryAccount);
-	PlanState* (*ExecVecNode_Hook)(PlanState *Node, PlanState *parentNode, EState *eState,int eflags);
-	bool (*ExecProcNode_Hook)(PlanState *node,TupleTableSlot** pRtr);
-	bool (*ExecEndNode_Hook)(PlanState *node);
-	Oid (*GetNType)(Oid vtype);
-} VectorExecMthd;
-
-extern PGDLLIMPORT VectorExecMthd vmthd;
-
-
 struct ChunkTransportState;             /* #include "cdb/cdbinterconnect.h" */
 
 /*
@@ -265,7 +251,7 @@ extern void map_part_attrs_from_targetdesc(TupleDesc target, TupleDesc part, Att
 extern PartitionState *createPartitionState(PartitionNode *partsAndRules, int resultPartSize);
 extern TupleTableSlot *reconstructMatchingTupleSlot(TupleTableSlot *slot,
 													ResultRelInfo *resultRelInfo);
-extern void CreateAppendOnlyParquetSegFileForRelationOnMaster(Relation rel, List *segnos);
+extern void CreateAoSegFileForRelationOnMaster(Relation rel, List *segnos);
 
 extern List *InitializePartsMetadata(Oid rootOid);
 
@@ -505,7 +491,7 @@ extern void ResultRelInfoSetSegno(ResultRelInfo *resultRelInfo, List *mapping);
 
 extern void ResultRelInfoSetSegFileInfo(ResultRelInfo *resultRelInfo, List *mapping);
 
-extern void CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping);
+extern void CreateAoSegFileOnMaster(Oid relid, List *mapping);
 
 extern ResultRelSegFileInfo * InitResultRelSegFileInfo(int segno, char storageChar, int numfiles);
 
@@ -531,5 +517,37 @@ extern ResultRelInfo *values_get_partition(Datum *values, bool *nulls,
 										   TupleDesc desc, EState *estate);
 
 extern void SendAOTupCounts(EState *estate);
+
+extern PlanState* newExecutorPlanStateReference;
+extern void exec_mpp_query_new(const char *plan, int len, int stageNo,
+                               bool setDisplay, DestReceiver *dest,
+                               PlanState *planstate);
+typedef struct MyNewExecutorTupState {
+  TupleTableSlot *slot;
+  bool hasTuple;
+  int numberOfColumns;
+  char **colRawValues;
+  Datum *colValues;
+  uint64_t *colValLength;
+  bits8 **colValNullBitmap;
+  char **colAddresses;
+  bool *colIsNulls;
+  bool *colSpeedUpPossible;
+  bool *colSpeedUp;
+  bool *nulls;
+  Datum *datums;
+  int reserved;
+  FmgrInfo *in_functions;
+  Oid *typioparams;
+} MyNewExecutorTupState;
+extern MyNewExecutorTupState *makeMyNewExecutorTupState(TupleDesc tupdesc);
+// get one TupleTableSlot each call
+extern void beginMyNewExecutor(const char *plan, int len, int stageNo,
+                               PlanState *planstate);
+extern void execMyNewExecutor(MyNewExecutorTupState *newExecutorState);
+extern void endMyNewExecutor(MyNewExecutorTupState **newExecutorState);
+extern void stopMyNewExecutor();
+extern const char* getMyNewExecutorCompletionTag();
+extern void resetMyNewExecutorCancelFlag();
 
 #endif   /* EXECUTOR_H  */

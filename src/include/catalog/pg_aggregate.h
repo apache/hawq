@@ -318,7 +318,13 @@ DATA(insert ( 3538	string_agg_delim_transfn - - - string_agg_finalfn 0 2281 _nul
 
 DATA(insert ( 2913	pg_partition_oid_transfn      - - - pg_partition_oid_finalfn 0 2281 _null_ f));
 
+/* json */
+DATA(insert ( 3175 json_agg_transfn - - - json_agg_finalfn 0 2281 _null_ f));
+DATA(insert ( 3197 json_object_agg_transfn - - - json_object_agg_finalfn 0 2281 _null_ f));
 
+/* jsonb */
+DATA(insert ( 5521 jsonb_agg_transfn - - - jsonb_agg_finalfn 0 2281 _null_ f));
+DATA(insert ( 5524 jsonb_object_agg_transfn - - - jsonb_object_agg_finalfn 0 2281 _null_ f));
 
 /*
  * prototypes for functions in pg_aggregate.c

@@ -180,6 +180,9 @@ PerformCursorOpen(PlannedStmt *stmt, ParamListInfo params,
 	}
 	*/
 
+	// disable read cache mechanism
+	resetReadCache(false);
+
 	/*
 	 * Start execution, inserting parameters if any.
 	 */

@@ -14,12 +14,10 @@ SUBDIRS     = adt cache error fmgr hash init mb misc mmgr resowner \
 
 include $(top_srcdir)/src/backend/common.mk
 
-override CPPFLAGS := -I$(prefix)/include $(CPPFLAGS)
-
-all: fmgroids.h probes.h
+all: fmgroids.h probes.h hawq_funcoid_mapping.h
 
 
-$(SUBDIRS:%=%-recursive): fmgroids.h
+$(SUBDIRS:%=%-recursive): fmgroids.h hawq_funcoid_mapping.h
 
 
 fmgroids.h fmgrtab.c: Gen_fmgrtab.sh $(top_srcdir)/src/include/catalog/pg_proc.h
@@ -38,7 +36,9 @@ else
 	sed -f $(srcdir)/Gen_dummy_probes.sed $< >$@
 endif
 
+hawq_funcoid_mapping.h: Gen_hawq_funcoid_mapping.sh $(DEPENDENCY_PATH)/include/dbcommon/function/func-kind.cg.h
+	bash Gen_hawq_funcoid_mapping.sh fmgroids.h hawq_funcoid_mapping.h
 
 clean:
 	for dir in $(SUBDIRS); do $(MAKE) -C $$dir $@ || exit; done
-	rm -f SUBSYS.o fmgrtab.o fmgroids.h fmgrtab.c probes.h
+	rm -f SUBSYS.o fmgrtab.o fmgroids.h fmgrtab.c probes.h hawq_funcoid_mapping.h

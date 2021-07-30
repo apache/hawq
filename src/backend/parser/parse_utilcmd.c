@@ -121,6 +121,11 @@ generateClonedIndexStmt(CreateStmtContext *cxt, Relation source_idx,
 
 	/* Begin building the IndexStmt */
 	index = makeNode(IndexStmt);
+	if (pg_strncasecmp(cxt->format, "magma", strlen("magma")) == 0) {
+	  index->magma = true;
+	} else {
+	  index->magma = false;
+	}
 	index->relation = cxt->relation;
 	index->accessMethod = pstrdup(NameStr(amrec->amname));
 	if (OidIsValid(idxrelrec->reltablespace))

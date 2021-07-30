@@ -3047,6 +3047,7 @@ CTranslatorRelcacheToDXL::Erelstorage
 			erelstorage = IMDRelation::ErelstorageAppendOnlyRows;
 			break;
 		case RELSTORAGE_PARQUET:
+		case RELSTORAGE_ORC:
 			erelstorage = IMDRelation::ErelstorageAppendOnlyParquet;
 			break;
 		case RELSTORAGE_VIRTUAL:

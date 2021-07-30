@@ -660,7 +660,8 @@ cdbdisp_dumpDispatchResult(CdbDispatchResult       *dispatchResult,
         dispatchResult->error_message->len > 0)
     {
         oneTrailingNewline(buf);
-        appendStringInfoString(buf, dispatchResult->error_message->data);
+        char *errMsg = dispatchResult->error_message->data;
+        appendStringInfoString(buf, errMsg);
         if (!verbose)
             goto done;
     }
@@ -669,6 +670,170 @@ done:
     noTrailingNewline(buf);
 }                               /* cdbdisp_dumpDispatchResult */
 
+void cdbdisp_serializeDispatchResult(CdbDispatchResult *dispatchResult,
+                                     int qeIndex, struct PQExpBufferData *buf) {
+#define write_disp_int(val)                                          \
+  do {                                                               \
+    appendBinaryPQExpBuffer(buf, (const char *)&(val), sizeof(int)); \
+  } while (0)
+
+#define write_disp_int64(val)                                          \
+  do {                                                                 \
+    appendBinaryPQExpBuffer(buf, (const char *)&(val), sizeof(int64)); \
+  } while (0)
+
+#define write_disp_oid(val)                                          \
+  do {                                                               \
+    appendBinaryPQExpBuffer(buf, (const char *)&(val), sizeof(Oid)); \
+  } while (0)
+
+#define write_disp_binary(val, len)                           \
+  do {                                                        \
+    appendBinaryPQExpBuffer(buf, (const char *)(val), (len)); \
+  } while (0)
+
+  write_disp_int(qeIndex);
+  write_disp_int(dispatchResult->okindex);
+  write_disp_int(dispatchResult->errcode);
+  write_disp_int(dispatchResult->errindex);
+  write_disp_int(dispatchResult->numrowsrejected);
+
+  // write error message
+  int errMsgLen =
+      dispatchResult->error_message ? dispatchResult->error_message->len : 0;
+  write_disp_int(errMsgLen);
+  if (errMsgLen)
+    write_disp_binary(dispatchResult->error_message->data, errMsgLen);
+
+  int num = cdbdisp_numPGresult(dispatchResult);
+  write_disp_int(num);
+  for (int i = 0; i < num; ++i) {
+    PGresult *pgresult = cdbdisp_getPGresult(dispatchResult, i);
+
+    // write cmd status
+    write_disp_binary(pgresult->cmdStatus, sizeof(pgresult->cmdStatus));
+
+    // write QueryContextDispatchingSendBack
+    write_disp_int(pgresult->numSendback);
+    for (int m = 0; m < pgresult->numSendback; ++m) {
+      write_disp_oid((pgresult->sendback)[m].relid);
+      write_disp_int64((pgresult->sendback)[m].insertCount);
+      write_disp_int((pgresult->sendback)[m].segno);
+      write_disp_int64((pgresult->sendback)[m].varblock);
+      write_disp_int((pgresult->sendback)[m].numfiles);
+      for (int n = 0; n < (pgresult->sendback)[m].numfiles; ++n) {
+        write_disp_int64((pgresult->sendback)[m].eof[n]);
+        write_disp_int64((pgresult->sendback)[m].uncompressed_eof[n]);
+      }
+    }
+
+    // write cdb statistics
+    int cdbStatNum = 0;
+    pgCdbStatCell *statcell;
+    if (pgresult->cdbstats) {
+      for (statcell = pgresult->cdbstats; statcell; statcell = statcell->next) {
+        ++cdbStatNum;
+      }
+    }
+    write_disp_int(cdbStatNum);
+    for (statcell = pgresult->cdbstats; statcell; statcell = statcell->next) {
+      write_disp_int(statcell->len);
+      write_disp_binary(statcell->data, statcell->len);
+    }
+  }
+}
+
+void cdbdisp_deserializeDispatchResult(CdbDispatchResult *dispatchResult,
+                                       int *qeIndex,
+                                       struct PQExpBufferData *buf) {
+  char *str = buf->data;
+
+#define read_disp_int(val)            \
+  do {                                \
+    memcpy(&(val), str, sizeof(int)); \
+    str += sizeof(int);               \
+  } while (0)
+
+#define read_disp_int64(val)            \
+  do {                                  \
+    memcpy(&(val), str, sizeof(int64)); \
+    str += sizeof(int64);               \
+  } while (0)
+
+#define read_disp_oid(val)            \
+  do {                                \
+    memcpy(&(val), str, sizeof(Oid)); \
+    str += sizeof(Oid);               \
+  } while (0)
+
+  read_disp_int(*qeIndex);
+  if (dispatchResult == NULL) return;
+
+  read_disp_int(dispatchResult->okindex);
+  read_disp_int(dispatchResult->errcode);
+  read_disp_int(dispatchResult->errindex);
+  read_disp_int(dispatchResult->numrowsrejected);
+
+  // read error message
+  int errMsgLen;
+  read_disp_int(errMsgLen);
+  if (errMsgLen) {
+    dispatchResult->error_message = createPQExpBuffer();
+    appendBinaryPQExpBuffer(dispatchResult->error_message, str, errMsgLen);
+    str += errMsgLen;
+  }
+
+  int num;
+  read_disp_int(num);
+  for (int i = 0; i < num; ++i) {
+    PGresult *pgresult = PQmakeEmptyPGresult(NULL, PGRES_COMMAND_OK);
+    cdbdisp_appendResult(dispatchResult, pgresult);
+
+    // read cmd status
+    memcpy(pgresult->cmdStatus, str, sizeof(pgresult->cmdStatus));
+    str += sizeof(pgresult->cmdStatus);
+
+    // read QueryContextDispatchingSendBack
+    read_disp_int(pgresult->numSendback);
+    pgresult->sendback =
+        malloc(pgresult->numSendback *
+               sizeof(struct QueryContextDispatchingSendBackData));
+    for (int m = 0; m < pgresult->numSendback; ++m) {
+      read_disp_oid((pgresult->sendback)[m].relid);
+      read_disp_int64((pgresult->sendback)[m].insertCount);
+      read_disp_int((pgresult->sendback)[m].segno);
+      read_disp_int64((pgresult->sendback)[m].varblock);
+      read_disp_int((pgresult->sendback)[m].numfiles);
+      (pgresult->sendback)[m].eof =
+          malloc((pgresult->sendback)[m].numfiles * sizeof(int64));
+      (pgresult->sendback)[m].uncompressed_eof =
+          malloc((pgresult->sendback)[m].numfiles * sizeof(int64));
+      for (int n = 0; n < (pgresult->sendback)[m].numfiles; ++n) {
+        read_disp_int64((pgresult->sendback)[m].eof[n]);
+        read_disp_int64((pgresult->sendback)[m].uncompressed_eof[n]);
+      }
+    }
+
+    // read cdb statistics
+    int cdbStatNum = 0;
+    read_disp_int(cdbStatNum);
+    for (int n = 0; n < cdbStatNum; ++n) {
+      int len = 0;
+      read_disp_int(len);
+      if (len) {
+        pgCdbStatCell *cell = malloc(sizeof(pgCdbStatCell));
+        cell->data = malloc(len);
+        cell->len = len;
+        memcpy(cell->data, str, len);
+        str += len;
+        if (pgresult->cdbstats)
+          pgresult->cdbstats->next = cell;
+        else
+          pgresult->cdbstats = cell;
+      }
+    }
+  }
+}
 
 /*--------------------------------------------------------------------*/
 
@@ -930,6 +1095,31 @@ cdbdisp_handleModifiedCatalogOnSegments(CdbDispatchResults *results,
 	}
 }
 
+void cdbdisp_handleModifiedCatalogOnSegmentsForUD(
+    CdbDispatchResults *results, List **relFileNodeInfo,
+    void (*handler1)(QueryContextDispatchingSendBack sendback, List **l1,
+                     List **l2),
+    void (*handler2)(List *l)) {
+  List *indexList = NIL;
+  for (int i = 0; i < results->resultCount; ++i) {
+    CdbDispatchResult *dispatchResult = &results->resultArray[i];
+    int nres = cdbdisp_numPGresult(dispatchResult);
+    int ires;
+    for (ires = 0; ires < nres; ++ires) {
+      /* for each PGresult */
+      PGresult *pgresult = cdbdisp_getPGresult(dispatchResult, ires);
+      if (handler1 && pgresult && pgresult->sendback) {
+        int j;
+        for (j = 0; j < pgresult->numSendback; ++j) {
+          handler1(&pgresult->sendback[j], relFileNodeInfo, &indexList);
+        }
+      }
+    }
+  }
+
+  if (handler2) handler2(indexList);
+}
+
 void
 cdbdisp_iterate_results_sendback(PGresult **results, int numresults,
 			void (*handler)(QueryContextDispatchingSendBack sendback))
@@ -949,36 +1139,6 @@ cdbdisp_iterate_results_sendback(PGresult **results, int numresults,
 	}
 }
 
-/*
- * sum tuple counts that were added into a partitioned AO table
- */
-HTAB *
-cdbdisp_sumAoPartTupCount(PartitionNode *parts,
-						  CdbDispatchResults *results)
-{
-	int i;
-	HTAB *ht = NULL;
-
-	if (!parts)
-		return NULL;
-
-
-	for (i = 0; i < results->resultCount; ++i)
-	{
-		CdbDispatchResult  *dispatchResult = &results->resultArray[i];
-		int nres = cdbdisp_numPGresult(dispatchResult);
-		int ires;
-		for (ires = 0; ires < nres; ++ires)
-		{						   /* for each PGresult */
-			PGresult *pgresult = cdbdisp_getPGresult(dispatchResult, ires);
-
-			ht = process_aotupcounts(parts, ht, (void *)pgresult->aotupcounts,
-									 pgresult->naotupcounts);
-		}
-	}
-
-	return ht;
-}
 /*
  * Find the max of the lastOid values returned from the QEs
  */

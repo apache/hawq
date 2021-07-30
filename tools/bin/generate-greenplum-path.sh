@@ -57,16 +57,32 @@ fi
 EOF
 
 cat <<EOF
-PATH=\$GPHOME/bin:\$PATH
+PATH=\$GPHOME/bin:\$JAVA_HOME/bin:\$PATH
 EOF
 
 if [ "${PLAT}" = "Darwin" ] ; then
 	cat <<EOF
-DYLD_LIBRARY_PATH=\$GPHOME/lib:\$DYLD_LIBRARY_PATH
+DYLD_LIBRARY_PATH=\$GPHOME/lib:\$JAVA_HOME/jre/lib/amd64/server:\$DYLD_LIBRARY_PATH
 EOF
 else
     cat <<EOF
-LD_LIBRARY_PATH=\$GPHOME/lib:\$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=\$GPHOME/lib:\$JAVA_HOME/jre/lib/amd64/server:\$LD_LIBRARY_PATH
+EOF
+fi
+
+# leverage dependency libraries
+
+cat <<EOF
+DEPENDENCY_PATH=$DEPENDENCY_PATH
+EOF
+
+if [ "${PLAT}" != "Darwin" ] ; then
+    cat <<EOF
+LD_LIBRARY_PATH=\$DEPENDENCY_PATH/lib:\$LD_LIBRARY_PATH:/usr/local/lib
+EOF
+    else
+    cat <<EOF
+DYLD_LIBRARY_PATH=\$DEPENDENCY_PATH/lib:\$DYLD_LIBRARY_PATH
 EOF
 fi
 
@@ -98,6 +114,7 @@ EOF
 cat <<EOF
 export GPHOME
 export PATH
+export DEPENDENCY_PATH
 EOF
 
 if [ "${PLAT}" != "Darwin" ] ; then

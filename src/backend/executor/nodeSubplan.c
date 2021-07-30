@@ -55,6 +55,7 @@
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 
 
 #include <math.h>                       /* ceil() */
@@ -1027,6 +1028,7 @@ static QueryDesc *SubplanQueryDesc(QueryDesc * qd)
 	substmt->contextdisp = stmt->contextdisp;
 	substmt->scantable_splits = stmt->scantable_splits;
 	substmt->resource = stmt->resource;
+	substmt->hiveUrl = stmt->hiveUrl;
 	
 	/*
 	 * Fake a QueryDesc stucture for CdbDispatchPlan call. It should
@@ -1056,13 +1058,12 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 	ListCell   *l;
 	bool		found = false;
 	ArrayBuildState *astate = NULL;
-    Size        savepeakspace = MemoryContextGetPeakSpace(planstate->state->es_query_cxt);
-
+  Size        savepeakspace = MemoryContextGetPeakSpace(planstate->state->es_query_cxt);
 	QueryDesc  *queryDesc = NULL;
-
 	bool		shouldDispatch = false;
+	bool newExecutor = false;
 	volatile bool   shouldTeardownInterconnect = false;
-    volatile bool   explainRecvStats = false;
+  volatile bool   explainRecvStats = false;
 
 	if (Gp_role == GP_ROLE_DISPATCH &&
 		planstate != NULL &&
@@ -1100,8 +1101,8 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
          */
 		queryDesc->estate = CreateExecutorState();
 
-        queryDesc->showstatctx = gbl_queryDesc->showstatctx;
-        queryDesc->estate->showstatctx = gbl_queryDesc->showstatctx;
+    queryDesc->showstatctx = gbl_queryDesc->showstatctx;
+    queryDesc->estate->showstatctx = gbl_queryDesc->showstatctx;
 		queryDesc->estate->es_sliceTable = gbl_queryDesc->estate->es_sliceTable;
 		queryDesc->estate->es_param_exec_vals = gbl_queryDesc->estate->es_param_exec_vals;
 		queryDesc->estate->motionlayer_context = gbl_queryDesc->estate->motionlayer_context;
@@ -1126,20 +1127,36 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
              * command to the appropriate segdbs.  It does not wait for them
              * to finish unless an error is detected before all are dispatched.
 			 */
-			queryDesc->estate->dispatch_data = initialize_dispatch_data(queryDesc->resource, false);
-			prepare_dispatch_query_desc(queryDesc->estate->dispatch_data, queryDesc);
-			dispatch_run(queryDesc->estate->dispatch_data);
-			cleanup_dispatch_data(queryDesc->estate->dispatch_data);
+		  CommonPlanContext ctx;
+		  bool newPlanner = can_convert_common_plan(queryDesc, &ctx);
+       if (newPlanner && ctx.enforceNewScheduler && scheduler_plan_support_check(queryDesc)) {
+		   	const char *queryId = palloc0(sizeof(int) + sizeof(int) + 5);
+		   	sprintf(queryId, "QID%d_%d", gp_session_id, gp_command_count);
+		   	scheduler_prepare_for_new_query(queryDesc, queryId, subplan->plan_id);
+		   	pfree(queryId);
+		   	scheduler_run(queryDesc->estate->scheduler_data, &ctx);
+		  } else {
+		    queryDesc->estate->mainDispatchData = mainDispatchInit(queryDesc->resource);
+		    queryDesc->estate->dispatch_data = NULL;
+		    mainDispatchPrepare(queryDesc->estate->mainDispatchData, queryDesc, newPlanner);
+		    mainDispatchRun(queryDesc->estate->mainDispatchData, &ctx, newPlanner);
+		  }
+
+			// decide if the query is supported by new executor
+			if (queryDesc && queryDesc->newPlan)
+			  newExecutor = true;
 
 			/*
 			 * Set up the interconnect for execution of the initplan root slice.
 			 */
-			shouldTeardownInterconnect = true;
-			Assert(!(queryDesc->estate->interconnect_context));
-			SetupInterconnect(queryDesc->estate);
-			Assert((queryDesc->estate->interconnect_context));
+			if (!newExecutor) {
+			  shouldTeardownInterconnect = true;
+			  Assert(!(queryDesc->estate->interconnect_context));
+			  SetupInterconnect(queryDesc->estate);
+			  Assert((queryDesc->estate->interconnect_context));
 
-			ExecUpdateTransportState(planstate, queryDesc->estate->interconnect_context);
+			  ExecUpdateTransportState(planstate, queryDesc->estate->interconnect_context);
+			}
 		}
 
 		/*
@@ -1158,10 +1175,28 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 		if (planstate->chgParam != NULL)
 			ExecReScan(planstate, NULL);
 
-		for (slot = ExecProcNode(planstate);
-			 !TupIsNull(slot);
-			 slot = ExecProcNode(planstate))
+		if (newExecutor) {
+		  Plan *plan = exec_subplan_get_plan(gbl_queryDesc->plannedstmt, subplan);
+		  TupleDesc cleanTupDesc = ExecCleanTypeFromTL(plan->targetlist, false);
+		  queryDesc->newExecutorState = makeMyNewExecutorTupState(cleanTupDesc);
+		  beginMyNewExecutor(queryDesc->newPlan->str, queryDesc->newPlan->len,
+		                     subplan->qDispSliceId, planstate);
+		}
+
+		while (true)
 		{
+		  if (newExecutor) {
+		    execMyNewExecutor(queryDesc->newExecutorState);
+		    if (queryDesc->newExecutorState->hasTuple)
+		    	slot =  queryDesc->newExecutorState->slot;
+		    else
+		    	slot = NULL;
+		  } else {
+		  	slot = ExecProcNode(planstate);
+		  }
+
+		  if (TupIsNull(slot)) break;
+
 			int			i = 1;
 
 			if (subLinkType == EXISTS_SUBLINK || subLinkType == NOT_EXISTS_SUBLINK)
@@ -1182,8 +1217,11 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 
 				if (shouldDispatch)
 				{
-					/* Tell MPP we're done with this plan. */
-					ExecSquelchNode(planstate);
+					// Tell MPP we're done with this plan
+					if (newExecutor)
+						stopMyNewExecutor();
+					else
+						ExecSquelchNode(planstate);
 				}
 
 				break;
@@ -1240,6 +1278,9 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 			}
 		}
 
+		if (newExecutor)
+			endMyNewExecutor(&queryDesc->newExecutorState);
+
 		if (!found)
 		{
 			if (subLinkType == EXISTS_SUBLINK || subLinkType == NOT_EXISTS_SUBLINK)
@@ -1288,42 +1329,51 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
          */
         if (shouldDispatch && 
 			queryDesc && queryDesc->estate &&
-			queryDesc->estate->dispatch_data)
+			queryDesc->estate->mainDispatchData)
         {
+            /* Wait for all gangs to finish. */
+            mainDispatchWait(queryDesc->estate->mainDispatchData, false);
+
             /* If EXPLAIN ANALYZE, collect execution stats from qExecs. */
             if (planstate->instrument)
             {
-                MemoryContext   savecxt;
-
-                /* Wait for all gangs to finish. */
-                dispatch_wait(queryDesc->estate->dispatch_data);	
-
                 /* Allocate buffer to pass extra message text to cdbexplain. */
-                savecxt = MemoryContextSwitchTo(gbl_queryDesc->estate->es_query_cxt);
+                MemoryContext savecxt = MemoryContextSwitchTo(gbl_queryDesc->estate->es_query_cxt);
                 node->cdbextratextbuf = makeStringInfo();
                 MemoryContextSwitchTo(savecxt);
 
                 /* Jam stats into subplan's Instrumentation nodes. */
                 explainRecvStats = true;
-                if (queryDesc->estate->dispatch_data &&
-                    !dispatcher_has_error(queryDesc->estate->dispatch_data))
+                if (queryDesc->estate->mainDispatchData &&
+                    !mainDispatchHasError(queryDesc->estate->mainDispatchData))
                 {
                   cdbexplain_recvExecStats(planstate,
-                                         dispatch_get_results(queryDesc->estate->dispatch_data),
+                                         mainDispatchGetResults(queryDesc->estate->mainDispatchData),
                                          LocallyExecutingSliceIndex(queryDesc->estate),
                                          econtext->ecxt_estate->showstatctx,
-                                         dispatch_get_segment_num(queryDesc->estate->dispatch_data));
+                                         mainDispatchGetSegNum(queryDesc->estate->mainDispatchData));
 
                 }
             }
             /*
-             * Wait for all gangs to finish.  Check and free the results.
-             * If the dispatcher or any QE had an error, report it and
-             * exit to our error handler (below) via PG_THROW.
+             * Check and free the results. If the dispatcher or any QE had an error,
+             * report it and exit to our error handler (below) via PG_THROW.
              */
-            dispatch_wait(queryDesc->estate->dispatch_data);
-            dispatch_cleanup(queryDesc->estate->dispatch_data);
-			queryDesc->estate->dispatch_data = NULL;
+            mainDispatchCleanUp(&queryDesc->estate->mainDispatchData);
+        } else if (shouldDispatch &&
+            queryDesc && queryDesc->estate &&
+            queryDesc->estate->scheduler_data) {
+          scheduler_wait(queryDesc->estate->scheduler_data);
+          queryDesc->estate->scheduler_data = NULL;
+          if (planstate->instrument && queryDesc->estate->scheduler_data &&
+              queryDesc->estate->scheduler_data->state != SS_ERROR) {
+            scheduler_receive_computenode_stats(
+                queryDesc->estate->scheduler_data, planstate);
+            cdbexplain_recvSchedulerExecStats(
+                planstate, queryDesc->estate->scheduler_data, 0,
+                econtext->ecxt_estate->showstatctx);
+          }
+          scheduler_cleanup(queryDesc->estate->scheduler_data);
         }
 
 		/* teardown the sequence server */
@@ -1344,23 +1394,29 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 	{
 
         /* If EXPLAIN ANALYZE, collect local and distributed execution stats. */
-        if (planstate->instrument)
-        {
-            cdbexplain_localExecStats(planstate, econtext->ecxt_estate->showstatctx);
-            if (!explainRecvStats &&
-				shouldDispatch)
-            {
-				Assert(queryDesc != NULL &&
-					   queryDesc->estate != NULL);
-                /* Wait for all gangs to finish.  Cancel slowpokes. */
-                dispatch_wait(queryDesc->estate->dispatch_data);
+        if (planstate->instrument) {
+          if (planstate->state->mainDispatchData) {
+            cdbexplain_localExecStats(planstate,
+                                      econtext->ecxt_estate->showstatctx);
+            if (!explainRecvStats && shouldDispatch) {
+              Assert(queryDesc != NULL && queryDesc->estate != NULL);
+              /* Wait for all gangs to finish.  Cancel slowpokes. */
+              mainDispatchWait(queryDesc->estate->mainDispatchData, false);
 
-                cdbexplain_recvExecStats(planstate,
-                                         dispatch_get_results(queryDesc->estate->dispatch_data),
-                                         LocallyExecutingSliceIndex(queryDesc->estate),
-                                         econtext->ecxt_estate->showstatctx,
-                                         dispatch_get_segment_num(queryDesc->estate->dispatch_data));
+              cdbexplain_recvExecStats(
+                  planstate,
+                  mainDispatchGetResults(queryDesc->estate->mainDispatchData),
+                  LocallyExecutingSliceIndex(queryDesc->estate),
+                  econtext->ecxt_estate->showstatctx,
+                  mainDispatchGetSegNum(queryDesc->estate->mainDispatchData));
             }
+          } else if (planstate->state->scheduler_data){
+            scheduler_receive_computenode_stats(
+                queryDesc->estate->scheduler_data, planstate);
+            cdbexplain_recvSchedulerExecStats(
+                planstate, queryDesc->estate->scheduler_data, 0,
+                econtext->ecxt_estate->showstatctx);
+          }
         }
 
         /* Restore memory high-water mark for root slice of main query. */
@@ -1371,9 +1427,12 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 		 * Wait for them to finish and clean up the dispatching structures.
          * Replace current error info with QE error info if more interesting.
 		 */
-        if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->dispatch_data) {
-			dispatch_catch_error(queryDesc->estate->dispatch_data);
-			queryDesc->estate->dispatch_data = NULL;
+        if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->mainDispatchData) {
+          mainDispatchCatchError(&queryDesc->estate->mainDispatchData);
+        } else if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->scheduler_data) {
+          scheduler_catch_error(queryDesc->estate->scheduler_data);
+          scheduler_cleanup(queryDesc->estate->scheduler_data);
+          queryDesc->estate->scheduler_data = NULL;
         }
 		
 		/* teardown the sequence server */

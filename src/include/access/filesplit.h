@@ -37,6 +37,8 @@ typedef struct FileSplitNode
 {
 	NodeTag type;
 	int segno;
+	uint32 range_id;
+	uint32 replicaGroup_id;
 	int64 logiceof;
 	int64 offsets;
 	int64 lengths;
@@ -55,6 +57,8 @@ typedef struct SegFileSplitMapNode
 	NodeTag type;
 	Oid relid;
 	List *splits;
+	char *serializeSchema;
+	int serializeSchemaLen;
 } SegFileSplitMapNode;
 
 typedef SegFileSplitMapNode *SegFileSplitMap;
@@ -75,4 +79,10 @@ AssignAOSegFileSplitToSegment(Oid relid, List *segment_infos, int target_segment
 extern List *
 GetFileSplitsOfSegment(List *segFileSplitMaps, Oid relid, int segment_index);
 
+extern List *
+GetFileSplitsOfSegmentMagma(List *splitToSegmentMaps, Oid relid);
+
+extern void
+GetMagmaSchemaByRelid(List *splitToSegmentMaps, Oid relid,
+                      char **serializeSchema, int *serializeSchemaLen);
 #endif /* FILESPLIT_H */

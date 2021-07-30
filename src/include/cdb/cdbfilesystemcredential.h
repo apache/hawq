@@ -35,10 +35,27 @@
 extern int server_ticket_renew_interval;
 extern char *krb5_ccname;
 
+struct FileSystemCredentialKey
+{
+  char protocol[64];
+  char host[1024];
+  int port;
+};
+
+struct FileSystemCredential
+{
+  struct FileSystemCredentialKey key;
+  char *credential;
+  void *fs;
+};
+
+typedef struct FileSystemCredential* FileSystemCredential;
 bool login(void);
 void FSCredShmemInit(void);
 int FSCredShmemSize(void);
 
+void get_current_credential_cache_and_memcxt(HTAB ** currentFilesystemCredentials,
+        MemoryContext *currentFilesystemCredentialsMemoryContext);
 void create_filesystem_credentials(Portal portal);
 void cleanup_filesystem_credentials(Portal portal);
 void set_filesystem_credentials(Portal portal, HTAB * currentFilesystemCredentials,

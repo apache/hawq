@@ -129,6 +129,7 @@ void init_slot(TupleTableSlot *slot, TupleDesc tupdesc)
 	slot->tts_tupleDescriptor = tupdesc;
 	slot->tts_mcxt = CurrentMemoryContext;
 	slot->tts_buffer = InvalidBuffer;
+	slot->tts_rangeid = 0;
 }
 
 static void cleanup_slot(TupleTableSlot *slot)
@@ -1481,7 +1482,11 @@ slot_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
                 switch(attnum)
                 {
                         case SelfItemPointerAttributeNumber:
+              /*
 							Assert(ItemPointerIsValid(&(slot->PRIVATE_tts_synthetic_ctid)));
+							 * Magma reuses this field to save row id which might set ip_posid
+               * 0. This breaks this assertion.
+							 */
 							result = PointerGetDatum(&(slot->PRIVATE_tts_synthetic_ctid));
 							break;
                         case ObjectIdAttributeNumber:
@@ -1492,7 +1497,10 @@ slot_getsysattr(TupleTableSlot *slot, int attnum, bool *isnull)
 								result = ObjectIdGetDatum(InvalidOid);
 							break;
                         case GpSegmentIdAttributeNumber:
-							result = Int32GetDatum(GetQEIndex());
+                        	/* in magma case, tts_rangeid is high 16 bits rowid part(high 16 bits of 64bits rowid)
+                        	 * and low 16 bits rangeid, transfer the high 16 bits rowid to 33-48bits of gp_segmentid.*/
+							result = slot->tts_rangeid != 0 ? (((Int32GetDatum(slot->tts_rangeid)) << 16)
+									| Int32GetDatum(GetQEIndex())) : Int32GetDatum(GetQEIndex());
 							break;
                         case TableOidAttributeNumber:
 							result = ObjectIdGetDatum(slot->tts_tableOid);

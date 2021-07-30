@@ -205,6 +205,12 @@ extern int gp_mdver_max_entries;
 extern PGDLLIMPORT int MyProcPid;
 extern PGDLLIMPORT pg_time_t MyStartTime;
 extern PGDLLIMPORT struct Port *MyProcPort;
+typedef struct ExecutorC ExecutorC;
+extern ExecutorC	*MyNewExecutor;
+typedef struct SchedulerC SchedulerC;
+extern SchedulerC *MyScheduler;
+typedef struct CachedResultC CachedResultC;
+extern CachedResultC *MyCachedResult;
 extern long MyCancelKey;
 extern int	MyPMChildSlot;
 
@@ -319,6 +325,13 @@ extern bool VacuumCostActive;
 extern int hawq_re_memory_overcommit_max;
 extern double hawq_re_memory_quota_allocation_ratio;
 extern int gp_vmem_protect_gang_cache_limit;
+
+extern uint32_t sql_memory;
+extern double sql_cpu;
+extern const char *sql_creation_time;
+extern const char *sql_text;
+extern const char *portal_name;
+extern bool is_qtype_sql;
 
 /* in tcop/postgres.c */
 extern void check_stack_depth(void);

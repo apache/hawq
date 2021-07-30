@@ -241,6 +241,7 @@ extern bool Debug_print_tablespace;
 extern bool	Debug_print_server_processes;
 extern bool Debug_print_control_checkpoints;
 extern bool Debug_print_execution_detail;
+extern bool Debug_print_dispatcher_detail;
 extern bool	Debug_dtm_action_primary;
 
 extern bool gp_log_optimization_time;
@@ -277,6 +278,12 @@ extern bool gp_disable_catalog_access_on_segment;
 
 extern bool gp_called_by_pgdump;
 
+/* filespace guc value*/
+extern bool hawq_init_with_magma;
+extern bool hawq_init_with_hdfs;
+extern char *default_table_format;
+extern char *default_tablespace;
+
 /* Debug DTM Action */
 typedef enum
 {
@@ -306,12 +313,16 @@ extern int Debug_dtm_action_delay_ms;
 extern int Debug_dtm_action_segment;
 
 extern int default_hash_table_bucket_number;
+extern int default_magma_hash_table_nvseg_per_seg;
+extern int hawq_auto_ha_timeout;
+extern int default_magma_block_size;  //  default magma block size
 extern int hawq_rm_nvseg_for_copy_from_perquery;
 extern int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_limit;
 extern bool allow_file_count_bucket_num_mismatch;
+extern bool enable_pg_stat_activity_history;
 
 extern char *ConfigFileName;
 extern char *HbaFileName;
@@ -464,13 +475,13 @@ extern char   *acl_type;
 /* rps port*/
 extern int     rps_addr_port;
 
-/* interval of checking local RPS */
-extern int     rps_check_local_interval;
-
 /*
  * cloud authenticate
  */
 extern char	   *pg_cloud_clustername;
+
+/* interval of checking local RPS */
+extern int     rps_check_local_interval;
 
 /*
  * During insertion in a table with parquet partitions,
@@ -540,6 +551,21 @@ extern char   *pxf_remote_service_secret;
 /* Time based authentication GUC */
 extern char  *gp_auth_time_override_str;
 
+extern char *dispatch_udf_str;
+extern char *dispatch_udf_mode_str;
+
+extern char *enable_alpha_newqe_str;
+
+extern char *orc_enable_filter_pushdown;
+extern int orc_update_delete_work_mem;
+
+extern bool magma_cache_read;
+extern char *magma_enable_shm;
+extern int magma_shm_limit_per_block;
+
+extern int readable_external_table_timeout;
+extern int writable_external_table_bufsize;
+
 extern void SetConfigOption(const char *name, const char *value,
 				GucContext context, GucSource source);
 
@@ -606,7 +632,7 @@ extern void SetPGVariable(const char *name, List *args, bool is_local);
 extern void SetPGVariableDispatch(const char *name, List *args, bool is_local);
 extern void GetPGVariable(const char *name, DestReceiver *dest);
 extern TupleDesc GetPGVariableResultDesc(const char *name);
-extern void ResetPGVariable(const char *name);
+extern bool ResetPGVariable(const char *name);
 
 extern char *flatten_set_variable_args(const char *name, List *args);
 
@@ -640,6 +666,10 @@ extern void read_nondefault_variables(void);
 extern const char *assign_default_tablespace(const char *newval,
 						  bool doit, GucSource source);
 
+/* in commands/tablespace.c */
+extern const char *assign_default_tableformat(const char *newval,
+						  bool doit, GucSource source);
+
 /* in utils/adt/regexp.c */
 extern const char *assign_regex_flavor(const char *value,
 					bool doit, GucSource source);
@@ -651,5 +681,11 @@ extern const char *assign_search_path(const char *newval,
 /* in access/transam/xlog.c */
 extern const char *assign_xlog_sync_method(const char *method,
 						bool doit, GucSource source);
+
+/* Return true when extensive feature has been supported */
+bool enableOushuDbExtensiveFeatureSupport();
+
+/* Log ERROR when extensive feature has not been supported, otherwise do nothing */
+void checkOushuDbExtensiveFeatureSupport(char featureCategory[]);
 
 #endif   /* GUC_H */

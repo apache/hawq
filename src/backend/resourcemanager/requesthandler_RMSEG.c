@@ -289,8 +289,8 @@ bool handleRMSEGRequestRUAlive(void **arg)
 
 	/* Check if can connect postmaster */
 	sprintf(conninfo,
-			"options='-c gp_session_role=UTILITY' dbname=template1 port=%d connect_timeout=60",
-			seg_addr_port);
+			"host=%s options='-c gp_session_role=UTILITY' dbname=template1 port=%d connect_timeout=60",
+			DRMGlobalInstance->SocketLocalHostName.Str, seg_addr_port);
 	while (retry > 0)
 	{
 		retry--;
@@ -353,9 +353,11 @@ void checkLocalPostmasterStatus(void)
 	}
 
 	/* Check if can connect postmaster */
-	sprintf(conninfo, "options='-c gp_session_role=UTILITY' "
+	sprintf(conninfo, "host=%s options='-c gp_session_role=UTILITY' "
 					  "dbname=template1 port=%d connect_timeout=60",
+					  DRMGlobalInstance->SocketLocalHostName.Str,
 					  seg_addr_port);
+
 	conn = PQconnectdb(conninfo);
 	if ((libpqres = PQstatus(conn)) != CONNECTION_OK) {
 		elog(LOG, "Segment postmaster is down, libpb conn result : %d, %s",

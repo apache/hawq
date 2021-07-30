@@ -128,6 +128,7 @@ static bool match_special_index_operator(Expr *clause, Oid opclass,
 static Expr *expand_boolean_index_clause(Node *clause, int indexcol,
 							IndexOptInfo *index);
 static List *expand_indexqual_opclause(RestrictInfo *rinfo, Oid opclass);
+static bool check_index_only(RelOptInfo *rel, IndexOptInfo *index);
 static RestrictInfo *expand_indexqual_rowcompare(RestrictInfo *rinfo,
 							IndexOptInfo *index,
 							int indexcol);
@@ -155,6 +156,7 @@ create_bitmap_scan_path(char relstorage,
 	switch(relstorage)
 	{
 		case RELSTORAGE_HEAP:
+		case RELSTORAGE_EXTERNAL:
 			path = (Path *)create_bitmap_heap_path(root, rel, bitmapqual, outer_rel);
 			break;
 		default:
@@ -338,6 +340,7 @@ find_usable_indexes(PlannerInfo *root, RelOptInfo *rel,
 	List	   *result = NIL;
 	List	   *all_clauses = NIL;		/* not computed till needed */
 	ListCell   *ilist;
+	bool   index_only_scan = false;
 
 	foreach(ilist, rel->indexlist)
 	{
@@ -420,7 +423,11 @@ find_usable_indexes(PlannerInfo *root, RelOptInfo *rel,
 		 * how many of them are actually useful for this query.  This is not
 		 * relevant unless we are at top level.
 		 */
-		index_is_ordered = OidIsValid(index->ordering[0]);
+		// disabled order by for magma index scan
+		if (rel->ext == RELSTORAGE_EXTERNAL)
+			index_is_ordered = false;
+		else
+			index_is_ordered = OidIsValid(index->ordering[0]);
 		if (index_is_ordered && istoplevel && outer_rel == NULL)
 		{
 			index_pathkeys = build_index_pathkeys(root, index,
@@ -476,25 +483,36 @@ find_usable_indexes(PlannerInfo *root, RelOptInfo *rel,
 			useful_pathkeys = NIL;
 
 		/*
-		 * 3. Generate an indexscan path if there are relevant restriction
+		 * 3. Check if an index-only scan is possible.  If we're not building
+		 * plain indexscans, this isn't relevant since bitmap scans don't support
+		 * index data retrieval anyway.
+		 */
+		if (rel->ext == RELSTORAGE_EXTERNAL)
+		{
+			index_only_scan = check_index_only(rel, index);
+		}
+
+		/*
+		 * 4. Generate an indexscan path if there are relevant restriction
 		 * clauses in the current clauses, OR the index ordering is
 		 * potentially useful for later merging or final output ordering, OR
 		 * the index has a predicate that was proven by the current clauses.
 		 */
-		if (found_clause || useful_pathkeys != NIL || useful_predicate)
+		if (found_clause || useful_pathkeys != NIL || useful_predicate
+				|| index_only_scan)
 		{
-			ipath = create_index_path(root, index,
-									  restrictclauses,
-									  useful_pathkeys,
-									  index_is_ordered ?
-									  ForwardScanDirection :
-									  NoMovementScanDirection,
-									  outer_rel);
+			index->indexonly = index_only_scan;
+			ipath = create_index_path(
+			root, index, restrictclauses, useful_pathkeys,
+			index_is_ordered ?
+			    ForwardScanDirection : NoMovementScanDirection,
+			    outer_rel);
+			ipath->indexonly = index_only_scan;
 			result = lappend(result, ipath);
 		}
 
 		/*
-		 * 4. If the index is ordered, and there is a requested query ordering
+		 * 5. If the index is ordered, and there is a requested query ordering
 		 * that we failed to match, consider variant ways of achieving the
 		 * ordering.  Again, this is only interesting at top level.
 		 */
@@ -507,11 +525,11 @@ find_usable_indexes(PlannerInfo *root, RelOptInfo *rel,
 			scandir = match_variant_ordering(root, index, restrictclauses);
 			if (!ScanDirectionIsNoMovement(scandir))
 			{
-				ipath = create_index_path(root, index,
-										  restrictclauses,
-										  root->query_pathkeys,
-										  scandir,
-										  outer_rel);
+				index->indexonly = index_only_scan;
+				ipath = create_index_path(
+				    root, index, restrictclauses,
+				    root->query_pathkeys, scandir, outer_rel);
+				ipath->indexonly = index_only_scan;
 				result = lappend(result, ipath);
 			}
 		}
@@ -1300,6 +1318,10 @@ match_clause_to_indexcol(IndexOptInfo *index,
 	{
 		leftop = get_leftop(clause);
 		rightop = get_rightop(clause);
+		// disable param for magma index scan
+		if (index->rel->ext == RELSTORAGE_EXTERNAL)
+			if (rightop->type == T_Param)
+				return false;
 		if (!leftop || !rightop)
 			return false;
 		left_relids = rinfo->left_relids;
@@ -1769,16 +1791,23 @@ best_inner_indexscan(PlannerInfo *root, RelOptInfo *rel,
         indexpaths = NIL;
 
 	/* Exclude plain index paths if the relation is an append-only relation. */
-	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_PARQUET)
+	if (relstorage_is_ao(relstorage) ||
+		/* disable inner join index scan for magma
+		 * because magma index scan cant support dynamic filter
+		 */
+		relstorage == RELSTORAGE_EXTERNAL)
 		indexpaths = NIL;
 
 	/*
 	 * If we found anything usable, generate a BitmapHeapPath for the most
 	 * promising combination of bitmap index paths.
 	 */
-	if (bitindexpaths != NIL &&
+	if ((bitindexpaths != NIL &&
         (root->config->enable_bitmapscan || root->config->mpp_trying_fallback_plan))
+      /* disable magma bitmap scan for inner join
+       * because magma index scan cant support dynamic filter
+       */
+      && (relstorage != RELSTORAGE_EXTERNAL))
 	{
 		Path *bitmapqual;
 		Path *bpath;
@@ -2627,6 +2656,84 @@ expand_boolean_index_clause(Node *clause,
 	}
 
 	return NULL;
+}
+
+/*
+ * check_index_only
+ *		Determine whether an index-only scan is possible for this index.
+ */
+static bool
+check_index_only(RelOptInfo *rel, IndexOptInfo *index)
+{
+	bool		result;
+	Bitmapset  *attrs_used = NULL;
+	Bitmapset  *index_canreturn_attrs = NULL;
+	ListCell   *lc;
+	int			i;
+
+	/* Index-only scans must be enabled */
+	if (!enable_magma_indexonlyscan)
+		return false;
+
+	/*
+	 * Check that all needed attributes of the relation are available from the
+	 * index.
+	 */
+
+	/*
+	 * First, identify all the attributes needed for joins or final output.
+	 * Note: we must look at rel's targetlist, not the attr_needed data,
+	 * because attr_needed isn't computed for inheritance child rels.
+	 */
+	pull_varattnos((Node *) rel->reltargetlist, rel->relid, &attrs_used);
+
+	/*
+	 * Add all the attributes used by restriction clauses; but consider only
+	 * those clauses not implied by the index predicate, since ones that are
+	 * so implied don't need to be checked explicitly in the plan.
+	 *
+	 * Note: attributes used only in index quals would not be needed at
+	 * runtime either, if we are certain that the index is not lossy.  However
+	 * it'd be complicated to account for that accurately, and it doesn't
+	 * matter in most cases, since we'd conclude that such attributes are
+	 * available from the index anyway.
+	 */
+	foreach(lc, rel->baserestrictinfo)
+	{
+		RestrictInfo *rinfo = (RestrictInfo *) lfirst(lc);
+
+		pull_varattnos((Node *) rinfo->clause, rel->relid, &attrs_used);
+	}
+
+	/*
+	 * Construct a bitmapset of columns that the index can return back in an
+	 * index-only scan.  If there are multiple index columns containing the
+	 * same attribute, all of them must be capable of returning the value,
+	 * since we might recheck operators on any of them.  (Potentially we could
+	 * be smarter about that, but it's such a weird situation that it doesn't
+	 * seem worth spending a lot of sweat on.)
+	 */
+	for (i = 0; i < index->ncolumns; i++)
+	{
+		int			attno = index->indexkeys[i];
+
+		/*
+		 * For the moment, we just ignore index expressions.  It might be nice
+		 * to do something with them, later.
+		 */
+		if (attno == 0)
+			continue;
+		index_canreturn_attrs = bms_add_member(index_canreturn_attrs,
+																					 attno - FirstLowInvalidHeapAttributeNumber);
+	}
+
+	/* Do we have all the necessary attributes? */
+	result = bms_is_subset(attrs_used, index_canreturn_attrs);
+
+	bms_free(attrs_used);
+	bms_free(index_canreturn_attrs);
+
+	return result;
 }
 
 /*

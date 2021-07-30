@@ -60,6 +60,11 @@ SSH_MAX_RETRY=10
 # Delay before retrying ssh connection, in seconds
 SSH_RETRY_DELAY=.5
 
+# different from above ,
+# timeout and retry times when there is no response
+SSH_CONNECTTIMEOUT=60
+SSH_CONNECTIONATTEMPTS=1
+
 
 class WorkerPool(object):
     """TODO:"""
@@ -490,7 +495,9 @@ class RemoteExecutionContext(LocalExecutionContext):
 
         # Escape " for remote execution otherwise it interferes with ssh
         cmd.cmdStr = cmd.cmdStr.replace('"', '\\"')
-        cmd.cmdStr="ssh -o 'StrictHostKeyChecking no' %s \"%s %s\"" % (self.targetHost,SRC_GPPATH,cmd.cmdStr)
+        cmd.cmdStr="ssh -o 'StrictHostKeyChecking no' " + \
+        " -o ConnectTimeout=%s -o ConnectionAttempts=%s " % (SSH_CONNECTTIMEOUT,SSH_CONNECTIONATTEMPTS) + \
+        " %s \"%s %s\"" % (self.targetHost,SRC_GPPATH,cmd.cmdStr)
         LocalExecutionContext.execute(self,cmd)
         if (cmd.get_results().stderr.startswith('ssh_exchange_identification: Connection closed by remote host')):
             self.__retry(cmd)

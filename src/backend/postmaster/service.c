@@ -356,9 +356,12 @@ ServiceClientWrite(ServiceClient *serviceClient, void* request, int requestLen)
 		SUPPRESS_PANIC();
 
 		if (serviceClient->sockfd == -1)
+		{
+			LWLockRelease(WALWriteLock);
 			ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 						     errmsg("Lost connection to '%s'",
 						            serviceConfig->title)));
+		}
 
 		/*
 		 * write the request
@@ -372,6 +375,7 @@ ServiceClientWrite(ServiceClient *serviceClient, void* request, int requestLen)
 
 			if (n == 0)
 			{
+				LWLockRelease(WALWriteLock);
 				ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 									 errmsg("Connection to '%s' is closed",
 							                serviceConfig->title)));
@@ -381,6 +385,7 @@ ServiceClientWrite(ServiceClient *serviceClient, void* request, int requestLen)
 			{
 				if (saved_err != EINTR && saved_err != EWOULDBLOCK)
 				{
+					LWLockRelease(WALWriteLock);
 					ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 									 errmsg("Write error to '%s': %s",
 									        serviceConfig->title,
@@ -404,6 +409,7 @@ ServiceClientWrite(ServiceClient *serviceClient, void* request, int requestLen)
 
 							ServiceGetClientTimeout(serviceConfig, &wholeTimeout);
 
+							LWLockRelease(WALWriteLock);
 							ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 											 errmsg("Write to '%s' timed out after %d.%03d seconds)",
 								 		            serviceConfig->title,
@@ -416,6 +422,7 @@ ServiceClientWrite(ServiceClient *serviceClient, void* request, int requestLen)
 						{
 							saved_err = errno;
 
+							LWLockRelease(WALWriteLock);
 							ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 											 errmsg("Write error to '%s': %s",
 											        serviceConfig->title,
@@ -520,6 +527,7 @@ ServiceClientRead(ServiceClient *serviceClient, void* response, int responseLen,
 
 			if (n == 0)
 			{
+				LWLockRelease(WALWriteLock);
 				ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 								errmsg("Connection to '%s' is closed (%d)",
 									   serviceConfig->title, serviceClient->sockfd)));
@@ -529,6 +537,7 @@ ServiceClientRead(ServiceClient *serviceClient, void* response, int responseLen,
 			{
 				if (saved_err != EINTR && saved_err != EWOULDBLOCK)
 				{
+					LWLockRelease(WALWriteLock);
 					ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 									errmsg("Read error from '%s': %s (%d)",
 										   serviceConfig->title,
@@ -550,6 +559,7 @@ ServiceClientRead(ServiceClient *serviceClient, void* response, int responseLen,
 						{
 							if (timeout != NULL)
 							{
+								LWLockRelease(WALWriteLock);
 								ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 												errmsg("Read from '%s' timed out after %d.%03d seconds",
 													   serviceConfig->title,
@@ -563,6 +573,7 @@ ServiceClientRead(ServiceClient *serviceClient, void* response, int responseLen,
 						{
 							saved_err = errno;
 
+							LWLockRelease(WALWriteLock);
 							ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 											errmsg("Read error from '%s': %s (%d)",
 												   serviceConfig->title,

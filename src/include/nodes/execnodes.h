@@ -75,6 +75,8 @@ struct FileScanDescData;
 struct TBMIterateResult;
 struct TriggerDesc;
 struct SliceTable;
+struct ExternalInsertDescData;          /* #include "access/fileam.h" */
+struct OrcInsertDescData;
 
 /* ----------------
  *          IndexInfo information
@@ -307,6 +309,10 @@ typedef struct ResultRelInfo
 
 	struct ExternalInsertDescData   *ri_extInsertDesc;
 	struct ParquetInsertDescData    *ri_parquetInsertDesc;
+	struct OrcInsertDescData        *ri_orcInsertDesc;
+
+	struct OrcDeleteDescData        *ri_orcDeleteDesc;
+	struct OrcUpdateDescData        *ri_orcUpdateDesc;
 
 	struct QueryContextDispatchingSendBackData *ri_insertSendBack;
 
@@ -501,6 +507,8 @@ typedef struct EState
 	int                        es_num_result_relations;                /* length of array */
 	ResultRelInfo *es_result_relation_info;                /* currently active array elt */
 	JunkFilter *es_junkFilter;        /* currently active junk filter */
+	HTAB                           *es_ext_del_oid_desc;  /* execution status of delete */
+	HTAB                           *es_ext_upd_oid_desc;  /* execution status of update */
 
 	Oid es_last_inserted_part; /* The Oid of the last partition we opened for insertion */
 
@@ -574,8 +582,13 @@ typedef struct EState
 
 	bool cancelUnfinished;                /* when we're cleaning up, we need to make sure that we know it */
 
+	bool terminateOnGoing;	/* If it is in a terminate process. */
+
     /* results from qExec processes */
 	struct DispatchData			*dispatch_data;
+	struct MainDispatchData *mainDispatchData;
+
+	struct SchedulerData			*scheduler_data;
 
     /* CDB: EXPLAIN ANALYZE statistics */
     struct CdbExplain_ShowStatCtx  *showstatctx;
@@ -1293,9 +1306,6 @@ typedef struct PlanState
          */
         int gpmon_plan_tick;
         gpmon_packet_t gpmon_pkt;
-
-        /* state of executor operator  */
-        void* vectorized;
 } PlanState;
 
 typedef struct Gpmon_NameUnit_MaxVal
@@ -1492,6 +1502,7 @@ typedef enum
 	TableTypeHeap,
 	TableTypeAppendOnly,
 	TableTypeParquet,
+	TableTypeOrc,
 	TableTypeInvalid,
 } TableType;
 
@@ -1539,9 +1550,7 @@ typedef struct ScanState
 
 	/* The type of the table that is being scanned */
 	TableType tableType;
-	char *hivehost;
-	int hiveport;
-	char *hivepath;
+	char *hiveUrl;
 
 	/* Runtime filter */
 	struct RuntimeFilterState *runtimeFilter;
@@ -1874,6 +1883,12 @@ typedef struct ExternalScanState
 	bool cdb_want_ctid;
 	ItemPointerData cdb_fake_ctid;
 	int parent_agg_type;
+
+	/* index info */
+	ExternalScanType type;
+	List *indexqual;
+	char *indexname;
+	ScanDirection indexorderdir;
 } ExternalScanState;
 
 /* ----------------
@@ -1915,6 +1930,13 @@ typedef struct ParquetScanState
 	ScanState ss;
 	ParquetScanOpaqueData *opaque;
 } ParquetScanState;
+
+struct OrcScanOpaqueData;
+typedef struct OrcScanState
+{
+	ScanState ss;
+	struct OrcScanDescData *scandesc;
+} OrcScanState;
 
 /*
  * TableScanState

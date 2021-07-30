@@ -86,6 +86,9 @@ static void DeleteFilespaceEntryTuples(Oid fsoid);
  */
 #define MAX_FILESPACES 64
 
+#define LOCAL_FILESYSTEM "local"
+
+#define HDFS_FILESYSTEM "hdfs"
 
 static bool isLocalFilesystem(Oid fsysid)
 {
@@ -178,6 +181,18 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	short				 fsrep;		/* num of replication */
 	ListCell			*cell;
 
+	if(stmt->fsysname && pg_strcasecmp(stmt->fsysname, LOCAL_FILESYSTEM) == 0)
+  {
+    /*
+     * Extra local filespace is pointless here, Magma table storage is determined by
+     * magma_server, tables of other format can only be stored on hdfs.
+     */
+    ereport(ERROR,
+        (errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+         errmsg("do not support creating local filespace."),
+         errhint("creating filespace on hdfs.")));
+  }
+
 	if (Gp_role != GP_ROLE_DISPATCH)
 		elog(ERROR, "cannot create filespaces in utility mode");
 
@@ -215,7 +230,7 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	 * InvalidOid for local filesystem
 	 */
 	fsysoid = InvalidOid;
-	if(stmt->fsysname && pg_strcasecmp(stmt->fsysname, "local") != 0)
+	if(stmt->fsysname && pg_strcasecmp(stmt->fsysname, LOCAL_FILESYSTEM) != 0)
 	{
 		/*
 		 * get Oid of filesystem. if filesystem not found,
@@ -318,7 +333,7 @@ CreateFileSpace(CreateFileSpaceStmt *stmt)
 	encoded = EncodeFileLocations(stmt->fsysname, fsrep, stmt->location);
 
 	bool existed;
-	if (HdfsPathExistAndNonEmpty(encoded, &existed, true)) /* skip hdfs trash directory */
+	if (pg_strcasecmp(stmt->fsysname, HDFS_FILESYSTEM) == 0 && HdfsPathExistAndNonEmpty(encoded, &existed, true)) /* skip hdfs trash directory */
 		ereport(ERROR, 
 				(errcode_for_file_access(),
 				 errmsg("%s: File exists and non empty", encoded)));

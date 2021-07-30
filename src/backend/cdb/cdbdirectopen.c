@@ -32,6 +32,7 @@
 #include "catalog/pg_am.h"
 #include "catalog/pg_index.h"
 #include "catalog/pg_opclass.h"
+#include "catalog/pg_exttable.h"
 #include "utils/builtins.h"
 #include "cdb/cdbvars.h"
 
@@ -50,6 +51,38 @@ DirectOpenDefineStatic(DirectOpen_PgClass,\
 DatabaseInfo_PgClassPgClass,\
 DatabaseInfo_PgClassAttrArray,\
 true);
+
+/*
+ * pg_exttable.
+ */
+static FormData_pg_class
+			DatabaseInfo_PgExtTablePgClass =
+						{Class_pg_exttable};
+
+static FormData_pg_attribute
+			DatabaseInfo_PgExtTableAttrArray[Natts_pg_exttable] =
+							{Schema_pg_exttable};
+
+DirectOpenDefineStatic(DirectOpen_PgExtTable,\
+DatabaseInfo_PgExtTablePgClass,\
+DatabaseInfo_PgExtTableAttrArray,\
+false);
+
+/*
+ * pg_namespace.
+ */
+static FormData_pg_class
+			DatabaseInfo_PgNameSpacePgClass =
+						{Class_pg_namespace};
+
+static FormData_pg_attribute
+			DatabaseInfo_PgNameSpaceAttrArray[Natts_pg_namespace] =
+							{Schema_pg_namespace};
+
+DirectOpenDefineStatic(DirectOpen_PgNameSpace,\
+DatabaseInfo_PgNameSpacePgClass,\
+DatabaseInfo_PgNameSpaceAttrArray,\
+false);
 
 /*
  * gp_relation_node.

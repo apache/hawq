@@ -32,9 +32,12 @@
 
 #include "funcapi.h"
 #include "miscadmin.h"
+#include "access/filesplit.h"
 #include "access/heapam.h"
 #include "access/genam.h"
 #include "access/aosegfiles.h"
+#include "access/orcsegfiles.h"
+#include "access/parquetsegfiles.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_proc.h"
 #include "catalog/dependency.h"
@@ -50,8 +53,6 @@
 #include "utils/syscache.h"
 #include "utils/fmgroids.h"
 #include "utils/numeric.h"
-#include "access/filesplit.h"
-#include "access/parquetsegfiles.h"
 
 static Datum ao_compression_ratio_internal(Oid relid);
 
@@ -1652,7 +1653,7 @@ ao_compression_ratio_internal(Oid relid)
 	/* open the parent (main) relation */
 	parentrel = heap_open(relid, AccessShareLock);
 
-	if(!RelationIsAoRows(parentrel) && !RelationIsParquet(parentrel))
+	if(!RelationIsAo(parentrel))
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				errmsg("'%s' is not an append-only relation",
@@ -1662,9 +1663,13 @@ ao_compression_ratio_internal(Oid relid)
 	{
 		returnDatum = aorow_compression_ratio_internal(parentrel);
 	}
-	else
+	else if (RelationIsParquet(parentrel))
 	{
 		returnDatum = parquet_compression_ration_internal(parentrel);
+	}
+	else
+	{
+	  returnDatum = getOrcCompressionRatio(parentrel);
 	}
 	
 	heap_close(parentrel, AccessShareLock);

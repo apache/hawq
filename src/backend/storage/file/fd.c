@@ -2085,6 +2085,26 @@ cleanup_hdfs_handlers_for_dropping()
 	HdfsFsTable4Drop = NULL;
 }
 
+int HdfsIterateFilesInDir(const char *dir, HdfsIterateCallback callback,
+                          void *arg) {
+  char path[MAXPGPATH + 1];
+  char *protocol;
+  if (HdfsParsePath(dir, &protocol, NULL, NULL, NULL) || NULL == protocol)
+    return -1;
+  hdfsFS fs = HdfsGetConnection(dir, false);
+  if (NULL == fs) return -1;
+  if (NULL == ConvertToUnixPath(dir, path, sizeof(path))) return -1;
+  int num = -1;
+  hdfsFileInfo *fi = hdfsListDirectory(fs, path, &num);
+  for (int i = 0; i < num; ++i) {
+    if (fi[i].mKind == kObjectKindFile &&
+        callback(fi[i].mName, fi[i].mSize, arg)) {
+      return -1;
+    }
+  }
+  return 0;
+}
+
 /*
  * closeAllVfds
  *
@@ -2492,6 +2512,7 @@ HdfsGetConnection(const char * path, bool isForDrop)
 		}
 		else
 		{
+			elog(LOG, "search 4 drop 1");
 			entry = (struct FsEntry *) hash_search(HdfsFsTable4Drop,
 												   location,
 												   HASH_ENTER,
@@ -2530,6 +2551,7 @@ HdfsGetConnection(const char * path, bool isForDrop)
 						if (!isForDrop)
 							hash_search(HdfsFsTable, location, HASH_REMOVE, &found);
 						else {
+							elog(LOG, "search 4 drop 2");
 							hash_search(HdfsFsTable4Drop, location, HASH_REMOVE, &found);
 						}
 						errno = EACCES;
@@ -3093,6 +3115,30 @@ HdfsRemovePath(FileName fileName, int recursive)
 }
 
 int
+HdfsRemoveFilesInDir(const char * dir) {
+	char path[MAXPGPATH + 1];
+	char *protocol;
+	if (HdfsParsePath(dir, &protocol, NULL, NULL, NULL) || NULL == protocol)
+		return -1;
+	hdfsFS fs = HdfsGetConnection(dir, true);
+	if (NULL == fs)
+		return -1;
+	if (NULL == ConvertToUnixPath(dir, path, sizeof(path)))
+		return -1;
+	int num = -1;
+	hdfsFileInfo  *fi = hdfsListDirectory(fs, path, &num);
+	for (int i = 0; i < num; ++i) {
+			if (fi[i].mKind == kObjectKindFile &&
+					HdfsDelete(protocol, fs, fi[i].mName, 0))
+			{
+				errno = EIO;
+				return -1;
+			}
+	}
+	return 0;
+}
+
+int
 HdfsMakeDirectory(const char * path, mode_t mode)
 {
 	char p[MAXPGPATH + 1];
@@ -3272,8 +3318,14 @@ HdfsRenewDelegationToken(void *fs, char *credential)
 
 void HdfsCancelDelegationToken(void *fs, char *credential)
 {
-	Insist(NULL != fs && NULL != credential && strlen(credential) > 0);
+	Insist(NULL != fs && NULL != credential);
 
+	if (strlen(credential) == 0) {
+		/*when secure hawq cluster running on insecure hdfs cluster, the length of
+		 *  token get from namenode is zero, which will happen in case one query contains
+		 *  tables from both insecure and secure cluster*/
+		return;
+	}
 	if (-1 == hdfsCancelDelegationToken(fs, credential))
 	{
 		ereport(WARNING,
@@ -3281,7 +3333,6 @@ void HdfsCancelDelegationToken(void *fs, char *credential)
 								errmsg("failed to cancel hdfs delegation token."),
 								errdetail("%s", HdfsGetLastError())));
 	}
-
 }
 
 const char * HdfsGetLastError(void)

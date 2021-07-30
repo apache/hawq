@@ -20,14 +20,10 @@ package org.apache.hawq.pxf.plugins.hive;
  */
 
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
-import org.apache.hadoop.hive.ql.io.orc.Reader;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument;
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory;
 import org.apache.hadoop.mapred.*;
-import org.apache.hawq.pxf.api.OneRow;
-import org.apache.hawq.pxf.api.ReadAccessor;
 import org.apache.hawq.pxf.api.utilities.ColumnDescriptor;
-import org.apache.hawq.pxf.api.utilities.EnumAggregationType;
 import org.apache.hawq.pxf.api.utilities.InputData;
 import org.apache.hawq.pxf.plugins.hdfs.utilities.HdfsUtilities;
 import org.apache.hawq.pxf.plugins.hive.utilities.HiveUtilities;
@@ -43,8 +39,6 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 import static org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory.SARG_PUSHDOWN;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertNotNull;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -61,19 +55,16 @@ public class HiveORCAccessorTest {
     @Mock OrcInputFormat orcInputFormat;
     @Mock InputFormat inputFormat;
     @Mock ColumnDescriptor columnDesc;
-    @Mock Reader orcReader;
     JobConf jobConf;
     HiveORCAccessor accessor;
 
     @Before
-    @SuppressWarnings("unchecked")
     public void setup() throws Exception {
         jobConf = new JobConf();
         PowerMockito.whenNew(JobConf.class).withAnyArguments().thenReturn(jobConf);
 
         PowerMockito.mockStatic(HiveUtilities.class);
         PowerMockito.when(HiveUtilities.parseHiveUserData(any(InputData.class), any(PXF_HIVE_SERDES[].class))).thenReturn(new HiveUserData("", "", null, HiveDataFragmenter.HIVE_NO_PART_TBL, true, "1", ""));
-        PowerMockito.when(HiveUtilities.getOrcReader(any(InputData.class))).thenReturn(orcReader);
 
         PowerMockito.mockStatic(HdfsUtilities.class);
 
@@ -83,7 +74,6 @@ public class HiveORCAccessorTest {
         PowerMockito.whenNew(OrcInputFormat.class).withNoArguments().thenReturn(orcInputFormat);
         RecordReader recordReader = mock(RecordReader.class);
         PowerMockito.when(orcInputFormat.getRecordReader(any(InputSplit.class), any(JobConf.class), any(Reporter.class))).thenReturn(recordReader);
-        PowerMockito.when(inputData.getAccessor()).thenReturn(HiveORCAccessor.class.getName());
 
         accessor = new HiveORCAccessor(inputData);
     }
@@ -129,11 +119,6 @@ public class HiveORCAccessorTest {
         SearchArgument sarg = SearchArgumentFactory.newBuilder().startAnd().in("FOO", 1, 2, 3).end().build();
 
         assertEquals(sarg.toKryo(), jobConf.get(SARG_PUSHDOWN));
-    }
-
-    @Test(expected=IllegalStateException.class)
-    public void emitAggObjectCountStatsNotInitialized() {
-        accessor.emitAggObject();
     }
 
 }

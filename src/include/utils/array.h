@@ -246,6 +246,7 @@ extern void deconstruct_array(ArrayType *array,
 				  Oid elmtype,
 				  int elmlen, bool elmbyval, char elmalign,
 				  Datum **elemsp, bool **nullsp, int *nelemsp);
+extern bool array_contains_nulls(ArrayType *array);
 extern ArrayBuildState *accumArrayResult(ArrayBuildState *astate,
 				 Datum dvalue, bool disnull,
 				 Oid element_type,
@@ -284,5 +285,10 @@ extern Datum array_agg_finalfn(PG_FUNCTION_ARGS);
 
 /* MPP Additions: */
 extern Datum array_int4_add(PG_FUNCTION_ARGS);
+
+extern Datum euclidean_metric_float4array(PG_FUNCTION_ARGS);
+extern Datum euclidean_metric_float8array(PG_FUNCTION_ARGS);
+extern Datum cosine_distance_float4array(PG_FUNCTION_ARGS);
+extern Datum cosine_distance_float8array(PG_FUNCTION_ARGS);
 
 #endif   /* ARRAY_H */

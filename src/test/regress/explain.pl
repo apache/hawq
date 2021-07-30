@@ -268,7 +268,7 @@ correctly identify the left and right children.
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.apache.org
+Address bug reports and comments to: dev@hawq.incubator.apache.org
 
 =cut
 
@@ -599,7 +599,7 @@ BEGIN {
         if ($colorscheme =~ m/list|dump/i)
         {
             use IO::File;
-            use POSIX qw(tmpnam);
+            use File::Temp qw/ :POSIX /;
 
             my ($tmpnam, $tmpfh);
 
@@ -1307,7 +1307,7 @@ if (1)
             $glob_optn = "jpg";
             
             use IO::File;
-            use POSIX qw(tmpnam);
+            use File::Temp qw/ :POSIX /;
 
             my $tmpnam;
 
@@ -1432,7 +1432,7 @@ if (1)
             # instead.
 
             use IO::File;
-            use POSIX qw(tmpnam);
+            use File::Temp qw/ :POSIX /;
 
             my $tmpnam;
 

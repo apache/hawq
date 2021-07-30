@@ -91,7 +91,6 @@ ARGV: \-meta\ \/Users\/yjin\/hawq_main\/gpMgmt\/bin\/gppylib\/data\/2\.0\.json\ 
 #include "catalog/pg_tidycat.h"
 
 #include "catalog/gp_configuration.h"
-#include "catalog/gp_configuration.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_san_config.h"
 

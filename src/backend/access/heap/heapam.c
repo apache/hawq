@@ -64,6 +64,7 @@
 #include "cdb/cdbpersistentrecovery.h"
 #include "cdb/cdbinmemheapam.h"
 #include "cdb/cdbvars.h"
+#include "cdb/cdbdatalocality.h"
 #include "miscadmin.h"
 
 static XLogRecPtr log_heap_update(Relation reln, Buffer oldbuf,
@@ -897,12 +898,15 @@ relation_open(Oid relationId, LOCKMODE lockmode)
  * ----------------
  */
 Relation
-try_relation_open(Oid relationId, LOCKMODE lockmode, bool noWait)
+try_relation_open(Oid relationId, LOCKMODE lockmode, bool noWait, bool analyze)
 {
 	Relation	r;
 
 	Assert(lockmode >= NoLock && lockmode < MAX_LOCKMODES);
-
+	/* magma format uses MVCC to store data, so we can do insert/update/delete concurrently */
+	/* but when analyze magma table, this lock shouldn't be AccessShareLock */
+	if (dataStoredInMagmaByOid(relationId) && !analyze)
+		lockmode = AccessShareLock;
 	/* Get the lock first */
 	if (lockmode != NoLock)
 	{
@@ -1180,7 +1184,7 @@ relation_openrv(const RangeVar *relation, LOCKMODE lockmode)
 	 * throw a more graceful error message if the relation was dropped
 	 * between the RangeVarGetRelid and when we try to open the relation.
 	 */
-	rel = try_relation_open(relOid, lockmode, false);
+	rel = try_relation_open(relOid, lockmode, false, false);
 
 	if (!RelationIsValid(rel))
 	{
@@ -1241,7 +1245,7 @@ try_relation_openrv(const RangeVar *relation, LOCKMODE lockmode, bool noWait)
 		return NULL;
 
 	/* Let relation_open do the rest */
-	return try_relation_open(relOid, lockmode, noWait);
+	return try_relation_open(relOid, lockmode, noWait, false);
 }
 
 
@@ -1317,7 +1321,7 @@ try_heap_open(Oid relationId, LOCKMODE lockmode, bool noWait)
 {
 	Relation	r;
 
-	r = try_relation_open(relationId, lockmode, noWait);
+	r = try_relation_open(relationId, lockmode, noWait, false);
 
 	if (!RelationIsValid(r))
 		return NULL;

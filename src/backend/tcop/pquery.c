@@ -175,6 +175,10 @@ CreateQueryDesc(PlannedStmt *plannedstmt,
 	qd->resource = plannedstmt->resource;
 	qd->planner_segments = plannedstmt->planner_segments;
 
+	qd->newPlan = NULL;
+	qd->newPlanForceAuto = false;
+	qd->newExecutorState = NULL;
+
 	return qd;
 }
 
@@ -209,6 +213,10 @@ CreateUtilityQueryDesc(Node *utilitystmt,
 	qd->portal_name = NULL;
 
 	qd->resource = NULL;
+
+	qd->newPlan = NULL;
+	qd->newPlanForceAuto = false;
+	qd->newExecutorState = NULL;
 
 	return qd;
 }
@@ -818,6 +826,7 @@ AllocateResource(QueryResourceLife   life,
 	resource->resource_id = resourceId;
 	resource->master_start_time = PgStartTime;
 	resource->segments = NIL;
+	resource->vsegChangedMagma = false;
 
 	getAllocatedResourceContext(resource->resource_id, &rescontext);
 	if (rescontext != NULL)
@@ -1235,6 +1244,10 @@ PortalStart(Portal portal, ParamListInfo params, Snapshot snapshot,
 		switch (portal->strategy)
 		{
 			case PORTAL_ONE_SELECT:
+
+			  // we only enable read cache for one select query
+			  initReadCache((PlannedStmt *) linitial(portal->stmts),
+			                portal->sourceText);
 
 				/*
 				 * Must set snapshot before starting executor.	Be sure to
@@ -1686,6 +1699,7 @@ PortalRunSelect(Portal portal,
 	 */
 	queryDesc = PortalGetQueryDesc(portal);
 
+
 	/* Caller messed up if we have neither a ready query nor held data. */
 	Assert(queryDesc || portal->holdStore);
 
@@ -2086,7 +2100,9 @@ PortalRunMulti(Portal portal, bool isTopLevel,
 		 * one.
 		 */
 		if (lnext(stmtlist_item) != NULL)
+		{
 			CommandCounterIncrement();
+		}
 
 		/*
 		 * Clear subsidiary contexts to recover temporary memory.

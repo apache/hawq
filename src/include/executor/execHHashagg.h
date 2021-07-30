@@ -43,17 +43,6 @@
 typedef uint32 HashKey;
 typedef struct BatchFileInfo BatchFileInfo;
 
-/*
- * Represent different types for input records to be inserted
- * into the hash table.
- */
-typedef enum InputRecordType
-{
-	INPUT_RECORD_TUPLE = 0,
-	INPUT_RECORD_GROUP_AND_AGGS,
-} InputRecordType;
-
-
 /* An entry in an Agg hash table.
  * 
  * Each such entry corresponds to a single group and includes the grouping
@@ -76,6 +65,8 @@ typedef struct HashAggEntry
 	HashKey	hashvalue;
 	bool is_primodial; /* indicate if this entry is there before spilling. */
 } HashAggEntry;
+
+typedef HashAggEntry* HashAggBucket;
 
 /* A SpillFile controls access to a temporary file used to hold  
  * transition tuples spilled from the hash table in order to free 
@@ -194,6 +185,9 @@ typedef struct HashAggTable
 	HashAggEntry  **buckets;
 	uint64 *bloom;
 
+	/* hashkey bitshift amount to determine bucket - used when spilling */
+	unsigned pshift;
+
 	/* Overflow batches */
 	SpillSet       *spill_set;
 	/* Representation of all workfile names, used by the workfile manager */
@@ -239,10 +233,13 @@ typedef struct HashAggTable
 	uint64 num_tuples; /* Total input tuples so far*/
 	uint64 num_output_groups; /* Total output groups */
 	uint64 num_ht_groups; /* number of groups in the hash table */
+	uint64 num_entries; /* number of currently in-memory groups/entries */
 	uint64 num_spill_groups; /* number of spilled groups */
 	uint32 num_overflows; /* number of times hash table overflows */
+	uint32 num_expansions; /* number of times hash table is expanded */
 	uint64 total_buckets; /* total number of buckets allocated */
 	bool is_spilling; /* indicate that spilling happened for this batch. */
+	bool expandable;  /* hash table buckets still have space to grow */
 	struct TupleTableSlot *prev_slot; /* a slot that is read previously. */
     CdbExplain_Agg      chainlength;
 } HashAggTable;
@@ -267,12 +264,4 @@ calcHashAggTableSizes(double memquota,	/* Memory quota in bytes. */
 					   int transpace,	/* Est per entry size of by-ref values. */
                        bool force,      /* true => succeed even if work_mem too small */
                        HashAggTableSizes   *out_hats);
-extern int suspendSpillFiles(SpillSet *spill_set);
-extern SpillSet *read_spill_set(AggState *aggstate);
-extern HashAggEntry *lookup_agg_hash_entry(AggState *aggstate, void *input_record,
-										   InputRecordType input_type, int32 input_size,
-										   uint32 hashkey, unsigned parent_hash_bit, bool *p_isnew);
-extern void spill_hash_table(AggState *aggstate);
-extern void reset_agg_hash_table(AggState *aggstate);
-
 #endif

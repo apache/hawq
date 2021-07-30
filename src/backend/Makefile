@@ -14,8 +14,6 @@ subdir = src/backend
 top_builddir = ../..
 include $(top_builddir)/src/Makefile.global
 
-override CPPFLAGS := -I$(prefix)/include $(CPPFLAGS)
-
 SUBDIRS = access bootstrap catalog parser commands executor foreign \
 	lib libpq gp_libpq_fe main nodes optimizer port postmaster regex \
 	rewrite storage tcop utils resourcemanager $(top_builddir)/src/timezone cdb
@@ -49,7 +47,7 @@ LIBS := $(filter-out -lpgport, $(LIBS)) $(LDAP_LIBS_BE) $(CONNECTEMCLIB)
 
 # The backend doesn't need everything that's in LIBS, however
 LIBS := $(filter-out -lreadline -ledit -ltermcap -lncurses -lcurses, $(LIBS))
-LIBS := -lprotobuf -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl -lxml2 $(LIBS)
+LIBS := -lprotobuf -lboost_system -lboost_date_time -lhdfs3 -lgsasl -lxml2 $(LIBS)
 
 ORCA_BLD_PATH=$(abs_top_builddir)/depends/thirdparty
 
@@ -118,7 +116,7 @@ submake-gpos: $(ORCA_BLD_PATH)/gpos_prepare_timestamp
 submake-gp-xerces: $(ORCA_BLD_PATH)/gp-xerces_prepare_timestamp
 	if [ ! -f $(ORCA_BLD_PATH)/gp-xerces_build_timestamp ]; then \
 		rm -rf $(ORCA_BLD_PATH)/gp-xerces/build; mkdir -p $(ORCA_BLD_PATH)/gp-xerces/build; cd $(ORCA_BLD_PATH)/gp-xerces/build; mkdir -p install; \
-		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix); \
+		$(GP_XERCES_SRC_PATH)/configure --prefix=$(prefix) LDFLAGS=-L$(DEPENDENCY_PATH)/lib; \
 		$(MAKE) DESTDIR=$(ORCA_BLD_PATH)/gp-xerces/build/install install && \
 		touch $(ORCA_BLD_PATH)/gp-xerces_build_timestamp; \
 	fi
@@ -175,7 +173,7 @@ ifneq ($(PORTNAME), win32)
 ifneq ($(PORTNAME), aix)
 
 postgres: $(OBJS) submake-libdxltranslators
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys, $(filter-out submake-libdxltranslators, $^)) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys, $(filter-out submake-libdxltranslators, $^)) $(LIBS) $(LIBASAN) -o $@
 
 endif
 endif
@@ -185,9 +183,9 @@ ifeq ($(PORTNAME), cygwin)
 
 postgres: $(OBJS) postgres.def libpostgres.a
 	$(DLLTOOL) --dllname $@$(X) --output-exp $@.exp --def postgres.def
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
 	$(DLLTOOL) --dllname $@$(X) --base-file $@.base --output-exp $@.exp --def postgres.def
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Wl,--stack,$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--stack,$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(LIBS)
 	rm -f $@.exp $@.base
 
 postgres.def: $(OBJS)
@@ -203,9 +201,9 @@ LIBS += -lsecur32
 
 postgres: $(OBJS) postgres.def libpostgres.a $(WIN32RES)
 	$(DLLTOOL) --dllname $@$(X) --output-exp $@.exp --def postgres.def
-	$(CXX) $(CFLAGS) $(LDFLAGS) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@$(X) -Wl,--base-file,$@.base $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
 	$(DLLTOOL) --dllname $@$(X) --base-file $@.base --output-exp $@.exp --def postgres.def
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Wl,--stack=$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wl,--stack=$(WIN32_STACK_RLIMIT) -o $@$(X) $@.exp $(call expand_subsys,$(OBJS)) $(WIN32RES) $(LIBS)
 	rm -f $@.exp $@.base
 
 postgres.def: $(OBJS)
@@ -219,7 +217,7 @@ endif # win32
 ifeq ($(PORTNAME), aix)
 
 postgres: $(POSTGRES_IMP)
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(call expand_subsys,$(OBJS)) -Wl,-bE:$(top_builddir)/src/backend/$(POSTGRES_IMP) $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $(call expand_subsys,$(OBJS)) -Wl,-bE:$(top_builddir)/src/backend/$(POSTGRES_IMP) $(LIBS) -o $@
 
 $(POSTGRES_IMP): $(OBJS)
 	$(LD) $(LDREL) $(LDOUT) SUBSYS.o $(call expand_subsys,$^)
@@ -237,13 +235,14 @@ endif
 endif # aix
 
 # Update the commonly used headers before building the subdirectories
-$(SUBDIRS:%=%-recursive): $(top_builddir)/src/include/parser/gram.h $(top_builddir)/src/include/utils/fmgroids.h $(top_builddir)/src/include/utils/probes.h
+$(SUBDIRS:%=%-recursive): $(top_builddir)/src/include/parser/gram.h $(top_builddir)/src/include/utils/fmgroids.h $(top_builddir)/src/include/utils/probes.h \
+$(top_builddir)/src/include/utils/hawq_funcoid_mapping.h
 
 
 # The postgres.o target is needed by the rule in Makefile.global that
 # creates the exports file when MAKE_EXPORTS = true.
 postgres.o: $(OBJS)
-	$(CXX) $(LDREL) $(LDFLAGS) $(call expand_subsys,$^) $(LIBS) -o $@
+	$(CC) $(LDREL) $(LDFLAGS) $(call expand_subsys,$^) $(LIBS) -o $@
 
 
 # The following targets are specified in make commands that appear in
@@ -258,6 +257,9 @@ utils/fmgroids.h: utils/Gen_fmgrtab.sh $(top_srcdir)/src/include/catalog/pg_proc
 
 utils/probes.h: utils/probes.d
 	$(MAKE) -C utils probes.h
+
+utils/hawq_funcoid_mapping.h: utils/Gen_hawq_funcoid_mapping.sh utils/fmgroids.h
+	$(MAKE) -C utils hawq_funcoid_mapping.h
 
 # Make symlinks for these headers in the include directory. That way
 # we can cut down on the -I options. Also, a symlink is automatically
@@ -275,6 +277,10 @@ $(top_builddir)/src/include/utils/fmgroids.h: utils/fmgroids.h
 $(top_builddir)/src/include/utils/probes.h: utils/probes.h
 	cd $(dir $@) && rm -f $(notdir $@) && \
 	    $(LN_S) ../../../$(subdir)/utils/probes.h .
+
+$(top_builddir)/src/include/utils/hawq_funcoid_mapping.h: utils/hawq_funcoid_mapping.h
+	cd $(dir $@) && rm -f $(notdir $@) && \
+	    $(LN_S) ../../../$(subdir)/utils/hawq_funcoid_mapping.h .
 
 
 utils/probes.o: utils/probes.d $(SUBDIROBJS)
@@ -384,7 +390,8 @@ clean:
 	rm -f $(LOCALOBJS) postgres$(X) $(POSTGRES_IMP) \
 		$(top_srcdir)/src/include/parser/gram.h \
 		$(top_srcdir)/src/include/parser/parse.h \
-		$(top_builddir)/src/include/utils/fmgroids.h
+		$(top_builddir)/src/include/utils/fmgroids.h \
+		$(top_builddir)/src/include/utils/hawq_funcoid_mapping.h
 ifeq ($(PORTNAME), cygwin)
 	rm -f postgres.dll postgres.def libpostgres.a
 endif
@@ -422,4 +429,4 @@ maintainer-clean: distclean
 # are up to date.  It saves the time of doing all the submakes.
 .PHONY: quick
 quick: $(OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o postgres
+	$(CC) $(CFLAGS) $(LDFLAGS) $(export_dynamic) $(call expand_subsys,$^) $(LIBS) -o postgres

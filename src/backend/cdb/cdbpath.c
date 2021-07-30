@@ -1388,6 +1388,8 @@ cdbpath_dedup_fixup_walker(Path *path, void *context)
 
 		case T_SeqScan:
 		case T_ExternalScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 		case T_AppendOnlyScan:
 		case T_ParquetScan:
 		case T_IndexScan:

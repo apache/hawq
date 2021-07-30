@@ -137,19 +137,6 @@ public class BridgeOutputBuilder {
         return outputList;
     }
 
-    public LinkedList<Writable> makeVectorizedOutput(List<List<OneField>> recordsBatch) throws BadRecordException {
-        outputList.clear();
-        if (recordsBatch != null) {
-            for (List<OneField> record : recordsBatch) {
-                if (inputData.outputFormat() == OutputFormat.GPDBWritable) {
-                    makeGPDBWritableOutput();
-                }
-                fillOutputRecord(record);
-            }
-        }
-        return outputList;
-    }
-
     /**
      * Returns whether or not this is a partial line.
      *

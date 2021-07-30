@@ -60,6 +60,7 @@
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbfilerep.h"
 #include "cdb/cdbfilesystemcredential.h"
+#include "cdb/executormgr_new.h"
 #include "cdb/tupchunk.h"
 #include "commands/async.h"
 #include "commands/vacuum.h"
@@ -72,6 +73,7 @@
 #include "libpq/pqformat.h"
 #include "miscadmin.h"
 #include "optimizer/cost.h"
+#include "optimizer/newPlanner.h"
 #include "optimizer/paths.h"
 #include "optimizer/planmain.h"
 #include "parser/gramparse.h"
@@ -146,7 +148,6 @@
 extern bool Log_disconnections;
 extern int	CommitDelay;
 extern int	CommitSiblings;
-extern char *default_tablespace;
 extern bool fullPageWrites;
 
 extern bool enable_partition_rules;
@@ -241,6 +242,12 @@ static const char *assign_canonical_path(const char *newval, bool doit, GucSourc
 static const char *assign_backslash_quote(const char *newval, bool doit, GucSource source);
 static const char *assign_timezone_abbreviations(const char *newval, bool doit, GucSource source);
 
+static const char *assign_new_interconnect_type(const char *newval, bool doit,GucSource source);
+static const char *assign_new_executor_mode(const char *newval, bool doit, GucSource source);
+static const char *assign_new_executor_runtime_filter_mode(const char *newval, bool doit, GucSource source);
+static const char *assign_new_scheduler_mode(const char *newval, bool doit, GucSource source);
+static const char *assign_switch_mode(const char *newval, bool doit, GucSource source);
+
 static bool assign_tcp_keepalives_idle(int newval, bool doit, GucSource source);
 static bool assign_tcp_keepalives_interval(int newval, bool doit, GucSource source);
 static bool assign_tcp_keepalives_count(int newval, bool doit, GucSource source);
@@ -296,6 +303,7 @@ bool		Debug_print_tablespace = false;
 bool		Debug_print_server_processes = false;
 bool		Debug_print_control_checkpoints = false;
 bool    Debug_print_execution_detail = false;
+bool    Debug_print_dispatcher_detail = false;
 bool 		Debug_appendonly_print_insert = false;
 bool 		Debug_appendonly_print_insert_tuple = false;
 bool 		Debug_appendonly_print_scan = false;
@@ -452,6 +460,7 @@ char       *Debug_dtm_action_protocol_str;
 /* Enable check for compatibility of encoding and locale in createdb */
 bool		gp_encoding_check_locale_compatibility;
 bool  allow_file_count_bucket_num_mismatch;
+bool  enable_pg_stat_activity_history;
 
 char	   *pgstat_temp_directory;
 
@@ -624,6 +633,27 @@ char   *pxf_remote_service_secret = NULL;
 /* Time based authentication GUC */
 char  *gp_auth_time_override_str = NULL;
 
+char *dispatch_udf_str = NULL;
+char *dispatch_udf_mode_str = "OFF";
+
+char *enable_alpha_newqe_str = "ON";
+
+// filter push down for orc scan
+char *orc_enable_filter_pushdown = "ON";
+int orc_update_delete_work_mem;
+
+// enable magma in hawq
+bool hawq_init_with_magma = false;
+
+// enable cache read for magma
+bool magma_cache_read = true;
+
+// enable magma share memory
+char *magma_enable_shm = "ON";
+int magma_shm_limit_per_block;
+
+static char *new_interconnect_type_str = "TCP";
+
 /* Password hashing */
 char  *password_hash_algorithm_str = "MD5";
 PasswdHashAlg password_hash_algorithm = PASSWORD_HASH_MD5;
@@ -639,6 +669,10 @@ bool gp_log_stack_trace_lines;
 bool		enable_seqscan = true;
 bool		enable_indexscan = true;
 bool		enable_bitmapscan = true;
+bool		enable_magma_indexscan = false;
+bool		enable_magma_seqscan = true;
+bool		enable_magma_bitmapscan = false;
+bool		enable_magma_indexonlyscan = false;
 bool		force_bitmap_table_scan = false;
 bool		enable_tidscan = true;
 bool		enable_sort = true;
@@ -730,6 +764,9 @@ int		optimizer_plan_id;
 int  optimizer_samples_number;
 int  optimizer_log_failure;
 int default_hash_table_bucket_number;
+int default_magma_hash_table_nvseg_per_seg;
+int hawq_auto_ha_timeout;
+int default_magma_block_size;
 int hawq_rm_nvseg_for_copy_from_perquery;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
@@ -791,10 +828,6 @@ char   *acl_type;
 int    rps_addr_port;
 int    rps_check_local_interval;
 
-char   *rps_addr_host;
-char   *rps_addr_suffix;
-int     rps_addr_port;
-
 char	   *pg_cloud_clustername = NULL;
 
 /*auto-switch service*/
@@ -806,11 +839,16 @@ bool enable_master_auto_ha = false;
  */
 char *ha_zookeeper_quorum = "localhost:2181";
 
+// curl url external table related guc
+int writable_external_table_bufsize = 64;
+int readable_external_table_timeout = 0;
+
 /*
  * Displayable names for context types (enum GucContext)
  *
  * Note: these strings are deliberately not localized.
  */
+
 const char *const GucContext_Names[] =
 {
 	 /* PGC_INTERNAL */ "internal",
@@ -1012,6 +1050,16 @@ const char *const config_type_names[] =
 static struct config_bool ConfigureNamesBool[] =
 {
 	{
+		{"enable_master_auto_ha", PGC_USERSET, CUSTOM_OPTIONS,
+			gettext_noop("Enable standby to be active automatically when master fails"),
+			NULL,
+			GUC_SUPERUSER_ONLY | GUC_NOT_IN_SAMPLE
+		},
+		&enable_master_auto_ha,
+		false, NULL, NULL
+	},
+
+	{
 		{"upgrade_mode", PGC_POSTMASTER, CUSTOM_OPTIONS,
 			gettext_noop("Upgrade Mode"),
 			NULL,
@@ -1065,6 +1113,38 @@ static struct config_bool ConfigureNamesBool[] =
 			NULL
 		},
 		&enable_indexscan,
+		true, NULL, NULL
+	},
+	{
+		{"enable_magma_indexscan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of magma-index-scan plans."),
+			NULL
+		},
+		&enable_magma_indexscan,
+		true, NULL, NULL
+	},
+	{
+		{"enable_magma_seqscan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of magma-seq-scan plans."),
+			NULL
+		},
+		&enable_magma_seqscan,
+		true, NULL, NULL
+	},
+	{
+		{"enable_magma_bitmapscan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of magma-bitmap-scan plans."),
+			NULL
+		},
+		&enable_magma_bitmapscan,
+		false, NULL, NULL
+	},
+	{
+		{"enable_magma_indexonlyscan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of magma-indexonly-scan plans."),
+			NULL
+		},
+		&enable_magma_indexonlyscan,
 		true, NULL, NULL
 	},
 	{
@@ -1405,6 +1485,14 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 	{
+		{"debug_udf_plan", PGC_USERSET, LOGGING_WHAT,
+			gettext_noop("Prints the execution plan of udf to server log."),
+			NULL
+		},
+		&Debug_udf_plan,
+		false, NULL, NULL
+	},
+	{
 		{"debug_pretty_print", PGC_USERSET, LOGGING_WHAT,
 			gettext_noop("Indents parse and plan tree displays."),
 			NULL
@@ -1445,14 +1533,6 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&log_statement_stats,
 		false, assign_log_stats, NULL
-	},
-	{
-		{"debug_udf_plan", PGC_USERSET, LOGGING_WHAT,
-			gettext_noop("Prints the execution plan of udf to server log."),
-			NULL
-		},
-		&Debug_udf_plan,
-		false, NULL, NULL
 	},
 	{
 		{"log_dispatch_stats", PGC_SUSET, STATS_MONITORING,
@@ -2952,6 +3032,16 @@ static struct config_bool ConfigureNamesBool[] =
     false, NULL, NULL
   },
 
+  {
+    {"debug_print_dispatcher_detail", PGC_SUSET, LOGGING_WHAT,
+      gettext_noop("Prints dispatcher details for debug to server log."),
+      NULL,
+      GUC_NEW_DISP | GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+    },
+    &Debug_print_dispatcher_detail,
+    false, NULL, NULL
+  },
+
 	{
 		{"gp_local_distributed_cache_stats", PGC_SUSET, DEVELOPER_OPTIONS,
 			gettext_noop("Prints local-distributed cache statistics at end of commit / prepare."),
@@ -3214,6 +3304,16 @@ static struct config_bool ConfigureNamesBool[] =
 		true, NULL, NULL
 	},
 
+  {
+    {"enable_pg_stat_activity_history", PGC_USERSET, STATS_ANALYZE,
+      gettext_noop("set enable_pg_stat_activity_history"
+          " to save sql information"),
+      NULL
+    },
+    &enable_pg_stat_activity_history,
+    false, NULL, NULL
+  },
+
 	{
 	    {"allow_file_count_bucket_num_mismatch", PGC_POSTMASTER, CLIENT_CONN_LOCALE,
 	          gettext_noop("allow hash table to be treated as random when file count and"
@@ -3412,11 +3512,7 @@ static struct config_bool ConfigureNamesBool[] =
 			NULL
 		},
 		&optimizer,
-#ifdef USE_ORCA
-		true, assign_optimizer, NULL
-#else
 		false, assign_optimizer, NULL
-#endif
 	},
 
 	{
@@ -4455,6 +4551,36 @@ static struct config_bool ConfigureNamesBool[] =
 		false, NULL, NULL
 	},
 
+  {
+    {"hawq_init_with_magma", PGC_USERSET, CLIENT_CONN_STATEMENT,
+      gettext_noop("choose whether init cluster with magma."),
+      gettext_noop("The option is true or false."),
+      GUC_IS_NAME
+    },
+    &hawq_init_with_magma,
+    false, NULL, NULL
+  },
+
+	{
+    {"magma_cache_read", PGC_USERSET, EXTERNAL_TABLES,
+      gettext_noop("Enable cache read for magma"),
+      NULL,
+      GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+    },
+    &magma_cache_read,
+    false, NULL, NULL
+  },
+
+  {
+    {"hawq_init_with_hdfs", PGC_USERSET, CLIENT_CONN_STATEMENT,
+      gettext_noop("choose whether init cluster with hdfs."),
+      gettext_noop("The option is true or false."),
+      GUC_IS_NAME
+    },
+    &hawq_init_with_hdfs,
+    true, NULL, NULL
+  },
+
 	/* End-of-list marker */
 	{
 		{NULL, 0, 0, NULL, NULL}, NULL, false, NULL, NULL
@@ -4521,7 +4647,62 @@ static struct config_int ConfigureNamesInt[] =
 			NULL
 		},
 		&default_hash_table_bucket_number,
-		6, 1, 65535, NULL, NULL
+		8, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"new_executor_partitioned_hash_recursive_depth_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets new_executor_partitioned_hash_recursive_depth_limit"),
+			NULL
+		},
+		&new_executor_partitioned_hash_recursive_depth_limit,
+		6, 0, 10, NULL, NULL
+	},
+
+	{
+		{"new_executor_ic_tcp_client_limit_per_query_per_segment", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets new_executor_ic_tcp_client_limit_per_query_per_segment"),
+			NULL
+		},
+		&new_executor_ic_tcp_client_limit_per_query_per_segment,
+		10000, 0, 65535, NULL, NULL
+	},
+
+	{
+		{"default_magma_hash_table_nvseg_per_seg", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default vseg number per node for Magma hash table"),
+			NULL
+		},
+		&default_magma_hash_table_nvseg_per_seg,
+		8, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"magma_shm_limit_per_block", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Sets the maximum allowed memory per-block on each magma segment."),
+			NULL,
+			GUC_UNIT_KB
+		},
+		&magma_shm_limit_per_block,
+		1024, 0, MAX_KILOBYTES, NULL, NULL
+	},
+
+  {
+    {"hawq_auto_ha_timeout", PGC_USERSET, QUERY_TUNING_OTHER,
+      gettext_noop("Sets auto HA timeout value in millisecond."),
+      NULL
+    },
+    &hawq_auto_ha_timeout,
+    60000, 1, 43200000, NULL, NULL  // default is 60000ms, max is 43200000(~12h)
+  },
+
+	{
+		{"default_magma_block_size", PGC_USERSET, QUERY_TUNING_OTHER,
+			gettext_noop("Sets default magma block size for magma hash table"),
+			NULL
+		},
+		&default_magma_block_size,
+		134217728, 1, 524288000, NULL, NULL  // default is 128M, max is 500M
 	},
 
 	{
@@ -4881,6 +5062,17 @@ static struct config_int ConfigureNamesInt[] =
 		&maintenance_work_mem,
 		65536, 1024, MAX_KILOBYTES, NULL, NULL
 	},
+    {
+      {"orc_update_delete_work_mem", PGC_USERSET, QUERY_TUNING,
+            gettext_noop("Sets the maximum memory to be used for ORC update/delete workspaces."),
+            gettext_noop("This much memory may be used by each ORC update/delete "
+                         "sort operation and hash table before switching to "
+                         "temporary disk files."),
+            GUC_UNIT_KB
+      },
+      &orc_update_delete_work_mem,
+          65536, 0, MAX_KILOBYTES, NULL, NULL
+    },
 
 	{
 	    {"gp_query_context_mem_limit", PGC_USERSET, RESOURCES_MEM,
@@ -5067,7 +5259,7 @@ static struct config_int ConfigureNamesInt[] =
 		{"statement_timeout", PGC_USERSET, CLIENT_CONN_STATEMENT,
 			gettext_noop("Sets the maximum allowed duration (in milliseconds) of any statement."),
 			gettext_noop("A value of 0 turns off the timeout."),
-			GUC_UNIT_MS | GUC_GPDB_ADDOPT
+			GUC_UNIT_MS | GUC_GPDB_ADDOPT | GUC_NEW_DISP
 		},
 		&StatementTimeout,
 		0, 0, INT_MAX, NULL, NULL
@@ -5076,8 +5268,8 @@ static struct config_int ConfigureNamesInt[] =
 	{
 		{"gp_vmem_idle_resource_timeout", PGC_USERSET, CLIENT_CONN_OTHER,
 			gettext_noop("Sets the time a session can be idle (in milliseconds) before we release gangs on the segment DBs to free resources."),
-			gettext_noop("A value of 0 closes idle gangs at once."),
-			GUC_UNIT_MS | GUC_GPDB_ADDOPT
+			gettext_noop("A value of 0 means closing idle gangs at once"),
+			GUC_UNIT_MS | GUC_GPDB_ADDOPT | GUC_NEW_DISP
 		},
 		&IdleSessionGangTimeout,
 #ifdef USE_ASSERT_CHECKING
@@ -5330,6 +5522,28 @@ static struct config_int ConfigureNamesInt[] =
 		&GpIdentity.numsegments,
 		UNINITIALIZED_GP_IDENTITY_VALUE, INT_MIN, INT_MAX, NULL, NULL
 	},
+
+	{
+	    {"readable_external_table_timeout", PGC_USERSET, EXTERNAL_TABLES,
+	      gettext_noop("Cancel the query if no data read within N seconds."),
+	      gettext_noop("A value of 0 turns off the timeout."),
+	      GUC_UNIT_S | GUC_NOT_IN_SAMPLE
+	    },
+	    &readable_external_table_timeout,
+	    0, 0, INT_MAX,
+	    NULL, NULL, NULL
+	  },
+
+	  {
+	    {"writable_external_table_bufsize", PGC_USERSET, EXTERNAL_TABLES,
+	      gettext_noop("Buffer size in kilobytes for writable external table before writing data to gpfdist."),
+	      gettext_noop("Valid value is between 32K and 128M: [32, 131072]."),
+	      GUC_UNIT_KB | GUC_NOT_IN_SAMPLE
+	    },
+	    &writable_external_table_bufsize,
+	    64, 32, 131072,
+	    NULL, NULL, NULL
+	  },
 
 	{
 		{"gp_max_csv_line_length", PGC_USERSET, EXTERNAL_TABLES,
@@ -5687,6 +5901,26 @@ static struct config_int ConfigureNamesInt[] =
 		&gp_connections_per_thread,
 		512, 1, INT_MAX, assign_gp_connections_per_thread, show_gp_connections_per_thread
 	},
+
+	{
+    {"main_disp_connections_per_thread", PGC_SUSET, GP_ARRAY_TUNING,
+      gettext_noop("Sets the number of libpq handled in each main dispatcher thread."),
+      NULL,
+      GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+    },
+    &main_disp_connections_per_thread,
+    2, 1, INT_MAX, NULL, NULL
+  },
+
+  {
+    {"proxy_disp_connections_per_thread", PGC_SUSET, GP_ARRAY_TUNING,
+      gettext_noop("Sets the number of libpq handled in each proxy dispatcher thread."),
+      NULL,
+      GUC_SUPERUSER_ONLY |  GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE | GUC_NEW_DISP
+    },
+    &proxy_disp_connections_per_thread,
+    8, 1, INT_MAX, NULL, NULL
+  },
 
 	{
 		{"gp_subtrans_warn_limit", PGC_POSTMASTER, RESOURCES,
@@ -6303,7 +6537,7 @@ static struct config_int ConfigureNamesInt[] =
 
 	{
 		{"hawq_rps_check_local_interval", PGC_POSTMASTER, PRESET_OPTIONS,
-			gettext_noop("interval of checking master's RPS if talking with standby's RPS"),
+			gettext_noop("interval (in seconds) of checking master's RPS if talking with standby's RPS"),
 			NULL
 		},
 		&rps_check_local_interval,
@@ -6317,6 +6551,15 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&seg_addr_port,
 		1, 1, 65535, NULL, NULL
+	},
+
+	{
+		{"hawq_scheduler_rpc_base_port,", PGC_POSTMASTER, PRESET_OPTIONS,
+			gettext_noop("scheduler rpc server address base port number"),
+			NULL
+		},
+		&scheduler_rpc_base_port,
+		5439, 1, 65535, NULL, NULL
 	},
 
     {
@@ -6482,7 +6725,7 @@ static struct config_int ConfigureNamesInt[] =
                     NULL
             },
             &rm_nvseg_perquery_perseg_limit,
-            6, 1, 65535, NULL, NULL
+            8, 1, 65535, NULL, NULL
     },
 
     {
@@ -6496,8 +6739,7 @@ static struct config_int ConfigureNamesInt[] =
 
     {
             {"hawq_rm_nslice_perseg_limit", PGC_POSTMASTER, RESOURCES_MGM,
-                    gettext_noop("the limit of the number of slice number in one segment "
-                                             "for one query."),
+                    gettext_noop("the limit of the number of slice number in one segment."),
                     NULL
             },
             &rm_nslice_perseg_limit,
@@ -6712,6 +6954,7 @@ static struct config_int ConfigureNamesInt[] =
 		&metadata_cache_max_hdfs_file_num,
 		524288, 32768, 8388608, NULL, NULL
 	},
+
 	{
 		{"share_input_scan_wait_lockfile_timeout", PGC_USERSET, DEVELOPER_OPTIONS,
 			gettext_noop("timeout (in millisecond) for waiting lock file which writer creates."),
@@ -7160,7 +7403,7 @@ static struct config_real ConfigureNamesReal[] =
 
 	{
 		{"hawq_hashjoin_bloomfilter_ratio", PGC_USERSET, GP_ARRAY_TUNING,
-			gettext_noop("Sets the ratio for hash join Bloom filter."),
+			gettext_noop("Sets the ratio for hash join bloom filter."),
 			NULL,
 			GUC_NO_SHOW_ALL
 		},
@@ -7177,6 +7420,127 @@ static struct config_real ConfigureNamesReal[] =
 
 static struct config_string ConfigureNamesString[] =
 {
+  {
+    {"new_interconnect_type", PGC_BACKEND, EXTERNAL_TABLES,
+     gettext_noop("Sets the protocol used for inter-node communication for new executor."),
+     gettext_noop("Valid values are \"tcp\" and \"udp\"."),
+     GUC_GPDB_ADDOPT
+    },
+    &new_interconnect_type_str,
+    "tcp", assign_new_interconnect_type, show_new_interconnect_type
+  },
+
+  {
+		{"new_executor", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable the new executor."),
+			gettext_noop("Valid values are \"OFF\", \"AUTO\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&new_executor_mode,
+		"AUTO", assign_new_executor_mode, NULL
+	},
+
+	{
+		{"new_executor_runtime_filter_mode", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable the new executor's runtime filter."),
+			gettext_noop("Valid values are \"OFF\", \"AUTO\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&new_executor_runtime_filter_mode,
+		"OFF", assign_new_executor_runtime_filter_mode, NULL
+	},
+
+	{
+		{"new_executor_enable_partitioned_hashagg", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable the new executor's partitioned hash aggregation."),
+			gettext_noop("Valid values are \"OFF\", \"AUTO\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&new_executor_enable_partitioned_hashagg_mode,
+		"AUTO", assign_new_executor_mode, NULL
+	},
+
+	{
+		{"new_executor_enable_partitioned_hashjoin", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable the new executor's partitioned hash join."),
+			gettext_noop("Valid values are \"OFF\", \"AUTO\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&new_executor_enable_partitioned_hashjoin_mode,
+		"AUTO", assign_new_executor_mode, NULL
+	},
+
+	{
+		{"new_executor_enable_external_sort", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable the new executor's external sort."),
+			gettext_noop("Valid values are \"OFF\", \"AUTO\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&new_executor_enable_external_sort_mode,
+		"OFF", assign_new_executor_mode, NULL
+	},
+
+
+	{
+		{"new_scheduler", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable the new scheduler."),
+			gettext_noop("Valid values are \"OFF\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+		},
+		&new_scheduler_mode,
+		"OFF", assign_new_scheduler_mode, NULL
+	},
+
+	{
+		{"dispatch_udf", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("specified UDF to be dispatched."),
+			gettext_noop("Valid separator is \",\""),
+			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+		},
+		&dispatch_udf_str,
+		"", NULL, NULL
+	},
+
+	{
+		{"dispatch_udf_mode", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("all UDF in the same namespace to be dispatched."),
+			gettext_noop("Valid values are \"OFF\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+		},
+		&dispatch_udf_mode_str,
+		"OFF", assign_switch_mode, NULL
+	},
+
+	{
+		{"enable_alpha_newqe", PGC_USERSET, EXTERNAL_TABLES,
+			gettext_noop("Enable new qe alpha feature"),
+			gettext_noop("Valid values are \"OFF\" and \"ON\"."),
+			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+		},
+		&enable_alpha_newqe_str,
+		"ON", assign_switch_mode, NULL
+	},
+
+	{
+    {"orc_enable_filter_pushdown", PGC_USERSET, EXTERNAL_TABLES,
+      gettext_noop("Enable filter pushdown for orc scan"),
+      gettext_noop("Valid values are \"OFF\" and \"ON\"."),
+      GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+    },
+    &orc_enable_filter_pushdown,
+    "ON", assign_switch_mode, NULL
+  },
+
+  {
+    {"magma_enable_shm", PGC_USERSET, EXTERNAL_TABLES,
+      gettext_noop("Enable share memory for magma scan"),
+      gettext_noop("Valid values are \"OFF\" and \"ON\"."),
+      GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+    },
+    &magma_enable_shm,
+    "ON", assign_switch_mode, NULL
+  },
+
 	{
 		{"allow_system_table_mods", PGC_USERSET, CUSTOM_OPTIONS,
 			gettext_noop("Allows ddl/dml modifications of system tables."),
@@ -7490,6 +7854,16 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&default_tablespace,
 		"", assign_default_tablespace, NULL
+	},
+
+	{
+		{"default_table_format", PGC_USERSET, CLIENT_CONN_STATEMENT,
+			gettext_noop("Sets the default tableformat when creating table."),
+			gettext_noop("The option is appendonly or magmaap."),
+			GUC_IS_NAME
+		},
+		&default_table_format,
+		"appendonly", assign_default_tableformat, NULL
 	},
 
 	{
@@ -8253,7 +8627,7 @@ static struct config_string ConfigureNamesString[] =
 
 	{
 		{"clusterName", PGC_POSTMASTER, PRESET_OPTIONS,
-			gettext_noop("Corresponding identifier for this hawq cluster in oushu cloud system."),
+			gettext_noop("Corresponding identifier for this OushuDB cluster in oushu cloud system."),
 			NULL
 		},
 		&pg_cloud_clustername,
@@ -8277,6 +8651,15 @@ static struct config_string ConfigureNamesString[] =
 		&dfs_url,
 		"localhost:8020/hawq", NULL, NULL
 	},
+
+  {
+    {"magma_nodes_url", PGC_POSTMASTER, PRESET_OPTIONS,
+      gettext_noop("magma nodes url"),
+      NULL
+    },
+    &magma_nodes_url,
+    "localhost:6666", NULL, NULL
+  },
 
 	{
 		{"hawq_master_directory", PGC_POSTMASTER, PRESET_OPTIONS,
@@ -8421,6 +8804,15 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&metadata_cache_testfile,
 		NULL, NULL, NULL
+	},
+
+	{
+		{"ha_zookeeper_quorum", PGC_USERSET, PRESET_OPTIONS,
+			gettext_noop("zookeeper server hostlist"),
+			NULL
+		},
+		&ha_zookeeper_quorum,
+		"localhost:2181", NULL, NULL
 	},
 
 	/* End-of-list marker */
@@ -11041,7 +11433,12 @@ SetPGVariableDispatch(const char *name, List *args, bool is_local)
 		}
 	}
 
-	dispatch_statement_string(buffer.data, NULL, 0, NULL, NULL, true);
+	// workaround for new dispatcher
+	struct config_generic *record = find_option(name, ERROR);
+	if (record->flags & (GUC_GPDB_ADDOPT | GUC_NEW_DISP)) {
+	  executormgr_cleanCachedExecutor();
+	  dispatch_statement_string(buffer.data, NULL, 0, NULL, NULL, true);
+	}
 }
 
 /*
@@ -11339,20 +11736,19 @@ GetPGVariableResultDesc(const char *name)
 /*
  * RESET command
  */
-void
-ResetPGVariable(const char *name)
-{
-	if (pg_strcasecmp(name, "all") == 0)
-		ResetAllOptions();
-	else
-		set_config_option(name,
-						  NULL,
-						  (superuser() ? PGC_SUSET : PGC_USERSET),
-						  PGC_S_SESSION,
-						  false,
-						  true);
+bool ResetPGVariable(const char *name) {
+  bool shouldDispatch = false;
+  if (pg_strcasecmp(name, "all") == 0) {
+    ResetAllOptions();
+    shouldDispatch = true;
+  } else {
+    struct config_generic *record = find_option(name, ERROR);
+    if (record->flags & (GUC_GPDB_ADDOPT | GUC_NEW_DISP)) shouldDispatch = true;
+    set_config_option(name, NULL, (superuser() ? PGC_SUSET : PGC_USERSET),
+                      PGC_S_SESSION, false, true);
+  }
+  return shouldDispatch;
 }
-
 
 /*
  * SHOW command
@@ -13550,6 +13946,59 @@ assign_timezone_abbreviations(const char *newval, bool doit, GucSource source)
 	return newval;
 }
 
+static const char *assign_new_interconnect_type(const char *newval, bool doit,
+                                                GucSource source) {
+  int newtype = 0;
+
+  if (newval == NULL || newval[0] == 0 || !pg_strcasecmp("tcp", newval))
+    newtype = INTERCONNECT_TYPE_TCP;
+  else if (!pg_strcasecmp("udp", newval))
+    newtype = INTERCONNECT_TYPE_UDP;
+  else
+    elog(ERROR,
+         "Unknown interconnect type for new executor. (current type is '%s')",
+         show_new_interconnect_type());
+
+  if (doit) new_interconnect_type = newtype;
+
+  return newval;
+}
+
+static const char *assign_new_executor_mode(const char *newval, bool doit, GucSource source) {
+		if (pg_strcasecmp(newval, new_executor_mode_on) != 0
+				&& pg_strcasecmp(newval, new_executor_mode_auto) != 0
+				&& pg_strcasecmp(newval, new_executor_mode_off) != 0) {
+			return NULL;			/* fail */
+		}
+		if (!enableOushuDbExtensiveFeatureSupport()) return "OFF";
+		return newval;				/* OK */
+}
+
+static const char *assign_new_executor_runtime_filter_mode(const char *newval, bool doit, GucSource source) {
+		if (pg_strcasecmp(newval, new_executor_runtime_filter_mode_local) != 0
+				&& pg_strcasecmp(newval, new_executor_runtime_filter_mode_global) != 0
+				&& pg_strcasecmp(newval, new_executor_mode_off) != 0) {
+			return NULL;			/* fail */
+		}
+		return newval;				/* OK */
+}
+
+static const char *assign_new_scheduler_mode(const char *newval, bool doit, GucSource source) {
+		if (pg_strcasecmp(newval, new_scheduler_mode_on) != 0
+				&& pg_strcasecmp(newval, new_scheduler_mode_off) != 0) {
+			return NULL;			/* fail */
+		}
+		return newval;				/* OK */
+}
+
+static const char *assign_switch_mode(const char *newval, bool doit,
+                                            GucSource source) {
+  if (pg_strcasecmp(newval, "ON") != 0 && pg_strcasecmp(newval, "OFF") != 0) {
+    return NULL; /* fail */
+  }
+  return newval; /* OK */
+}
+
 /*
  * pg_timezone_abbrev_initialize --- set default value if not done already
  *
@@ -13810,15 +14259,21 @@ assign_hawq_rm_stmt_vseg_memory(const char *newval, bool doit, GucSource source)
 			return NULL; /* Not valid format of memory quota. */
 		}
 
-		if ( newvalmb == 64   ||
-			 newvalmb == 128  ||
-			 newvalmb == 256  ||
-			 newvalmb == 512  ||
-			 newvalmb == 1024 ||
-			 newvalmb == 2048 ||
-			 newvalmb == 4096 ||
-			 newvalmb == 8192 ||
-			 newvalmb == 16384 )
+		if ( newvalmb == 64       ||
+			   newvalmb == 64 * 2   ||
+			   newvalmb == 64 * 4   ||
+			   newvalmb == 64 * 8   ||
+			   newvalmb == 64 * 16  ||
+			   newvalmb == 64 * 32  ||
+			   newvalmb == 64 * 64  ||
+			   newvalmb == 64 * 64 * 2  ||
+			   newvalmb == 64 * 64 * 4  ||
+			   newvalmb == 64 * 64 * 8  ||
+			   newvalmb == 64 * 64 * 16 ||
+			   newvalmb == 64 * 64 * 32 ||
+			   newvalmb == 64 * 64 * 64 ||
+			   newvalmb == 64 * 64 * 64 * 2  ||
+			   newvalmb == 64 * 64 * 64 * 4)
 		{
 			return newval;
 		}

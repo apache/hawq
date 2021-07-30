@@ -214,6 +214,13 @@ PGAC_ARG_BOOL(enable, debug, no,
 AC_SUBST(enable_debug)
 
 #
+# --enable-avx adds vector instruction optimization (-mavx -mavx2) to compiler flags
+#
+PGAC_ARG_BOOL(enable, avx, yes,
+              [  --enable-avx            build with vector instruction optimization (-mavx -mavx2)])
+AC_SUBST(enable_avx)
+
+#
 # --enable-profiling enables gcc profiling
 #
 PGAC_ARG_BOOL(enable, profiling, no,
@@ -225,6 +232,7 @@ AC_SUBST(enable_profiling)
 #
 PGAC_ARG_BOOL(enable, coverage, no,
               [  --enable-coverage       build with coverage testing instrumentation],
+              [AC_DEFINE([ENABLE_COVERAGE], 1, [Define to 1 to build with coverage enabled. (--enable-coverage)])],
 [AC_CHECK_PROGS(GCOV, gcov)
 if test -z "$GCOV"; then
   AC_MSG_ERROR([gcov not found])
@@ -477,6 +485,12 @@ if test "$enable_profiling" = yes && test "$ac_cv_prog_cc_g" = yes; then
   fi
 fi
 
+# disable avx if --enable-avx=no
+if test "$enable_avx" = no; then
+    CFLAGS="$CFLAGS -mno-avx -mno-avx2"
+    CXXFLAGS="$CXXFLAGS -mno-avx -mno-avx2"
+fi
+
 # We already have this in Makefile.win32, but configure needs it too
 if test "$PORTNAME" = "win32"; then
   CPPFLAGS="$CPPFLAGS -I$srcdir/src/include/port/win32 -DEXEC_BACKEND"
@@ -512,7 +526,7 @@ else
     HQ_VERSION="devel"
 fi
 
-GP_VERSION='4.2.0 build 1'
+GP_VERSION='4.2.0'
 GP_VERSION_IN="src/include/catalog/gp_version.in"
 GP_VERSION_HEADER="src/include/catalog/gp_version.h"
 if grep '\$\$' $GP_VERSION_IN > /dev/null 2>&1 ; then
@@ -526,7 +540,7 @@ else
   cc_string=$CC
 fi
 AC_DEFINE_UNQUOTED(PG_VERSION_STR,
-                   ["PostgreSQL $PACKAGE_VERSION (Greenplum Database $GP_VERSION) (HAWQ $HQ_VERSION) on $host, compiled by $cc_string"],
+                   ["PostgreSQL $PACKAGE_VERSION (Apache HAWQ 3.0.0.0) (Greenplum Database $GP_VERSION) on $host, compiled by $cc_string"],
                    [A string containing the version number, platform, and C compiler])
 
 if `echo "$HQ_VERSION" | grep "main build" > /dev/null 2>&1` ; then
@@ -618,15 +632,6 @@ AC_MSG_RESULT([checking whether to build with snmp... $enable_snmp])
 AC_SUBST(enable_snmp)
 
 #
-# --enable-gphdfs enables GPHDFS support
-#
-PGAC_ARG_BOOL(enable, gphdfs, no, [  --enable-gphdfs        enables GPHDFS support],
-              [AC_DEFINE([USE_GPHDFS], 1, 
-                         [Define to 1 to build with gphdfs capabilities. (--enable-gphdfs)])])
-AC_MSG_RESULT([checking whether to build with gphdfs...$enable_gphdfs])
-AC_SUBST(enable_gphdfs)
-
-#
 # --enable-email enables email alerts
 #
 PGAC_ARG_BOOL(enable, email, no,  [  --enable-email        enable email alerts],
@@ -668,6 +673,14 @@ if test "$enable_thread_safety" = yes -o \
 fi
 AC_MSG_RESULT([$enable_thread_safety])
 AC_SUBST(enable_thread_safety)
+
+#
+# Optionally build Magma Sanitize modules
+#
+AC_MSG_CHECKING([whether to build with Magma Sanitize])
+PGAC_ARG_BOOL(with, magma_sanitize, no, [  --with-magma_sanitize   build with sanitize check])
+AC_MSG_RESULT([$with_magma_sanitize])
+AC_SUBST([with_magma_sanitize])
 
 #
 # Optionally build Tcl modules (PL/Tcl)
@@ -731,7 +744,6 @@ AC_MSG_RESULT([$with_orc])
 AC_SUBST(with_orc)
 #
 
-#
 # GSSAPI
 #
 AC_MSG_CHECKING([whether to build with GSSAPI support])
@@ -785,7 +797,7 @@ AC_SUBST(with_pam)
 # LDAP
 #
 AC_MSG_CHECKING([whether to build with LDAP support])
-PGAC_ARG_BOOL(with, ldap, no,
+PGAC_ARG_BOOL(with, ldap, yes,
               [  --with-ldap             build with LDAP support],
               [AC_DEFINE([USE_LDAP], 1, [Define to 1 to build with LDAP support. (--with-ldap)])])
 AC_MSG_RESULT([$with_ldap])
@@ -841,27 +853,6 @@ AC_SUBST(with_libyarn)
 PGAC_ARG_BOOL(with, libhdfs3, yes,
               [  --without-libhdfs3      do not build libhdfs3])
 AC_SUBST(with_libhdfs3)
-
-#
-# dbcommon
-#
-PGAC_ARG_BOOL(with, dbcommon, yes,
-              [  --without-dbcommon      do not build dbcommon])
-AC_SUBST(with_dbcommon)
-
-#
-# univplan
-#
-PGAC_ARG_BOOL(with, univplan, yes,
-              [  --without-univplan      do not build univplan])
-AC_SUBST(with_univplan)
-
-#
-# storage
-#
-PGAC_ARG_BOOL(with, storage, yes,
-              [  --without-storage      do not build storage])
-AC_SUBST(with_storage)
 
 #
 # Prefer libedit
@@ -1106,6 +1097,7 @@ if test "$with_zlib" = yes; then
 If you have zlib already installed, see config.log for details on the
 failure.  It is possible the compiler isn't looking in the proper directory.
 Use --without-zlib to disable zlib support.])])
+LIBS="-lz -llz4 $LIBS"
 fi
 
 if test "$with_r" = yes; then
@@ -1444,6 +1436,12 @@ fi
 AC_CHECK_HEADERS(json-c/json.h, [], [AC_MSG_ERROR([header file <json-c/json.h> is required.
 Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
 AC_SEARCH_LIBS(json_tokener_parse, json-c json, [], [AC_MSG_ERROR([library 'json-c' is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])], [])
+
+# uuid 
+AC_CHECK_HEADERS(uuid/uuid.h, [], [AC_MSG_ERROR([header file <uuid/uuid.h> is required.
+Check config.log for details. It is possible the compiler isn't looking in the proper directory.])])
+AC_SEARCH_LIBS(uuid, [], [AC_MSG_ERROR([library 'uuid' is required.
 Check config.log for details. It is possible the compiler isn't looking in the proper directory.])], [])
 
 # libxml2
@@ -2206,7 +2204,9 @@ else
 fi
 AC_SUBST(vpath_build)
 
-AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk depends/thirdparty/googletest/Makefile.global depends/libhdfs3/Makefile.global depends/libyarn/Makefile.global depends/dbcommon/Makefile.global depends/univplan/Makefile.global depends/storage/Makefile.global src/Makefile.global src/pl/pljava/src/java/Makefile.global ranger-plugin/Makefile.global])
+AC_CONFIG_FILES([GNUmakefile src/VERSIONS.mk src/pl/pljava/src/java/Makefile.global])
+AC_CONFIG_FILES([src/Makefile.global])
+AC_CONFIG_FILES([ranger-plugin/Makefile.global])
 
 AC_CONFIG_LINKS([
   src/backend/port/dynloader.c:src/backend/port/dynloader/${template}.c
@@ -2229,12 +2229,9 @@ for FILE in $CONFIG_LINKS
 ])
 fi
 
-# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn & dbcommon & univplan & storage
+# Remove build_timestamp file to make sure rebuild depends lib: libhdfs & libyarn 
 rm -f depends/libhdfs3/build/libhdfs3_build_timestamp
 rm -f depends/libyarn/build/libyarn_build_timestamp
-rm -f depends/dbcommon/build/dbcommon_build_timestamp
-rm -f depends/univplan/build/univplan_build_timestamp
-rm -f depends/storage/build/storage_build_timestamp
 rm -f depends/thirdparty/gporca_build_timestamp
 rm -f depends/thirdparty/gpos_build_timestamp
 rm -f depends/thirdparty/gp-xerces_build_timestamp

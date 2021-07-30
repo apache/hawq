@@ -41,12 +41,21 @@
 /* NB: cost-estimation code should use the variables, not these constants! */
 /* If you change these, update backend/utils/misc/postgresql.sample.conf */
 #define DEFAULT_SEQ_PAGE_COST  1.0
-#define DEFAULT_RANDOM_PAGE_COST  100.0
+
+/* gp and hawq old random_page_cost is 100.0, pg is 4.0, this
+ * value use for calculate random get page cost which needed
+ * by planner.
+ */
+#define DEFAULT_RANDOM_PAGE_COST  25.0
 #define DEFAULT_CPU_TUPLE_COST	0.01
 #define DEFAULT_CPU_INDEX_TUPLE_COST 0.005
 #define DEFAULT_CPU_OPERATOR_COST  0.0025
 
-#define DEFAULT_EFFECTIVE_CACHE_SIZE  16384		/* measured in pages */
+/* This value is the max cache memory hawq can use, because gp
+ * and pg changed this value from 16384 to 524288 many years ago.
+ * 16384 is too small for the current server.
+ */
+#define DEFAULT_EFFECTIVE_CACHE_SIZE  524288		/* measured in pages */
 
 
 /*

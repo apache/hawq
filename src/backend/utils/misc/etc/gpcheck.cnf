@@ -31,14 +31,15 @@ sysctl.net.core.rmem_max = 2097152
 sysctl.net.core.wmem_max = 2097152
 
 [linux.limits]
-soft.nofile = 2900000
-hard.nofile = 2900000
+soft.nofile = 1048576
+hard.nofile = 1048576
 soft.nproc  = 131072
 hard.nproc  = 131072
 
 [linux.diskusage]
 diskusage.monitor.mounts = /
 diskusage.monitor.usagemax = 90%
+disk.space.total.GB = 1000.0
 
 [hdfs.base]
 dfs.mem.namenode.heap = 40960
@@ -98,3 +99,16 @@ hadoop.security.authentication = kerberos
 
 [hawq.yarn]
 hawq_global_rm_type = yarn
+
+[hawq.guc]
+default.hash.table.bucket.number = 8
+hawq.rm.nvseg.perquery.limit = 512
+hawq.rm.nvseg.perquery.perseg.limit = 8
+magma.range.number = 8
+magma.shm.limit.per.block = 1
+
+[hardware.performance]
+disk.write.min.bandwidth.MBs = 1000.0
+disk.read.min.bandwidth.MBs = 1000.0
+stream.min.bandwidth.MBs = 10000.0
+network.min.bandwidth.MBs = 5000.0

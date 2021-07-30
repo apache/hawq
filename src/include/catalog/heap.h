@@ -82,9 +82,12 @@ extern Oid heap_create_with_catalog(const char *relname,
 						 bool allow_system_table_mods,
 						 Oid *comptypeOid, /* MPP */
 						 ItemPointer persistentTid,
-						 int64 *persistentSerialNum);
+						 int64 *persistentSerialNum,
+						 const char *formattername);
 
 extern void heap_drop_with_catalog(Oid relid);
+
+extern void postRemoveSchema(char *schemaname);
 
 extern void heap_truncate(List *relids);
 
@@ -152,13 +155,16 @@ extern Form_pg_attribute SystemAttributeByName(const char *attname,
 extern void CheckAttributeNamesTypes(TupleDesc tupdesc, char relkind);
 
 extern void CheckAttributeType(const char *attname, Oid atttypid);
-extern void CheckAttributeForParquet(TupleDesc tupdesc, char relstorage);
+extern void CheckAttributeForParquet(TupleDesc tupdesc);
+extern void CheckAttributeForOrc(TupleDesc desc);
 
 extern void SetRelationNumChecks(Relation rel, int numchecks);
 
 extern Oid setNewRelfilenode(Relation relation);
 
 extern Oid setNewRelfilenodeToOid(Relation relation, Oid newrelfilenode);
+
+extern Oid orcSetNewRelfilenode(Oid relid);
 
 /* MPP-6929: metadata tracking */
 extern void MetaTrackAddObject(Oid		classid, 

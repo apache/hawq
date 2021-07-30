@@ -33,8 +33,10 @@
  */
 #include "postgres.h"
 
+#include "catalog/catquery.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
+#include "nodes/makefuncs.h"
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
 #include "optimizer/joininfo.h"
@@ -78,6 +80,7 @@ static bool qual_is_redundant(PlannerInfo *root, RestrictInfo *restrictinfo,
 				  List *restrictlist);
 static void check_mergejoinable(RestrictInfo *restrictinfo);
 static void check_hashjoinable(RestrictInfo *restrictinfo);
+static void handleCrossType(RestrictInfo *rinfo);
 
 
 /*****************************************************************************
@@ -1669,7 +1672,81 @@ check_hashjoinable(RestrictInfo *restrictinfo)
 
 	opno = ((OpExpr *) clause)->opno;
 
-	if (op_hashjoinable(opno) &&
-		!contain_volatile_functions((Node *) clause))
-		restrictinfo->hashjoinoperator = opno;
+  if (!contain_volatile_functions((Node *)clause)) {
+    if (op_hashjoinable(opno))
+      restrictinfo->hashjoinoperator = opno;
+    else
+      handleCrossType(restrictinfo);
+  }
+}
+
+static void handleCrossType(RestrictInfo *rinfo) {
+  if (rinfo->hashjoinoperator != InvalidOid) return;
+
+  OpExpr *expr = (OpExpr *)rinfo->clause;
+  if (IsA(rinfo->clause, BooleanTest)) {
+    BooleanTest *bt = (BooleanTest *)rinfo->clause;
+    if (bt->booltesttype == IS_NOT_FALSE) {
+      expr = (OpExpr *)bt->arg;
+    } else {
+      return;
+    }
+  }
+
+  char *oprName = caql_getcstring(NULL, cql("SELECT oprname FROM pg_operator "
+                                             " WHERE oid = :1",
+                                             ObjectIdGetDatum(expr->opno)));
+  if (strcmp(oprName, "=") != 0) return;
+
+  Expr *lExpr = list_nth(expr->args, 0);
+  Expr *rExpr = list_nth(expr->args, 1);
+  Oid lType = exprType(lExpr);
+  Oid rType = exprType(rExpr);
+  Oid castFuncId = InvalidOid;
+  Oid opId = InvalidOid;
+  Oid retType = InvalidOid;
+  int argIndex = 0;
+  int fetchCount = 0;
+
+  castFuncId = caql_getoid_plus(
+      NULL, &fetchCount, NULL,
+      cql("SELECT castfunc FROM pg_cast "
+          " WHERE castsource = :1 and casttarget = :2 and "
+          "castcontext= :3",
+          ObjectIdGetDatum(lType), ObjectIdGetDatum(rType), CharGetDatum('i')));
+  if (fetchCount) {
+    retType = rType;
+    opId = caql_getoid(NULL, cql("SELECT * FROM pg_operator "
+                                 " WHERE oprname = :1 and oprcanhash = :2 and "
+                                 "oprleft= :3",
+                                 CStringGetDatum("="), BoolGetDatum(true),
+                                 ObjectIdGetDatum(rType)));
+  } else {
+    ++argIndex;
+    retType = lType;
+    castFuncId =
+        caql_getoid_plus(NULL, &fetchCount, NULL,
+                         cql("SELECT castfunc FROM pg_cast "
+                             " WHERE castsource = :1 and casttarget = :2 and "
+                             "castcontext= :3",
+                             ObjectIdGetDatum(rType), ObjectIdGetDatum(lType),
+                             CharGetDatum('i')));
+    if (!fetchCount) return;
+    opId = caql_getoid(NULL, cql("SELECT * FROM pg_operator "
+                                 " WHERE oprname = :1 and oprcanhash = :2 and "
+                                 "oprleft= :3",
+                                 CStringGetDatum("="), BoolGetDatum(true),
+                                 ObjectIdGetDatum(lType)));
+  }
+
+  if (opId == InvalidOid || castFuncId == InvalidOid) return;
+
+  Expr *targetExpr = list_nth(expr->args, argIndex);
+  FuncExpr *newExpr = makeFuncExpr(castFuncId, retType, list_make1(targetExpr),
+                                   COERCE_EXPLICIT_CAST);
+  list_nth_replace(expr->args, argIndex, newExpr);
+  expr->opno = opId;
+  expr->opfuncid = InvalidOid;
+  set_opfuncid(expr);
+  rinfo->hashjoinoperator = opId;
 }

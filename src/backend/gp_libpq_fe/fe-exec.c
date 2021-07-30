@@ -35,6 +35,7 @@
  */
 #include "postgres.h"
 
+
 #include <ctype.h>
 #include <fcntl.h>
 #include <limits.h>
@@ -1034,6 +1035,8 @@ PQbuildGpQueryString(const char  *command,
 					 int          identity_len,
 					 const char  *resource,
 					 int          resource_len,
+					 const char		*commonPlan,
+					 int					commonPlanLen,
 					 int          flags,
 					 int          gp_command_count,
 					 int          localSlice,
@@ -1077,6 +1080,7 @@ PQbuildGpQueryString(const char  *command,
 		sizeof(sliceinfo_len) +
 		sizeof(identity_len) +
 		sizeof(resource_len) +
+		sizeof(commonPlanLen) +
 		sizeof(snapshotInfo_len) +
 		snapshotInfo_len +
 		sizeof(flags) +
@@ -1089,6 +1093,7 @@ PQbuildGpQueryString(const char  *command,
 		sliceinfo_len +
 		identity_len +
 		resource_len +
+		commonPlanLen +
 		seqServerHostlen;
 
 	shared_query = malloc(total_query_len);
@@ -1189,6 +1194,10 @@ PQbuildGpQueryString(const char  *command,
 	memcpy(pos, &tmp, sizeof(tmp));
 	pos += sizeof(tmp);
 
+	tmp = htonl(commonPlanLen);
+	memcpy(pos, &tmp, sizeof(tmp));
+	pos += sizeof(tmp);
+
 	if (snapshotInfo_len > 0)
 	{
 		memcpy(pos, snapshotInfo, snapshotInfo_len);
@@ -1249,6 +1258,12 @@ PQbuildGpQueryString(const char  *command,
 		pos += resource_len;
 	}
 
+	if (commonPlanLen > 0)
+	{
+		memcpy(pos, commonPlan, commonPlanLen);
+		pos += commonPlanLen;
+	}
+
 	if (seqServerHostlen > 0)
 	{
 		memcpy(pos, seqServerHost, seqServerHostlen);
@@ -1267,6 +1282,221 @@ PQbuildGpQueryString(const char  *command,
 		*final_len = len + 1;
 
 	return shared_query;
+}
+
+char *PQbuildGpNewQueryString(
+    const char *command, int command_len, const char *querytree,
+    int querytree_len, const char *plantree, int plantree_len,
+    const char *params, int params_len, const char *sliceinfo,
+    int sliceinfo_len, const char *snapshotInfo, int snapshotInfo_len,
+    const char *identity, int identity_len, const char *resource,
+    int resource_len, const char *commonPlan, int commonPlanLen, int flags,
+    int gp_command_count, int rootIdx, const char *seqServerHost,
+    int seqServerHostlen, int seqServerPort, int primary_gang_id,
+    int64 currentStatementStartTimestamp, Oid sessionUserId,
+    bool sessionUserIsSuper, Oid outerUserId, bool outerUserIsSuper,
+    Oid currentUserId, int *final_len) {
+  int tmp, len;
+  uint32 n32;
+  int total_query_len;
+  char *shared_query, *pos;
+  char one = 1;
+  char zero = 0;
+
+  total_query_len =
+      1 /* 'J' */ + sizeof(len) /* message length */ + 1 /* 'L' */ +
+      sizeof(len) /* new message length */ + sizeof(len) + /* qe index */
+      sizeof(gp_command_count) + sizeof(sessionUserId) +
+      1 /* sessionUserIsSuper */ + sizeof(outerUserId) +
+      1 /* outerUserIsSuper */ + sizeof(currentUserId) + sizeof(rootIdx) +
+      sizeof(primary_gang_id) +
+      sizeof(n32) * 2 /* currentStatementStartTimestamp */ +
+      sizeof(command_len
+             ) + sizeof(querytree_len) + sizeof(plantree_len) +
+      sizeof(params_len) + sizeof(sliceinfo_len) + sizeof(identity_len) +
+      sizeof(resource_len) + sizeof(commonPlanLen) + sizeof(snapshotInfo_len) +
+      snapshotInfo_len + sizeof(flags) + sizeof(seqServerHostlen) +
+      sizeof(seqServerPort) + command_len + querytree_len + plantree_len +
+      params_len + sliceinfo_len + identity_len + resource_len + commonPlanLen +
+      seqServerHostlen;
+
+  shared_query = malloc(total_query_len);
+  if (shared_query == NULL) {
+    /* tell our caller how much memory we wanted */
+    if (final_len != NULL) *final_len = total_query_len;
+    return NULL;
+  }
+
+  pos = shared_query;
+
+  *pos++ = 'J';
+
+  pos += 4; /* place holder for message length */
+
+  *pos++ = 'L';
+  pos += 4; /* place holder for new message length */
+
+  pos += 4; /* place holder for qe index */
+
+  tmp = htonl(gp_command_count);
+  memcpy(pos, &tmp, sizeof(gp_command_count));
+  pos += sizeof(gp_command_count);
+
+  tmp = htonl(sessionUserId);
+  memcpy(pos, &tmp, sizeof(sessionUserId));
+  pos += sizeof(sessionUserId);
+
+  if (sessionUserIsSuper)
+    *pos++ = one;
+  else
+    *pos++ = zero;
+
+  tmp = htonl(outerUserId);
+  memcpy(pos, &tmp, sizeof(outerUserId));
+  pos += sizeof(outerUserId);
+
+  if (outerUserIsSuper)
+    *pos++ = one;
+  else
+    *pos++ = zero;
+
+  tmp = htonl(currentUserId);
+  memcpy(pos, &tmp, sizeof(currentUserId));
+  pos += sizeof(currentUserId);
+
+  tmp = htonl(rootIdx);
+  memcpy(pos, &tmp, sizeof(rootIdx));
+  pos += sizeof(rootIdx);
+
+  tmp = htonl(primary_gang_id);
+  memcpy(pos, &tmp, sizeof(primary_gang_id));
+  pos += sizeof(primary_gang_id);
+
+  /* High order half first, since we're doing MSB-first */
+  n32 = (uint32)(currentStatementStartTimestamp >> 32);
+  n32 = htonl(n32);
+  memcpy(pos, &n32, sizeof(n32));
+  pos += sizeof(n32);
+
+  /* Now the low order half */
+  n32 = (uint32)currentStatementStartTimestamp;
+  n32 = htonl(n32);
+  memcpy(pos, &n32, sizeof(n32));
+  pos += sizeof(n32);
+
+  tmp = htonl(command_len);
+  memcpy(pos, &tmp, sizeof(command_len));
+  pos += sizeof(command_len);
+
+  tmp = htonl(querytree_len);
+  memcpy(pos, &tmp, sizeof(querytree_len));
+  pos += sizeof(querytree_len);
+
+  tmp = htonl(plantree_len);
+  memcpy(pos, &tmp, sizeof(plantree_len));
+  pos += sizeof(plantree_len);
+
+  tmp = htonl(params_len);
+  memcpy(pos, &tmp, sizeof(params_len));
+  pos += sizeof(params_len);
+
+  tmp = htonl(sliceinfo_len);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  tmp = htonl(snapshotInfo_len);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  tmp = htonl(identity_len);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  tmp = htonl(resource_len);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  tmp = htonl(commonPlanLen);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  if (snapshotInfo_len > 0) {
+    memcpy(pos, snapshotInfo, snapshotInfo_len);
+    pos += snapshotInfo_len;
+  }
+
+  tmp = htonl(flags);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  tmp = htonl(seqServerHostlen);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  tmp = htonl(seqServerPort);
+  memcpy(pos, &tmp, sizeof(tmp));
+  pos += sizeof(tmp);
+
+  if (command_len > 0) {
+    memcpy(pos, command, command_len);
+    pos += command_len;
+  }
+
+  if (querytree_len > 0) {
+    memcpy(pos, querytree, querytree_len);
+    pos += querytree_len;
+  }
+
+  if (plantree_len > 0) {
+    memcpy(pos, plantree, plantree_len);
+    pos += plantree_len;
+  }
+
+  if (params_len > 0) {
+    memcpy(pos, params, params_len);
+    pos += params_len;
+  }
+
+  if (sliceinfo_len > 0) {
+    memcpy(pos, sliceinfo, sliceinfo_len);
+    pos += sliceinfo_len;
+  }
+
+  if (identity_len > 0) {
+    memcpy(pos, identity, identity_len);
+    pos += identity_len;
+  }
+
+  if (resource_len > 0) {
+    memcpy(pos, resource, resource_len);
+    pos += resource_len;
+  }
+
+  if (commonPlanLen > 0) {
+    memcpy(pos, commonPlan, commonPlanLen);
+    pos += commonPlanLen;
+  }
+
+  if (seqServerHostlen > 0) {
+    memcpy(pos, seqServerHost, seqServerHostlen);
+    pos += seqServerHostlen;
+  }
+
+  len = pos - shared_query - 1;
+
+  /* fill in length placeholder */
+  tmp = htonl(len);
+  memcpy(shared_query + 1, &tmp, sizeof(len));
+
+  Assert(len + 1 == total_query_len);
+
+  if (final_len) *final_len = len + 1;
+
+  len = pos - shared_query - 6;
+  tmp = htonl(len);
+  memcpy(shared_query + 6, &tmp, sizeof(len));
+
+  return shared_query;
 }
 
 int

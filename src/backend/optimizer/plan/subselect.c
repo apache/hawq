@@ -430,6 +430,9 @@ make_subplan(PlannerInfo *root, Query *orig_subquery, SubLinkType subLinkType,
 		 */
 		config->enable_indexscan = false;
 		config->enable_bitmapscan = false;
+		config->enable_magma_indexscan = false;
+		config->enable_magma_bitmapscan = false;
+		config->enable_magma_indexonlyscan = false;
 		config->enable_tidscan = false;
 		config->enable_seqscan = true;
 	}
@@ -1171,11 +1174,16 @@ finalize_plan(PlannerInfo *root, Plan *plan, List *rtable,
 		case T_IndexScan:
 			finalize_primnode((Node *) ((IndexScan *) plan)->indexqual,
 							  &context);
-
 			/*
 			 * we need not look at indexqualorig, since it will have the same
 			 * param references as indexqual.
 			 */
+			break;
+
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+			finalize_primnode((Node *) ((ExternalScan *) plan)->indexqualorig,
+							  &context);
 			break;
 
 		case T_BitmapIndexScan:

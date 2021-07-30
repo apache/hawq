@@ -50,14 +50,18 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "fmgr.h"
 #include "gpmon/gpmon.h"
 
 #include "access/heapam.h"
 #include "access/aosegfiles.h"
+#include "access/orcam.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "access/appendonlywriter.h"
 #include "access/fileam.h"
 #include "access/filesplit.h"
+#include "access/read_cache.h"
 #include "access/reloptions.h"
 #include "access/transam.h"
 #include "access/xact.h"
@@ -92,10 +96,12 @@
 #include "storage/smgr.h"
 #include "utils/acl.h"
 #include "utils/builtins.h"
+#include "utils/hsearch.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
 #include "utils/ps_status.h"
 #include "utils/rel.h"
+#include "utils/uri.h"
 #include "utils/workfile_mgr.h"
 
 #include "catalog/pg_statistic.h"
@@ -108,7 +114,9 @@
 #include "cdb/cdbcat.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchresult.h"
+#include "cdb/cdbdatalocality.h"
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/cdbexplain.h"             /* cdbexplain_sendExecStats() */
 #include "cdb/cdbplan.h"
 #include "cdb/cdbsrlz.h"
@@ -127,8 +135,10 @@
 #include "cdb/cdbtargeteddispatch.h"
 #include "cdb/cdbquerycontextdispatching.h"
 #include "optimizer/prep.h"
+#include "tcop/pquery.h"
 
 #include "resourcemanager/dynrm.h"
+#include "utils/syscache.h"
 
 extern bool		filesystem_support_truncate;
 
@@ -261,6 +271,10 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
 			if (!OidIsValid(scan->fmterrtbl))
 				return false;
 
+			// hdfs protocol external table in text/csv format
+			if (hasErrTblInFmtOpts(scan->fmtOpts))
+				return false;
+
 			/*
 			 * check if two external table use the same error table in a statement
 			 */
@@ -288,7 +302,7 @@ SetupSegnoForErrorTable(Node *node, QueryCxtWalkerCxt *cxt)
             info->errTblOid = lcons_oid(scan->fmterrtbl, info->errTblOid);
 
             Relation errRel = heap_open(scan->fmterrtbl, RowExclusiveLock);
-            CreateAppendOnlyParquetSegFileForRelationOnMaster(errRel, errSegnos);
+            CreateAoSegFileForRelationOnMaster(errRel, errSegnos);
             prepareDispatchedCatalogSingleRelation(info, scan->fmterrtbl, TRUE, errSegnos);
             scan->err_aosegfileinfos = fetchSegFileInfos(scan->fmterrtbl, errSegnos);
 
@@ -414,7 +428,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
     Assert(queryDesc->plannedstmt != NULL);
 
     PlannedStmt *plannedStmt = queryDesc->plannedstmt;
-    
+
     if (NULL == plannedStmt->memoryAccount)
     {
         plannedStmt->memoryAccount = MemoryAccounting_CreateAccount(0, MEMORY_OWNER_TYPE_EXECUTOR);
@@ -767,7 +781,19 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                          LocallyExecutingSliceIndex(estate),
                          RootSliceIndex(estate));
             }
-            
+
+            if (Gp_role == GP_ROLE_DISPATCH &&
+                (queryDesc->operation == CMD_INSERT ||
+                 queryDesc->operation == CMD_UPDATE ||
+                 queryDesc->operation == CMD_DELETE)) {
+              for (int32_t i = 0; i < estate->es_num_result_relations; ++i)
+                if (RelationIsMagmaTable2(
+                        estate->es_result_relations[i].ri_RelationDesc->rd_id))
+                  ReadCacheHashEntryReviseOnCommit(
+                      estate->es_result_relations[i].ri_RelationDesc->rd_id,
+                      false);
+            }
+
             /*
              * Are we going to dispatch this plan parallel?  Only if we're running as
              * a QD and the plan is a parallel plan.
@@ -776,7 +802,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                 queryDesc->plannedstmt->planTree->dispatch == DISPATCH_PARALLEL &&
                 !(eflags & EXEC_FLAG_EXPLAIN_ONLY))
             {
-                shouldDispatch = true;
+                shouldDispatch = true && !readCacheEnabled();
             }
             else
             {
@@ -822,6 +848,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                         {
                             ++rti; /* List indices start with 1. */
                             RangeTblEntry *rte = lfirst(rtc);
+
                             if (rte->rtekind == RTE_RELATION)
                             {
                                 ListCell *relc;
@@ -854,11 +881,11 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                                     }
                                     else
                                     {
-                                        prepareDispatchedCatalogRelation(plannedstmt->contextdisp,
-                                                                         rte->relid, FALSE, NULL);
+                                      prepareDispatchedCatalogRelation(plannedstmt->contextdisp,
+                                                                       rte->relid, FALSE, NULL, FALSE);
                                     }
                                 }
-                                
+
                             }
                         }
                         
@@ -871,13 +898,16 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                         ResultRelInfo * relinfo;
                         relinfo = &estate->es_result_relation_info[i];
                         prepareDispatchedCatalogRelation(plannedstmt->contextdisp,
-                                                         RelationGetRelid(relinfo->ri_RelationDesc), TRUE, estate->es_result_aosegnos);
+                                                         RelationGetRelid(relinfo->ri_RelationDesc), TRUE, estate->es_result_aosegnos, TRUE);
                         result_segfileinfos = GetResultRelSegFileInfos(RelationGetRelid(relinfo->ri_RelationDesc),
                                                                        estate->es_result_aosegnos, result_segfileinfos);
+                        if (dataStoredInHive(relinfo->ri_RelationDesc)) {
+                          fetchUrlStoredInHive(RelationGetRelid(relinfo->ri_RelationDesc), &(plannedstmt->hiveUrl));
+                        }
+
                     }
-
                     plannedstmt->result_segfileinfos = result_segfileinfos;
-
+                    
                     if (plannedstmt->intoClause != NULL)
                     {
                         List *segment_segnos = SetSegnoForWrite(NIL, 0, GetQEGangNum(), true, true, false);
@@ -885,6 +915,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                                                                plannedstmt->intoClause->oidInfo.relOid, TRUE, segment_segnos);
                     }
                     
+
                     if (plannedstmt->rtable)
                         prepareDispatchedCatalog(plannedstmt->contextdisp, plannedstmt->rtable);
                     
@@ -939,11 +970,21 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                                                                        queryDesc->params,
                                                                        queryDesc->estate->es_param_exec_vals);
                 }
-                estate->dispatch_data = initialize_dispatch_data(queryDesc->resource, false);
-                prepare_dispatch_query_desc(estate->dispatch_data, queryDesc);
-                dispatch_run(estate->dispatch_data);
-                cleanup_dispatch_data(estate->dispatch_data);
-                
+                CommonPlanContext ctx;
+                bool newPlanner = can_convert_common_plan(queryDesc, &ctx);
+                if (newPlanner && ctx.enforceNewScheduler && scheduler_plan_support_check(queryDesc)) {
+                  const char *queryId = palloc0(sizeof(int) + sizeof(int) + 5);
+                  sprintf(queryId, "QID%d_%d", gp_session_id, gp_command_count);
+                  scheduler_prepare_for_new_query(queryDesc, queryId, 0);
+                  pfree(queryId);
+                  scheduler_run(queryDesc->estate->scheduler_data, &ctx);
+                } else {
+                  estate->mainDispatchData = mainDispatchInit(queryDesc->resource);
+                  estate->dispatch_data = NULL;
+                  mainDispatchPrepare(estate->mainDispatchData, queryDesc, newPlanner);
+                  mainDispatchRun(estate->mainDispatchData, &ctx, newPlanner);
+                }
+
                 DropQueryContextInfo(queryDesc->plannedstmt->contextdisp);
                 queryDesc->plannedstmt->contextdisp = NULL;
             }
@@ -977,8 +1018,11 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
             else if (exec_identity == GP_ROOT_SLICE)
             {
                 /* Run a root slice. */
+            		// new plan will use new interconnect
                 if (queryDesc->planstate != NULL &&
-                    queryDesc->planstate->plan->nMotionNodes > 0 && !estate->es_interconnect_is_setup)
+                    queryDesc->planstate->plan->nMotionNodes > 0
+										&& !estate->es_interconnect_is_setup
+										&& !queryDesc->newPlan)
                 {
                     estate->es_interconnect_is_setup = true;
                     
@@ -986,7 +1030,7 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                     SetupInterconnect(estate);
                     Assert(estate->interconnect_context);
                 }
-                if (estate->es_interconnect_is_setup)
+                if (estate->es_interconnect_is_setup && !queryDesc->newPlan)
                 {
                     ExecUpdateTransportState(queryDesc->planstate,
                                              estate->interconnect_context);
@@ -1144,6 +1188,35 @@ ExecutorRun(QueryDesc *queryDesc,
 	estate->es_processed = 0;
 	estate->es_lastoid = InvalidOid;
 
+	if (operation == CMD_UPDATE || operation == CMD_DELETE)
+	{
+		/* initialize execution status structure for delete, update */
+		HASHCTL hashInfo;
+		int hashFlag;
+		MemSet(&hashInfo, 0, sizeof(hashInfo));
+		hashInfo.keysize = sizeof(Oid);
+		hashInfo.entrysize = sizeof(ExternalInsertDescHashEntry);
+		hashInfo.hash = tag_hash;
+		hashFlag = (HASH_ELEM | HASH_FUNCTION);
+		if (operation == CMD_DELETE)
+		{
+			estate->es_ext_del_oid_desc = hash_create(
+					"Oid ExternalDeleteDesc Hash", 16, &hashInfo, hashFlag);
+			if (!estate->es_ext_del_oid_desc)
+			{
+				elog(ERROR, "failed to create hash for delete");
+			}
+		}
+		else
+		{
+			estate->es_ext_upd_oid_desc = hash_create(
+					"Oid ExternalUpdateDesc Hash", 16, &hashInfo, hashFlag);
+			if (!estate->es_ext_upd_oid_desc)
+			{
+				elog(ERROR, "failed to create hash for update");
+			}
+		}
+	}
 	sendTuples = (queryDesc->tupDesc != NULL &&
 			(operation == CMD_SELECT ||
 			 queryDesc->plannedstmt->returningLists));
@@ -1197,36 +1270,42 @@ ExecutorRun(QueryDesc *queryDesc,
 
 			Assert(motionState);
 
+			estate->es_plannedstmt = queryDesc->plannedstmt;
 			result = ExecutePlan(estate,
 					(PlanState *) motionState,
 					CMD_SELECT,
 					0,
 					ForwardScanDirection,
 					dest);
-		}
-		else if (exec_identity == GP_ROOT_SLICE)
-		{
-			/*
-			 * Run a root slice
-			 * It corresponds to the "normal" path through the executor
-			 * in that we enter the plan at the top and count on the
-			 * motion nodes at the fringe of the top slice to return
-			 * without ever calling nodes below them.
-			 */
-			result = ExecutePlan(estate,
-					queryDesc->planstate,
-					operation,
-					count,
-					direction,
-					dest);
-		}
-		else
-		{
-			/* should never happen */
-			Assert(!"undefined parallel execution strategy");
-		}
+    } else if (exec_identity == GP_ROOT_SLICE) {
+      /*
+       * Run a root slice
+       * It corresponds to the "normal" path through the executor
+       * in that we enter the plan at the top and count on the
+       * motion nodes at the fringe of the top slice to return
+       * without ever calling nodes below them.
+       */
+      if (readCacheEnabled()) {
+        do {
+          (*dest->receiveSlot)(NULL, dest);
+        } while (!readCacheEof());
+        result = NULL;
+      } else if (queryDesc->newPlan) {
+        exec_mpp_query_new(queryDesc->newPlan->str,
+                           queryDesc->newPlan->len, currentSliceId,
+                           false, dest, queryDesc->planstate);
+        result = NULL;
+      } else {
+        estate->es_plannedstmt = queryDesc->plannedstmt;
+        result = ExecutePlan(estate, queryDesc->planstate,
+                             operation, count, direction, dest);
+      }
+    } else {
+      /* should never happen */
+      Assert(!"undefined parallel execution strategy");
+    }
 
-		/*
+    /*
 		 * if result is null we got end-of-stream. We need to mark it
 		 * since with a cursor end-of-stream will only be received with
 		 * the fetch that returns the last tuple. ExecutorEnd needs to
@@ -1316,7 +1395,7 @@ ExecutorEnd(QueryDesc *queryDesc)
 
 	Assert(NULL != queryDesc->plannedstmt && NULL != queryDesc->plannedstmt->memoryAccount);
 
-	START_MEMORY_ACCOUNT(queryDesc->plannedstmt->memoryAccount);
+  START_MEMORY_ACCOUNT(queryDesc->plannedstmt->memoryAccount);
 
 	if (DEBUG1 >= log_min_messages)
 	{
@@ -1401,6 +1480,29 @@ ExecutorEnd(QueryDesc *queryDesc)
 		queryDesc->resource = NULL;
 		oldcontext = MemoryContextSwitchTo(tmpcontext);
 	}
+
+	/* cleanup execution status structure for delete if necessary */
+	HASH_SEQ_STATUS status;
+
+	ExternalInsertDescHashEntry *extDelDescEntry;
+	hash_seq_init(&status, estate->es_ext_del_oid_desc);
+	while ((extDelDescEntry = (ExternalInsertDescHashEntry *) hash_seq_search(&status)) != NULL)
+	{
+	    ExternalInsertDesc extDelDesc = extDelDescEntry->ext_ins_desc;
+	    InvokeMagmaEndDelete(extDelDesc->ext_ps_delete_funcs.enddeletes, extDelDesc);
+	}
+
+	ExternalInsertDescHashEntry *extUpdDescEntry;
+	hash_seq_init(&status, estate->es_ext_upd_oid_desc);
+	while ((extUpdDescEntry = (ExternalInsertDescHashEntry *) hash_seq_search(&status)) != NULL)
+	{
+	    ExternalInsertDesc extUpdDesc = extUpdDescEntry->ext_ins_desc;
+	    elog(LOG, "exec update end update: %d", extUpdDescEntry->ext_ins_oid);
+	    estate->es_processed += InvokeMagmaEndUpdate(extUpdDesc->ext_ps_update_funcs.endupdates, extUpdDesc);
+	}
+
+	hash_destroy(estate->es_ext_del_oid_desc);
+	hash_destroy(estate->es_ext_upd_oid_desc);
 
 	/*
 	 * If normal termination, let each operator clean itself up.
@@ -1758,40 +1860,61 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
 	}
 	else
 	{
-		List 	*all_relids = NIL;
 		Oid		 relid = getrelid(linitial_int(plannedstmt->resultRelations), rangeTable);
-
-		all_relids = lappend_oid(all_relids, relid);
 		estate->es_result_partitions = BuildPartitionNodeFromRoot(relid);
 
-		if (rel_is_partitioned(relid))
-		    all_relids = list_concat(all_relids, all_partition_relids(estate->es_result_partitions));
-		
-		estate->es_result_aosegnos = assignPerRelSegno(all_relids, GetQEGangNum());
-        
-		plannedstmt->result_partitions = estate->es_result_partitions;
-		plannedstmt->result_aosegnos = estate->es_result_aosegnos;
+    if (operation == CMD_UPDATE || operation == CMD_DELETE) {
+      estate->es_result_aosegnos = NIL;
 
-		/* Set any QD resultrels segno, just in case. The QEs set their own in ExecInsert(). */
-		int relno = 0;
-		ResultRelInfo* relinfo;
-		for (relno = 0; relno < numResultRelations; relno ++)
-		{
-			relinfo = &(resultRelInfos[relno]);
-			ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
-		}
+      if (get_rel_relstorage(relid) == RELSTORAGE_ORC &&
+          !(eflags & EXEC_FLAG_EXPLAIN_ONLY)) {
+        ListCell *cell;
+        foreach (cell, plannedstmt->resultRelations) {
+          Oid myRelId = getrelid(lfirst_int(cell), rangeTable);
+          if (rel_is_partitioned(myRelId)) continue;
+          if (!GetFileSplitsOfSegmentMagma(plannedstmt->scantable_splits, myRelId)) continue;
+          estate->es_plannedstmt->relFileNodeInfo = lappend_oid(
+              estate->es_plannedstmt->relFileNodeInfo, myRelId);
+          estate->es_plannedstmt->relFileNodeInfo =
+              lappend_oid(estate->es_plannedstmt->relFileNodeInfo,
+                          orcSetNewRelfilenode(myRelId));
+          AORelRemoveHashEntryOnCommit(myRelId);
+        }
+      }
+    } else {
+      List  *all_relids = NIL;
+      all_relids = lappend_oid(all_relids, relid);
+      if (rel_is_partitioned(relid))
+      {
+          all_relids = list_concat(all_relids, all_partition_relids(estate->es_result_partitions));
+      }
 
-		ListCell *cell;
-		foreach(cell, all_relids)
-		{
-			Oid relid =  lfirst_oid(cell);
-			if (!(eflags & EXEC_FLAG_EXPLAIN_ONLY))
-			{
-			  CreateAppendOnlyParquetSegFileOnMaster(relid, estate->es_result_aosegnos);
-			}
-		}
+      estate->es_result_aosegnos =
+          assignPerRelSegno(all_relids, GetQEGangNum());
 
-	}
+      /* Set any QD resultrels segno, just in case. The QEs set
+       * their own in ExecInsert(). */
+      int relno = 0;
+      ResultRelInfo *relinfo;
+      for (relno = 0; relno < numResultRelations; relno++) {
+        relinfo = &(resultRelInfos[relno]);
+        ResultRelInfoSetSegno(relinfo, estate->es_result_aosegnos);
+      }
+
+      ListCell *cell;
+      foreach (cell, all_relids) {
+        Oid relid = lfirst_oid(cell);
+        if (!(eflags & EXEC_FLAG_EXPLAIN_ONLY)) {
+          CreateAoSegFileOnMaster(relid,
+                                  estate->es_result_aosegnos);
+        }
+      }
+    }
+  }
+
+	plannedstmt->result_partitions = estate->es_result_partitions;
+	plannedstmt->result_aosegnos = estate->es_result_aosegnos;
+
 	estate->es_partition_state = NULL;
 	if (estate->es_result_partitions)
 	{
@@ -2046,11 +2169,6 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	 * processing tuples.
 	 */
 	planstate = ExecInitNode(plannedstmt->planTree, estate, eflags);
-
-	/* to process the planstate */
-	if(vmthd.vectorized_executor_enable &&
-		NULL != vmthd.ExecVecNode_Hook)
-		planstate = vmthd.ExecVecNode_Hook(planstate, NULL, estate, eflags);
 
 	queryDesc->planstate = planstate;
 
@@ -2320,6 +2438,8 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 	 */
 	/* CDB: we must promote locks for UPDATE and DELETE operations. */
 	lockmode = needLock ? RowExclusiveLock : NoLock;
+	if (dataStoredInMagmaByOid(resultRelationOid))
+		lockmode = AccessShareLock;
 	if (operation == CMD_UPDATE || operation == CMD_DELETE)
 	{
 		resultRelationDesc = CdbOpenRelation(resultRelationOid,
@@ -2424,7 +2544,7 @@ initResultRelInfo(ResultRelInfo *resultRelInfo,
 }
 
 	void
-CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
+CreateAoSegFileOnMaster(Oid relid, List *mapping)
 {
 	ListCell *relid_to_segno;
 	bool	  found = false;
@@ -2432,7 +2552,7 @@ CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 	Relation rel = heap_open(relid, AccessShareLock);
 
 	/* only relevant for AO relations */
-	if(!RelationIsAoRows(rel)  && !RelationIsParquet(rel) && !RelationIsExternal(rel))
+	if(!RelationIsAo(rel))
 	{
 		heap_close(rel, AccessShareLock);
 		return;
@@ -2454,7 +2574,7 @@ CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 			 * in hawq, master create all segfile for segments
 			 */
 			if (Gp_role == GP_ROLE_DISPATCH)
-				CreateAppendOnlyParquetSegFileForRelationOnMaster(rel, n->segnos);
+			  CreateAoSegFileForRelationOnMaster(rel, n->segnos);
 
 			found = true;
 			break;
@@ -2466,127 +2586,82 @@ CreateAppendOnlyParquetSegFileOnMaster(Oid relid, List *mapping)
 	Assert(found);
 }
 
-static void CreateExternalSegFileForRelationOnMaster(Relation rel, List *segnos,
-		SharedStorageOpTasks *addTasks)
-{
-	ParquetFileSegInfo * fsinfo;
-	ListCell *cell;
+typedef FileSegInfo *(*GetFileSegInfoCallback)(Relation rel,
+                                               AppendOnlyEntry *aoEntry,
+                                               Snapshot snapshot, int segNo);
+typedef void (*InsertInitialSegnoEntryCallBack)(AppendOnlyEntry *aoEntry,
+                                                int segNo);
 
-	Assert(RelationIsExternal(rel));
+static void CreateAoSegFileForRelationOnMasterInternal(
+    Relation rel, AppendOnlyEntry *aoEntry, List *segnos,
+    SharedStorageOpTasks *addTask, SharedStorageOpTasks *overwriteTask,
+    GetFileSegInfoCallback callback1,
+    InsertInitialSegnoEntryCallBack callback2) {
+  FileSegInfo *fsinfo;
+  ListCell *cell;
 
-	char * relname = RelationGetRelationName(rel);
+  Relation gp_relfile_node;
+  HeapTuple tuple;
 
-	foreach(cell, segnos)
-	{
-		int segno = lfirst_int(cell);
+  ItemPointerData persistentTid;
+  int64 persistentSerialNum;
 
-		Assert(NULL != addTasks);
-		Assert(addTasks->sizeTasks >= addTasks->numTasks);
+  Assert(RelationIsAo(rel));
 
-		RelFileNode *n;
+  char *relname = RelationGetRelationName(rel);
 
-		if (addTasks->sizeTasks == addTasks->numTasks)
-		{
-			addTasks->tasks = repalloc(addTasks->tasks,
-					addTasks->sizeTasks * sizeof(SharedStorageOpTask) * 2);
-			addTasks->sizeTasks *= 2;
-		}
+  gp_relfile_node = heap_open(GpRelfileNodeRelationId, AccessShareLock);
 
-		n = &addTasks->tasks[addTasks->numTasks].node;
-		n->dbNode = rel->rd_node.dbNode;
-		n->relNode = rel->rd_node.relNode;
-		n->spcNode = rel->rd_node.spcNode;
+  foreach (cell, segnos) {
+    int segno = lfirst_int(cell);
+    fsinfo = callback1(rel, aoEntry, SnapshotNow, segno);
 
-		addTasks->tasks[addTasks->numTasks].segno = segno;
-		addTasks->tasks[addTasks->numTasks].relname = palloc(strlen(relname) + 1);
-		strcpy(addTasks->tasks[addTasks->numTasks].relname, relname);
+    if (NULL == fsinfo) {
+      callback2(aoEntry, segno);
+    } else if (fsinfo->eof != 0) {
+      pfree(fsinfo);
+      continue;
+    }
 
-		addTasks->numTasks++;
-	}
+    if (fsinfo) {
+      pfree(fsinfo);
+    }
+
+    tuple =
+        FetchGpRelfileNodeTuple(gp_relfile_node, rel->rd_node.relNode, segno,
+                                &persistentTid, &persistentSerialNum);
+
+    if (HeapTupleIsValid(tuple)) {
+      bool currentTspSupportTruncate = false;
+
+      if (filesystem_support_truncate)
+        currentTspSupportTruncate =
+            TestCurrentTspSupportTruncate(rel->rd_node.spcNode);
+
+      heap_freetuple(tuple);
+
+      /*
+       * here is a record in persistent table, we assume the file exist on
+       * filesystem. but there is no record in pg_aoseg_xxx catalog. We should
+       * overwrite that file in case that the file system do not support
+       * truncate.
+       */
+      if (!currentTspSupportTruncate)
+        SharedStorageOpAddTask(relname, &rel->rd_node, segno, &persistentTid,
+                               persistentSerialNum, overwriteTask);
+
+      continue;
+    }
+
+    SharedStorageOpPreAddTask(&rel->rd_node, segno, relname, &persistentTid,
+                              &persistentSerialNum);
+
+    SharedStorageOpAddTask(relname, &rel->rd_node, segno, &persistentTid,
+                           persistentSerialNum, addTask);
+  }
+
+  heap_close(gp_relfile_node, AccessShareLock);
 }
-
-	static void
-CreaateAoRowSegFileForRelationOnMaster(Relation rel,
-		AppendOnlyEntry * aoEntry, List *segnos, SharedStorageOpTasks *addTask, SharedStorageOpTasks *overwriteTask)
-{
-	FileSegInfo * fsinfo;
-	ListCell *cell;
-
-	Relation gp_relfile_node;
-	HeapTuple tuple;
-
-	ItemPointerData persistentTid;
-	int64 persistentSerialNum;
-
-	Assert(RelationIsAoRows(rel));
-
-	char * relname = RelationGetRelationName(rel);
-
-	gp_relfile_node = heap_open(GpRelfileNodeRelationId, AccessShareLock);
-
-	foreach(cell, segnos)
-	{
-		int segno = lfirst_int(cell);
-		fsinfo = GetFileSegInfo(rel, aoEntry, SnapshotNow, segno);
-
-		if (NULL == fsinfo)
-		{
-			InsertInitialSegnoEntry(aoEntry, segno);
-		}
-		else if (fsinfo->eof != 0)
-		{
-			pfree(fsinfo);
-			continue;
-		}
-
-		if (fsinfo)
-		{
-			pfree(fsinfo);
-		}
-
-		tuple = FetchGpRelfileNodeTuple(
-					gp_relfile_node,
-					rel->rd_node.relNode,
-					segno,
-					&persistentTid,
-					&persistentSerialNum);
-
-		if (HeapTupleIsValid(tuple))
-		{
-			bool currentTspSupportTruncate = false;
-
-			if (filesystem_support_truncate)
-					currentTspSupportTruncate = TestCurrentTspSupportTruncate(rel->rd_node.spcNode);
-
-			heap_freetuple(tuple);
-
-			/*
-			 * here is a record in persistent table, we assume the file exist on filesystem.
-			 * but there is no record in pg_aoseg_xxx catalog.
-			 * We should overwrite that file in case that the file system do not support truncate.
-			 */
-			if (!currentTspSupportTruncate)
-                SharedStorageOpAddTask(relname, &rel->rd_node, segno,
-                        &persistentTid,
-                        persistentSerialNum,
-                        overwriteTask);
-
-			continue;
-		}
-
-		SharedStorageOpPreAddTask(&rel->rd_node, segno, relname,
-								  &persistentTid,
-								  &persistentSerialNum);
-
-		SharedStorageOpAddTask(relname, &rel->rd_node, segno,
-								&persistentTid,
-								persistentSerialNum,
-								addTask);
-	}
-
-	heap_close(gp_relfile_node, AccessShareLock);
-}
-
 
 static void
 CreateParquetSegFileForRelationOnMaster(Relation rel,
@@ -2669,34 +2744,78 @@ CreateParquetSegFileForRelationOnMaster(Relation rel,
 	heap_close(gp_relfile_node, AccessShareLock);
 }
 
+static void CreateExternalSegFileForRelationOnMaster(Relation rel, List *segnos,
+		SharedStorageOpTasks *addTasks)
+{
+	ParquetFileSegInfo * fsinfo;
+	ListCell *cell;
+
+	Assert(RelationIsExternal(rel));
+
+	char * relname = RelationGetRelationName(rel);
+
+	foreach(cell, segnos)
+	{
+		int segno = lfirst_int(cell);
+
+		Assert(NULL != addTasks);
+		Assert(addTasks->sizeTasks >= addTasks->numTasks);
+
+		RelFileNode *n;
+
+		if (addTasks->sizeTasks == addTasks->numTasks)
+		{
+			addTasks->tasks = repalloc(addTasks->tasks,
+					addTasks->sizeTasks * sizeof(SharedStorageOpTask) * 2);
+			addTasks->sizeTasks *= 2;
+		}
+
+		n = &addTasks->tasks[addTasks->numTasks].node;
+		n->dbNode = rel->rd_node.dbNode;
+		n->relNode = rel->rd_node.relNode;
+		n->spcNode = rel->rd_node.spcNode;
+
+		addTasks->tasks[addTasks->numTasks].segno = segno;
+		addTasks->tasks[addTasks->numTasks].relname = palloc(strlen(relname) + 1);
+		strcpy(addTasks->tasks[addTasks->numTasks].relname, relname);
+
+		addTasks->numTasks++;
+	}
+}
+
 void
-CreateAppendOnlyParquetSegFileForRelationOnMaster(Relation rel, List *segnos)
+CreateAoSegFileForRelationOnMaster(Relation rel, List *segnos)
 {
 	SharedStorageOpTasks *addTasks = CreateSharedStorageOpTasks();
 	SharedStorageOpTasks *overwriteTasks = CreateSharedStorageOpTasks();
 
 
-	if(RelationIsAoRows(rel) || RelationIsParquet(rel))
+	if(RelationIsAo(rel))
 	{
 		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(rel->rd_id, SnapshotNow);
 
-		if(RelationIsAoRows(rel))
-			CreaateAoRowSegFileForRelationOnMaster(rel, aoEntry, segnos, addTasks, overwriteTasks);
-		else
-			CreateParquetSegFileForRelationOnMaster(rel, aoEntry, segnos, addTasks, overwriteTasks);
+		// lock to avoid of hash table file count mismatch issue
+		Relation aoSegRel = heap_open(aoEntry->segrelid, AccessExclusiveLock);
 
-		pfree(aoEntry);
+    if (RelationIsAoRows(rel))
+      CreateAoSegFileForRelationOnMasterInternal(
+          rel, aoEntry, segnos, addTasks, overwriteTasks,
+          GetFileSegInfo, InsertInitialSegnoEntry);
+    else if (RelationIsOrc(rel))
+      CreateAoSegFileForRelationOnMasterInternal(
+          rel, aoEntry, segnos, addTasks, overwriteTasks,
+          getOrcFileSegInfo, insertInitialOrcSegnoEntry);
+    else
+      CreateParquetSegFileForRelationOnMaster(
+          rel, aoEntry, segnos, addTasks, overwriteTasks);
+
+    heap_close(aoSegRel, AccessExclusiveLock);
+    pfree(aoEntry);
 
 		PerformSharedStorageOpTasks(addTasks, Op_CreateSegFile);
 		PostPerformSharedStorageOpTasks(addTasks);
 		PerformSharedStorageOpTasks(overwriteTasks, Op_OverWriteSegFile);
 	}
-	// TODO: Should we create empty files on orc hash distribution table?
-	// else if (RelationIsExternal(rel))
-	// {
-	// 	CreateExternalSegFileForRelationOnMaster(rel, segnos, addTasks);
-	// 	PerformSharedStorageOpTasks(addTasks, Op_CreateSegFile);
-	// }
 
 	DropSharedStorageOpTasks(addTasks);
 	DropSharedStorageOpTasks(overwriteTasks);
@@ -2758,10 +2877,10 @@ ResultRelInfoSetSegFileInfo(ResultRelInfo *resultRelInfo, List *mapping)
 	/*
 	 * Only relevant for AO relations.
 	 */
-//	if (!relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
-//	{
-//		return;
-//	}
+	// if (!relstorage_is_ao(RelinfoGetStorage(resultRelInfo)))
+	// {
+	// 	return;
+	// }
 
 	Assert(mapping);
 	Assert(resultRelInfo->ri_RelationDesc);
@@ -2794,7 +2913,7 @@ InitResultRelSegFileInfo(int segno, char storageChar, int numfiles)
 	result->segno = segno;
 	result->numfiles = numfiles;
 	Assert(result->numfiles > 0);
-	if ((storageChar == RELSTORAGE_AOROWS) || (storageChar == RELSTORAGE_PARQUET))
+	if (relstorage_is_ao(storageChar))
 	{
 		Assert(result->numfiles == 1);
 	}
@@ -2959,9 +3078,12 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 	resultRelInfo = estate->es_result_relations;
 	for (i = 0; i < estate->es_num_result_relations; i++)
 	{
-		if (resultRelInfo->ri_aoInsertDesc)
-			++aocount;
-		if (resultRelInfo->ri_parquetInsertDesc || resultRelInfo->ri_insertSendBack)
+		if (resultRelInfo->ri_aoInsertDesc ||
+		    resultRelInfo->ri_orcInsertDesc ||
+		    resultRelInfo->ri_parquetInsertDesc ||
+		    resultRelInfo->ri_orcDeleteDesc ||
+		    resultRelInfo->ri_orcUpdateDesc ||
+		    resultRelInfo->ri_insertSendBack)
 			++aocount;
 		resultRelInfo++;
 	}
@@ -3013,6 +3135,13 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 			parquet_insert_finish(resultRelInfo->ri_parquetInsertDesc);
 		}
 
+		if (resultRelInfo->ri_orcInsertDesc) {
+		  sendback = CreateQueryContextDispatchingSendBack(1);
+		  resultRelInfo->ri_orcInsertDesc->sendback = sendback;
+		  sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+		  orcEndInsert(resultRelInfo->ri_orcInsertDesc);
+		}
+
 		/*
 		 * This can happen if we inserted into this parquet part then
 		 * closed it during insertion. SendBack information is saved
@@ -3031,11 +3160,9 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 
 			if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
 			{
-				elog(
-						ERROR, "invalid formatter type for external table: %s", __func__);
+				elog(ERROR, "invalid formatter type for external table: %s", __func__);
 			}
-			else if (extInsertDesc->ext_formatter_type
-					!= ExternalTableType_PLUG)
+			else if (extInsertDesc->ext_formatter_type != ExternalTableType_PLUG)
 			{
 				external_insert_finish(extInsertDesc);
 			}
@@ -3047,17 +3174,33 @@ ExecEndPlan(PlanState *planstate, EState *estate)
 				if (insertFinishFunc)
 				{
 					InvokePlugStorageFormatInsertFinish(insertFinishFunc,
-							extInsertDesc);
+								                        extInsertDesc);
 				}
 				else
 				{
 					elog(ERROR, "%s_insert_finish function was not found",
-					extInsertDesc->ext_formatter_name);
+					            extInsertDesc->ext_formatter_name);
 				}
 			}
 		}
 
-		if (resultRelInfo->ri_resultSlot)
+		// handle update/delete scenario
+    if (resultRelInfo->ri_orcDeleteDesc) {
+      sendback = CreateQueryContextDispatchingSendBack(1);
+      resultRelInfo->ri_orcDeleteDesc->sendback = sendback;
+      sendback->relid =
+          RelationGetRelid(resultRelInfo->ri_RelationDesc);
+      estate->es_processed += orcEndDelete(resultRelInfo->ri_orcDeleteDesc);
+    }
+
+    if (resultRelInfo->ri_orcUpdateDesc) {
+      sendback = CreateQueryContextDispatchingSendBack(1);
+      resultRelInfo->ri_orcUpdateDesc->sendback = sendback;
+      sendback->relid = RelationGetRelid(resultRelInfo->ri_RelationDesc);
+      estate->es_processed += orcEndUpdate(resultRelInfo->ri_orcUpdateDesc);
+    }
+
+    if (resultRelInfo->ri_resultSlot)
 		{
 			Assert(resultRelInfo->ri_resultSlot->tts_tupleDescriptor);
 			ReleaseTupleDesc(resultRelInfo->ri_resultSlot->tts_tupleDescriptor);
@@ -3200,6 +3343,7 @@ ExecutePlan(EState *estate,
 	TupleTableSlot *planSlot;
 	TupleTableSlot *slot;
 	ItemPointer tupleid = NULL;
+	Datum gp_segment_id;
 	ItemPointerData tuple_ctid;
 	long		current_tuple_count;
 	TupleTableSlot *result;
@@ -3284,13 +3428,47 @@ lnext:	;
 	 * if the tuple is null, then we assume there is nothing more to
 	 * process so we just return null...
 	 */
-	if (TupIsNull(planSlot))
-	{
-		result = NULL;
-		break;
-	}
+  if (TupIsNull(planSlot)) {
+    if (operation == CMD_DELETE || operation == CMD_UPDATE) {
+      for (int32_t i = 0; i < estate->es_num_result_relations; ++i) {
+        ResultRelInfo *resultRelInfo = estate->es_result_relations + i;
+        Relation resultRelationDesc = resultRelInfo->ri_RelationDesc;
+        if (RelationIsOrc(resultRelationDesc)) {
+          if (resultRelInfo->ri_orcDeleteDesc == NULL &&
+              operation == CMD_DELETE &&
+              GetFileSplitsOfSegmentMagma(
+                  estate->es_plannedstmt->scantable_splits,
+                  resultRelationDesc->rd_id)) {
+            List *splits = GetFileSplitsOfSegment(
+                estate->es_plannedstmt->scantable_splits,
+                resultRelationDesc->rd_id, GetQEIndex());
+            resultRelInfo->ri_orcDeleteDesc = orcBeginDelete(
+                resultRelationDesc, splits,
+                estate->es_plannedstmt->relFileNodeInfo,
+                false,
+                isDirectDispatch(estate->es_plannedstmt->planTree));
+          } else if (resultRelInfo->ri_orcUpdateDesc == NULL &&
+                     operation == CMD_UPDATE &&
+                     GetFileSplitsOfSegmentMagma(
+                         estate->es_plannedstmt->scantable_splits,
+                         resultRelationDesc->rd_id)) {
+            List *splits = GetFileSplitsOfSegment(
+                estate->es_plannedstmt->scantable_splits,
+                resultRelationDesc->rd_id, GetQEIndex());
+            resultRelInfo->ri_orcUpdateDesc = orcBeginUpdate(
+                resultRelationDesc, splits,
+                estate->es_plannedstmt->relFileNodeInfo,
+                false,
+                isDirectDispatch(estate->es_plannedstmt->planTree));
+          }
+        }
+      }
+    }
+    result = NULL;
+    break;
+  }
 
-	if (estate->es_plannedstmt->planGen == PLANGEN_PLANNER ||
+  if (estate->es_plannedstmt->planGen == PLANGEN_PLANNER ||
 			operation == CMD_SELECT)
 	{
 
@@ -3330,6 +3508,19 @@ lnext:	;
 				tupleid = (ItemPointer) DatumGetPointer(datum);
 				tuple_ctid = *tupleid;	/* make sure we don't free the ctid!! */
 				tupleid = &tuple_ctid;
+
+				if (!ExecGetJunkAttribute(junkfilter,
+				              slot,
+				              "gp_segment_id",
+				              &datum,
+				              &isNull))
+				          elog(ERROR, "could not find junk gp_segment_id column");
+
+				        /* shouldn't ever get a null result... */
+				        if (isNull)
+				          elog(ERROR, "gp_segment_id is NULL");
+
+				        gp_segment_id = datum;
 			}
 
 			/*
@@ -3371,7 +3562,7 @@ lmark:	;
 
 		tuple.t_self = *((ItemPointer) DatumGetPointer(datum));
 
-		if (erm->forUpdate)
+		if (erm->forUpdate && !dataStoredInMagmaByOid(erm->relation->rd_id))
 			lockmode = LockTupleExclusive;
 		else
 			lockmode = LockTupleShared;
@@ -3459,12 +3650,12 @@ lmark:	;
 				break;
 
 			case CMD_DELETE:
-				ExecDelete(tupleid, planSlot, dest, estate, PLANGEN_PLANNER, false /* isUpdate */);
+				ExecDelete(tupleid, gp_segment_id, planSlot, dest, estate, PLANGEN_PLANNER, false /* isUpdate */);
 				result = NULL;
 				break;
 
 			case CMD_UPDATE:
-				ExecUpdate(slot, tupleid, planSlot, dest, estate);
+				ExecUpdate(slot, tupleid, gp_segment_id, planSlot, dest, estate);
 				result = NULL;
 				break;
 
@@ -4271,6 +4462,8 @@ typedef struct
 	EState	   *estate;			/* EState we are working with */
 	AppendOnlyInsertDescData *ao_insertDesc; /* descriptor to AO tables */
 	ParquetInsertDescData *parquet_insertDesc; /* descriptor to parquet tables */
+	OrcInsertDescData *orc_insertDesc; // descriptor to orc tables
+	ExternalInsertDescData *ext_insertDesc; /* descriptor to external tables */
 } DR_intorel;
 
 static Relation
@@ -4448,7 +4641,8 @@ CreateIntoRel(QueryDesc *queryDesc)
 			allowSystemTableModsDDL,
 			&intoComptypeOid, 	/* MPP */
 			&persistentTid,
-			&persistentSerialNum);
+			&persistentSerialNum,
+			/* formattername */ NULL);
 
 	FreeTupleDesc(tupdesc);
 
@@ -4504,7 +4698,7 @@ CreateIntoRel(QueryDesc *queryDesc)
 	 * create a list of segment file numbers for insert.
 	 */
 	segnos = SetSegnoForWrite(NIL, intoRelationId, GetQEGangNum(), true, true, false);
-	CreateAppendOnlyParquetSegFileForRelationOnMaster(intoRelationDesc, segnos);
+	CreateAoSegFileForRelationOnMaster(intoRelationDesc, segnos);
 	queryDesc->plannedstmt->into_aosegnos = segnos;
 
 	/**
@@ -4520,6 +4714,145 @@ CreateIntoRel(QueryDesc *queryDesc)
 	estate->es_into_relation_descriptor = intoRelationDesc;
 
 	return intoRelationDesc;
+}
+
+static Relation
+CreateIntoMagmaRel(QueryDesc *queryDesc)
+{
+  EState     *estate = queryDesc->estate;
+
+  Relation  intoRelationDesc;
+  Oid     intoRelationId;
+  CreateExternalStmt          *createExtStmt = makeNode(CreateExternalStmt);
+
+  IntoClause *intoClause;
+  intoClause = queryDesc->plannedstmt->intoClause;
+  Insist(intoClause);
+
+  createExtStmt->exttypedesc = makeNode(ExtTableTypeDesc);
+  ExtTableTypeDesc *desc = (ExtTableTypeDesc *)(createExtStmt->exttypedesc);
+
+  desc->exttabletype = EXTTBL_TYPE_MAGMA;
+  desc->location_list = NIL;
+  int location_len = 0;
+  location_len = strlen(PROTOCOL_MAGMA) +         /* magma://          */
+                 strlen(magma_nodes_url) + 1;  /* magma_nodes_url + '\0'     */
+
+  char *path = (char *)palloc(sizeof(char) * location_len);
+
+  sprintf(path, "%s%s", PROTOCOL_MAGMA, magma_nodes_url);
+
+  desc->location_list = list_make1((Node *) makeString(path));
+
+  desc->command_string = NULL;
+  desc->on_clause = NIL;
+
+  /* have to copy the actual tupdesc to get rid of any constraints */
+  TupleDesc tupdesc = CreateTupleDescCopy(queryDesc->tupDesc);
+
+  createExtStmt->iswritable = TRUE;
+  createExtStmt->isexternal = FALSE;
+  createExtStmt->isweb = FALSE;
+  createExtStmt->base.relation = intoClause->rel;
+  createExtStmt->base.tableElts = BuildSchemaFromDesc(tupdesc);
+  createExtStmt->format = pstrdup(default_table_format);
+  createExtStmt->base.tablespacename = NULL; // tablespace is meaningless for external table
+  createExtStmt->base.options = intoClause->options;
+  createExtStmt->encoding = PG_SQL_ASCII; // default magma encoding
+  createExtStmt->sreh = NULL;
+  createExtStmt->base.partitionBy = NIL; // cannot create a partitioned table using CREATE TABLE AS SELECT
+  createExtStmt->policy = queryDesc->plannedstmt->intoPolicy;
+  FreeTupleDesc(tupdesc);
+
+  /*
+   * check options, report if user want to create heap or ao table.
+   */
+  ListCell  *cell = NULL;
+  foreach(cell, createExtStmt->base.options)
+  {
+    DefElem *e = (DefElem *) lfirst(cell);
+    char  *s = NULL;
+
+    if (!IsA(e, DefElem))
+      continue;
+    if (!e->arg || !IsA(e->arg, String))
+      continue;
+    if (pg_strcasecmp(e->defname, "appendonly"))
+      ereport(ERROR,
+          (errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
+           errmsg("does not support heap or appendonly table when default_table_format is magma format"),
+           errOmitLocation(true)));
+  }
+
+  GpPolicy   *targetPolicy;
+  targetPolicy = queryDesc->plannedstmt->intoPolicy;
+  /*
+   * in magma case, if distribution columns is not specified,
+   * choose first column as distribution key.
+   */
+  if (targetPolicy->nattrs == 0) {
+    targetPolicy->nattrs = 1;
+    targetPolicy->attrs[0] = 1;
+    targetPolicy->bucketnum = GetRelOpt_bucket_num_fromOptions(
+    		createExtStmt->base.options, GetDefaultMagmaBucketNum());
+  }
+// actually create magma table here
+  DefineExternalRelation(createExtStmt);
+
+  intoRelationId = RangeVarGetRelid(createExtStmt->base.relation, true, false /*allowHcatalog*/);
+
+  Assert(Gp_role != GP_ROLE_EXECUTE);
+
+  /*
+   * Check consistency of arguments
+   */
+  if (intoClause->onCommit != ONCOMMIT_NOOP && !intoClause->rel->istemp)
+    ereport(ERROR,
+        (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+         errmsg("ON COMMIT can only be used on temporary tables"),
+         errOmitLocation(true)));
+
+  /*
+   * Advance command counter so that the newly-created relation's catalog
+   * tuples will be visible to heap_open.
+   */
+  CommandCounterIncrement();
+
+  /*
+   * And open the constructed table for writing.
+   */
+  intoRelationDesc = heap_open(intoRelationId, AccessExclusiveLock);
+
+  /*
+   * Add column encoding entries based on the WITH clause.
+   *
+   * NOTE:  we could also do this expansion during parse analysis, by
+   * expanding the IntoClause options field into some attr_encodings field
+   * (cf. CreateStmt and transformCreateStmt()). As it stands, there's no real
+   * benefit for doing that from a code complexity POV. In fact, it would mean
+   * more code. If, however, we supported column encoding syntax during CTAS,
+   * it would be a good time to relocate this code.
+   */
+//  options for external table is incompatible with internal table.
+//  AddDefaultRelationAttributeOptions(intoRelationDesc,
+//      intoClause->options);
+
+  /*
+   * create a list of magma table ranges for insert.
+   */
+  List * relOids = list_make1_oid(intoRelationId);
+  estate->es_plannedstmt->scantable_splits = list_concat(
+		  estate->es_plannedstmt->scantable_splits, get_magma_scansplits(relOids));
+
+  /*
+   * list of segment file numbers, used for ao format table.
+   */
+  queryDesc->plannedstmt->into_aosegnos = NIL;
+
+  intoClause->oidInfo.relOid = intoRelationId;
+  estate->es_into_relation_descriptor = intoRelationDesc;
+
+  return intoRelationDesc;
 }
 
 /*
@@ -4541,7 +4874,16 @@ OpenIntoRel(QueryDesc *queryDesc)
 	DR_intorel *myState;
 
 	if (Gp_role != GP_ROLE_EXECUTE)
-		intoRelationDesc = CreateIntoRel(queryDesc);
+	{
+	  if (strcmp("appendonly", default_table_format) == 0)
+	  {
+	    intoRelationDesc = CreateIntoRel(queryDesc);
+	  } else if (strcmp(MAGMA_TP_FORMAT, default_table_format) == 0
+	      || strcmp(MAGMA_AP_FORMAT, default_table_format) == 0)
+	  {
+	    intoRelationDesc = CreateIntoMagmaRel(queryDesc);
+	  }
+	}
 	else
 	{
 		intoClause = queryDesc->plannedstmt->intoClause;
@@ -4585,9 +4927,9 @@ CloseIntoRel(QueryDesc *queryDesc)
 	if (rel)
 	{
 		/* APPEND_ONLY is closed in the intorel_shutdown */
-		if (!(RelationIsAoRows(rel) || RelationIsParquet(rel)))
+		if (!(RelationIsAo(rel) || RelationIsExternal(rel)))
         {
-			Insist(!"gpsql does not support heap table, use append only table instead");
+			Insist(!"hawq does not support heap table, use append only table instead");
 		}
 
 		/* close rel, but keep lock until commit */
@@ -4617,7 +4959,9 @@ CreateIntoRelDestReceiver(void)
 
 	self->estate = NULL;
 	self->ao_insertDesc = NULL;
-    self->parquet_insertDesc = NULL;
+  self->parquet_insertDesc = NULL;
+  self->orc_insertDesc = NULL;
+  self->ext_insertDesc = NULL;
 
 	return (DestReceiver *) self;
 }
@@ -4675,9 +5019,113 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 
 		parquet_insert(myState->parquet_insertDesc, slot);
 	}
+	else if (RelationIsOrc(into_rel))
+	{
+	  if(myState->orc_insertDesc == NULL)
+    {
+      int segno = list_nth_int(estate->into_aosegnos, GetQEIndex());
+      ResultRelSegFileInfo *segfileinfo = InitResultRelSegFileInfo(segno, RELSTORAGE_ORC, 1);
+      myState->orc_insertDesc = orcBeginInsert(into_rel, segfileinfo);
+    }
+	  orcInsert(myState->orc_insertDesc, slot);
+	}
+	else if(RelationIsExternal(into_rel))
+	{
+	    /* Writable external table */
+	    if (myState->ext_insertDesc == NULL)
+	    {
+	      /* Get pg_exttable information for the external table */
+	      ExtTableEntry *extEntry =
+	          GetExtTableEntry(RelationGetRelid(into_rel));
+
+	      /* Get formatter type and name for the external table */
+	      int formatterType = ExternalTableType_Invalid;
+	      char *formatterName = NULL;
+
+	      getExternalTableTypeStr(extEntry->fmtcode, extEntry->fmtopts,
+	                              &formatterType, &formatterName);
+
+	      pfree(extEntry);
+
+	      if (formatterType == ExternalTableType_Invalid)
+	      {
+	        elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	      }
+	      else if (formatterType != ExternalTableType_PLUG)
+	      {
+	    	  myState->ext_insertDesc = external_insert_init(
+	    			  into_rel, 0, formatterType, formatterName, estate->es_plannedstmt);
+	      }
+	      else
+	      {
+	        Assert(formatterName && (strcmp(formatterName, MAGMA_AP_FORMAT) == 0 ||
+	        		strcmp(formatterName, MAGMA_TP_FORMAT) == 0));
+
+	        Oid procOid = LookupPlugStorageValidatorFunc(formatterName,
+	                                                     "insert_init");
+
+	        if (OidIsValid(procOid))
+	        {
+	          FmgrInfo insertInitFunc;
+	          fmgr_info(procOid, &insertInitFunc);
+
+	          ResultRelSegFileInfo *segfileinfo = makeNode(ResultRelSegFileInfo);
+	          segfileinfo->segno = 0;
+	          /* this structure is used for ao and orc insert, set to zero in magma case
+	             ResultRelInfoSetSegFileInfo(resultRelInfo,
+	              estate->es_result_segfileinfos);
+	             segfileinfo = (ResultRelSegFileInfo *) list_nth(
+	              resultRelInfo->ri_aosegfileinfos, GetQEIndex());
+	           */
+	          myState->ext_insertDesc =
+	              InvokePlugStorageFormatInsertInit(&insertInitFunc,
+	                               into_rel,
+	                               formatterType,
+	                               formatterName,
+	                               estate->es_plannedstmt,
+	                               segfileinfo->segno,
+	                               PlugStorageGetTransactionSnapshot());
+	        }
+	        else
+	        {
+	          elog(ERROR, "%s_insert_init function was not found", formatterName);
+	        }
+	      }
+	    }
+
+	    ExternalInsertDesc extInsertDesc = myState->ext_insertDesc;
+	    if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
+	    {
+	      elog(ERROR, "invalid formatter type for external table: %s", __func__);
+	    }
+	    else if (extInsertDesc->ext_formatter_type != ExternalTableType_PLUG)
+	    {
+	      external_insert(extInsertDesc, slot);
+	    }
+	    else
+	    {
+	      Assert(extInsertDesc->ext_formatter_name);
+
+	      /* Form virtual tuple */
+	      slot_getallattrs(slot);
+
+	      FmgrInfo *insertFunc = extInsertDesc->ext_ps_insert_funcs.insert;
+
+	      if (insertFunc)
+	      {
+	        InvokePlugStorageFormatInsert(insertFunc,
+	                                              extInsertDesc,
+	                                              slot);
+	      }
+	      else
+	      {
+	        elog(ERROR, "%s_insert function was not found",
+	                    extInsertDesc->ext_formatter_name);
+	      }
+	    }
+	}
 	else
 	{
-
 		/* gpsql do not support heap table */
 		ereport(ERROR,
 				(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
@@ -4709,6 +5157,8 @@ intorel_shutdown(DestReceiver *self)
 		++aocount;
 	else if(RelationIsParquet(into_rel) && myState->parquet_insertDesc)
 		++aocount;
+	else if (RelationIsOrc(into_rel) && myState->orc_insertDesc)
+	  ++aocount;
 
 	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
 		buf = PreSendbackChangedCatalog(aocount);
@@ -4730,6 +5180,42 @@ intorel_shutdown(DestReceiver *self)
 		sendback->relid = RelationGetRelid(myState->parquet_insertDesc->parquet_rel);
 
 		parquet_insert_finish(myState->parquet_insertDesc);
+	}
+	else if (RelationIsOrc(into_rel) && myState->orc_insertDesc)
+	{
+	  sendback = CreateQueryContextDispatchingSendBack(1);
+    myState->orc_insertDesc->sendback = sendback;
+    sendback->relid = RelationGetRelid(myState->orc_insertDesc->rel);
+    orcEndInsert(myState->orc_insertDesc);
+	}
+	else if (RelationIsExternal(into_rel) && myState->ext_insertDesc)
+	{
+		ExternalInsertDesc extInsertDesc = myState->ext_insertDesc;
+
+		if (extInsertDesc->ext_formatter_type == ExternalTableType_Invalid)
+		{
+			elog(ERROR, "invalid formatter type for external table: %s", __func__);
+		}
+		else if (extInsertDesc->ext_formatter_type != ExternalTableType_PLUG)
+		{
+			external_insert_finish(extInsertDesc);
+		}
+		else
+		{
+			FmgrInfo *insertFinishFunc =
+					extInsertDesc->ext_ps_insert_funcs.insert_finish;
+
+			if (insertFinishFunc)
+			{
+				InvokePlugStorageFormatInsertFinish(insertFinishFunc,
+						extInsertDesc);
+			}
+			else
+			{
+				elog(ERROR, "%s_insert_finish function was not found",
+						extInsertDesc->ext_formatter_name);
+			}
+		}
 	}
 
 	if (sendback && Gp_role == GP_ROLE_EXECUTE)

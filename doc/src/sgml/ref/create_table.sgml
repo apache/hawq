@@ -69,34 +69,79 @@ CREATE [[GLOBAL | LOCAL] {TEMPORARY | TEMP}] TABLE table_name (
            [(...)] 
          ) ] 
     )
-
-where storage_parameter is:
-   APPENDONLY={TRUE|FALSE}
-   BLOCKSIZE={8192-2097152}
-   ORIENTATION={PARQUET|ROW}
-   COMPRESSTYPE={ZLIB|SNAPPY|GZIP|NONE}
-   COMPRESSLEVEL={0-9}
-   FILLFACTOR={10-100}
-   OIDS[=TRUE|FALSE]
+    
+ CREATE [[GLOBAL | LOCAL] {TEMPORARY | TEMP}] TABLE <table_name> (
+ [ { <column_name> <data_type> [ DEFAULT <default_expr> ]
+ [ ENCODING ( <storage_directive> [,...] ) ]
+     | <table_constraint>
+     | LIKE <other_table> [{INCLUDING | EXCLUDING}
+                        {DEFAULTS | CONSTRAINTS}] ...} ]
+       [, ... ]
+       [<column_reference_storage_directive> [, …] ]
+       )
+     FORMAT 'TEXT'
+             [( [HEADER]
+             [DELIMITER '<delimiter>' | 'OFF']
+             [NULL '<null string>']
+             [ESCAPE '<escape>' | 'OFF']
+             [NEWLINE 'LF' | 'CR' | 'CRLF']
+             [FILL MISSING FIELDS] )]
+       | 'CSV'
+             [( [HEADER]
+             [QUOTE '<quote>']
+             [DELIMITER '<delimiter>']
+             [NULL '<null string>']
+             [FORCE NOT NULL <column> [, ...]]
+             [ESCAPE '<escape>']
+             [NEWLINE 'LF' | 'CR' | 'CRLF']
+             [FILL MISSING FIELDS] )]
+       | 'ORC'
+             [( [COMPRESSTYPE 'NONE' | 'SNAPPY' | 'LZ4']
+             [DICTHRESHOLD [0-1]]
+             [BLOOMFILTER [column_name] [, ...]] )]
+       | 'MAGMAAP'
+     [ ENCODING '<encoding>' ]
+     [ DISTRIBUTED BY (<column>, [ ... ] ) | DISTRIBUTED RANDOMLY ]
+     [ PARTITION BY <partition_type> (<column>)
+     [ SUBPARTITION BY <partition_type> (<column>) ]
+        [ SUBPARTITION TEMPLATE ( <template_spec> ) ]
+     [...]
+     ( <partition_spec> )
+        | [ SUBPARTITION BY partition_type (<column>) ]
+            [...]
+     ( <partition_spec>
+       [ ( <subpartition_spec>
+            [(...)]
+          ) ]
 
 where column_constraint is:
    [CONSTRAINT constraint_name]
    NOT NULL | NULL 
-   | UNIQUE [USING INDEX TABLESPACE tablespace]
-            [WITH ( FILLFACTOR = value )]
-   | PRIMARY KEY [USING INDEX TABLESPACE tablespace] 
-                 [WITH ( FILLFACTOR = value )]
    | CHECK ( expression )
+   | PRIMARY KEY 
+
+where storage_directive for a column is:
+   COMPRESSTYPE={ZLIB|SNAPPY|GZIP|NONE} 
+ | COMPRESSLEVEL={0-9} 
+ | BLOCKSIZE={8192-2097152}
+
+where storage_parameter for a table is:
+   APPENDONLY={TRUE}
+   BLOCKSIZE={8192-2097152}
+   bucketnum={<x>}
+   ORIENTATION={ROW | PARQUET}
+   COMPRESSTYPE={ZLIB | SNAPPY | GZIP | NONE}
+   COMPRESSLEVEL={0-9}
+   FILLFACTOR={10-100}
+   OIDS=[TRUE|FALSE]
+   PAGESIZE={1024-1073741823}
+   ROWGROUPSIZE={1024-1073741823}
 
 and table_constraint is:
    [CONSTRAINT constraint_name]
-   UNIQUE ( column_name [, ... ] )
-          [USING INDEX TABLESPACE tablespace] 
-          [WITH ( FILLFACTOR=value )] 
-   | PRIMARY KEY ( column_name [, ... ] ) 
-                 [USING INDEX TABLESPACE tablespace] 
-                 [WITH ( FILLFACTOR=value )] 
    | CHECK ( expression )
+   | PRIMARY KEY ( column_name [, ... ] )
+
 
 where partition_type is:
     LIST
@@ -136,16 +181,28 @@ and subpartition_element is:
 [column_reference_storage_directive [, ...] ]
 [ TABLESPACE tablespace ]
 
-where storage_directive is:
-   COMPRESSTYPE={ZLIB|SNAPPY|GZIP|NONE} 
- | COMPRESSLEVEL={0-9} 
- | BLOCKSIZE={8192-2097152}
+where <storage_directive> is:
 
+   COMPRESSTYPE={ZLIB | SNAPPY | GZIP | NONE}
+ | COMPRESSLEVEL={0-9}
+ | BLOCKSIZE={8192-2097152}
+ 
 Where column_reference_storage_directive is:
 
    COLUMN column_name ENCODING ( storage_directive [, ... ] ), ... 
  | DEFAULT COLUMN ENCODING ( storage_directive [, ... ] )
 
+where <storage_parameter> for a partition is:
+
+   APPENDONLY={TRUE}
+   BLOCKSIZE={8192-2097152}
+   ORIENTATION={ROW | PARQUET}
+   COMPRESSTYPE={ZLIB | SNAPPY | GZIP | NONE}
+   COMPRESSLEVEL={0-9}
+   FILLFACTOR={10-100}
+   OIDS=[TRUE|FALSE]
+   PAGESIZE={1024-1073741823}
+   ROWGROUPSIZE={1024-1073741823}
 </synopsis>
 
 

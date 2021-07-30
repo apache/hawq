@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
+ * 
  *   http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -21,7 +21,7 @@
  * pxffilters.c
  *
  * Functions for handling push down of supported scan level filters to PXF.
- *
+ * 
  */
 #include "access/pxffilters.h"
 #include "catalog/pg_operator.h"
@@ -31,7 +31,7 @@
 #include "utils/guc.h"
 #include "utils/lsyscache.h"
 
-static List* pxf_make_expression_items_list(List *quals, Node *parent);
+static List* pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum);
 static void pxf_free_filter(PxfFilterDesc* filter);
 static char* pxf_serialize_filter_list(List *filters);
 static bool opexpr_to_pxffilter(OpExpr *expr, PxfFilterDesc *filter);
@@ -43,8 +43,7 @@ static bool supported_operator_type_scalar_array_op_expr(Oid type, PxfFilterDesc
 static void scalar_const_to_str(Const *constval, StringInfo buf);
 static void list_const_to_str(Const *constval, StringInfo buf);
 static List* append_attr_from_var(Var* var, List* attrs);
-static void add_extra_and_expression_items(List *expressionItems, int extraAndOperatorsNum);
-static List* get_attrs_from_expr(Expr *expr, bool* expressionIsSupported);
+static void enrich_trivial_expression(List *expressionItems);
 
 /*
  * All supported HAWQ operators, and their respective HDFS operator code.
@@ -264,21 +263,22 @@ Oid pxf_supported_types[] =
 };
 
 static void
-pxf_free_expression_items_list(List *expressionItems)
+pxf_free_expression_items_list(List *expressionItems, bool freeBoolExprNodes)
 {
-	ExpressionItem *expressionItem = NULL;
+	ExpressionItem 	*expressionItem = NULL;
+	int previousLength;
 
 	while (list_length(expressionItems) > 0)
 	{
-		expressionItem = (ExpressionItem *) linitial(expressionItems);
+		expressionItem = (ExpressionItem *) lfirst(list_head(expressionItems));
+		if (freeBoolExprNodes && nodeTag(expressionItem->node) == T_BoolExpr)
+		{
+			pfree((BoolExpr *)expressionItem->node);
+		}
 		pfree(expressionItem);
 
-		/*
-		 * to avoid freeing already freed items - delete all occurrences of
-		 * current expression
-		 */
-		int			previousLength = expressionItems->length + 1;
-
+		/* to avoid freeing already freed items - delete all occurrences of current expression*/
+		previousLength = expressionItems->length + 1;
 		while (expressionItems != NULL && previousLength > expressionItems->length)
 		{
 			previousLength = expressionItems->length;
@@ -296,17 +296,17 @@ pxf_free_expression_items_list(List *expressionItems)
  *
  * Basically this function just transforms expression tree to Reversed Polish Notation list.
  *
+ *
  */
 static List *
-pxf_make_expression_items_list(List *quals, Node *parent)
+pxf_make_expression_items_list(List *quals, Node *parent, int *logicalOpsNum)
 {
 	ExpressionItem *expressionItem = NULL;
 	List			*result = NIL;
 	ListCell		*lc = NULL;
 	ListCell		*ilc = NULL;
-	int				quals_size = list_length(quals);
-
-	if (quals_size == 0)
+	
+	if (list_length(quals) == 0)
 		return NIL;
 
 	foreach (lc, quals)
@@ -320,22 +320,19 @@ pxf_make_expression_items_list(List *quals, Node *parent)
 
 		switch (tag)
 		{
-			case T_Var:
-				/* IN(single_value) */
+			case T_Var: // IN(single_value)
 			case T_OpExpr:
-				/* Comparison operators >, >=, =, etc */
 			case T_ScalarArrayOpExpr:
-				/* IN(multiple values) */
 			case T_NullTest:
 			{
 				result = lappend(result, expressionItem);
 				break;
 			}
 			case T_BoolExpr:
-				/* Logical operators AND, OR, NOT */
 			{
+				(*logicalOpsNum)++;
 				BoolExpr	*expr = (BoolExpr *) node;
-				List *inner_result = pxf_make_expression_items_list(expr->args, node);
+				List *inner_result = pxf_make_expression_items_list(expr->args, node, logicalOpsNum);
 				result = list_concat(result, inner_result);
 
 				int childNodesNum = 0;
@@ -379,15 +376,7 @@ pxf_make_expression_items_list(List *quals, Node *parent)
 				break;
 		}
 	}
-
-	if ( quals_size > 1 && parent == NULL )
-	{
-        /*
-		If we find more than 1 qualifier, it means we have at least two expressions that are implicitly AND-ed by the query planner. Here, to make it explicit, we will need to add additional AND operators to compensate for the missing ones.
-		*/
-        add_extra_and_expression_items(result, quals_size - 1);
-	}
-
+	
 	return result;
 }
 
@@ -862,51 +851,12 @@ append_attr_from_var(Var* var, List* attrs)
 	return attrs;
 }
 
-/*
- * append_attr_from_func_args
- *
- * extracts all columns from FuncExpr into attrs
- * assigns false to expressionIsSupported if at least one of items is not supported
- */
 static List*
-append_attr_from_func_args(FuncExpr *expr, List* attrs, bool* expressionIsSupported) {
-	if (!expressionIsSupported) {
-		return NIL;
-	}
-	ListCell *lc = NULL;
-	foreach (lc, expr->args)
-	{
-		Node *node = (Node *) lfirst(lc);
-		if (IsA(node, FuncExpr)) {
-			attrs = append_attr_from_func_args((FuncExpr *) node, attrs, expressionIsSupported);
-		} else if (IsA(node, Var)) {
-			attrs = append_attr_from_var((Var *) node, attrs);
-		} else if (IsA(node, OpExpr)) {
-			attrs = get_attrs_from_expr((Expr *) node, expressionIsSupported);
-		} else {
-			*expressionIsSupported = false;
-			return NIL;
-		}
-	}
-
-	return attrs;
-
-}
-
-/*
- * get_attrs_from_expr
- *
- * extracts and returns list of all columns from Expr
- * assigns false to expressionIsSupported if at least one of items is not supported
- */
-static List*
-get_attrs_from_expr(Expr *expr, bool* expressionIsSupported)
+get_attrs_from_expr(Expr *expr)
 {
-	Node *leftop = NULL;
-	Node *rightop = NULL;
-	List *attrs = NIL;
-
-	*expressionIsSupported = true;
+	Node	*leftop 	= NULL;
+	Node	*rightop	= NULL;
+	List	*attrs = NIL;
 
 	if ((!expr))
 		return attrs;
@@ -920,46 +870,30 @@ get_attrs_from_expr(Expr *expr, bool* expressionIsSupported)
 		ScalarArrayOpExpr *saop = (ScalarArrayOpExpr *) expr;
 		leftop = (Node *) linitial(saop->args);
 		rightop = (Node *) lsecond(saop->args);
-	} else {
-		// If expression type is not known, report that it's not supported
-		*expressionIsSupported = false;
-		return NIL;
 	}
 
-	// We support following combinations of operands:
-	// Var, Const
-	// Relabel, Const
-	// FuncExpr, Const
-	// Const, Var
-	// Const, Relabel
-	// Const, FuncExpr
-	// For most of datatypes column is represented by Var node
-	// For varchar column is represented by RelabelType node
-	if (IsA(leftop, Var) && IsA(rightop, Const))
+	//Process left operand
+	//For most of datatypes column is represented by Var node
+	if (IsA(leftop, Var))
 	{
 		attrs = append_attr_from_var((Var *) leftop, attrs);
-	} else if (IsA(leftop, RelabelType) && IsA(rightop, Const))
+	}
+	//For varchar column is represented by RelabelType node
+	if (IsA(leftop, RelabelType))
 	{
 		attrs = append_attr_from_var((Var *) ((RelabelType *) leftop)->arg, attrs);
-	} else if (IsA(leftop, FuncExpr) && IsA(rightop, Const)) {
-		FuncExpr *expr = (FuncExpr *) leftop;
-		attrs = append_attr_from_func_args(expr, attrs, expressionIsSupported);
 	}
-	else if (IsA(rightop, Var) && IsA(leftop, Const))
+
+	//Process right operand
+	//For most of datatypes column is represented by Var node
+	if (IsA(rightop, Var))
 	{
 		attrs = append_attr_from_var((Var *) rightop, attrs);
-	} else if (IsA(rightop, RelabelType) && IsA(leftop, Const))
+	}
+	//For varchar column is represented by RelabelType node
+	if (IsA(rightop, RelabelType))
 	{
 		attrs = append_attr_from_var((Var *) ((RelabelType *) rightop)->arg, attrs);
-	} else if (IsA(rightop, FuncExpr) && IsA(leftop, Const)) {
-		FuncExpr *expr = (FuncExpr *) rightop;
-		attrs = append_attr_from_func_args(expr, attrs, expressionIsSupported);
-	}
-	else {
-		// If operand type or combination is not known, report that it's not supported
-		// to avoid partially extracted attributes from expression
-		*expressionIsSupported = false;
-		return NIL;
 	}
 
 	return attrs;
@@ -1248,26 +1182,34 @@ list_const_to_str(Const *constval, StringInfo buf)
  * serializePxfFilterQuals
  *
  * Wrapper around pxf_make_filter_list -> pxf_serialize_filter_list.
+ * Currently the only function exposed to the outside, however
+ * we could expose the others in the future if needed.
  *
  * The function accepts the scan qual list and produces a serialized
  * string that represents the push down filters (See called functions
  * headers for more information).
  */
-char *
-serializePxfFilterQuals(List *quals)
+char *serializePxfFilterQuals(List *quals)
 {
 	char	*result = NULL;
 
 	if (pxf_enable_filter_pushdown)
 	{
-		/* expressionItems will contain all the expressions including comparator and logical operators in postfix order */
-		List	   *expressionItems = pxf_make_expression_items_list(quals, NULL);
 
-		/* result will contain seralized version of the above postfix ordered expressions list */
-		result = pxf_serialize_filter_list(expressionItems);
+		int logicalOpsNum = 0;
+		List *expressionItems = pxf_make_expression_items_list(quals, NULL, &logicalOpsNum);
 
-		pxf_free_expression_items_list(expressionItems);
+		//Trivial expression means list of OpExpr implicitly ANDed
+		bool isTrivialExpression = logicalOpsNum == 0 && expressionItems && expressionItems->length > 1;
+
+		if (isTrivialExpression)
+		{
+			enrich_trivial_expression(expressionItems);
+		}
+		result  = pxf_serialize_filter_list(expressionItems);
+		pxf_free_expression_items_list(expressionItems, isTrivialExpression);
 	}
+
 
 	elog(DEBUG1, "serializePxfFilterQuals: filter result: %s", (result == NULL) ? "null" : result);
 
@@ -1275,29 +1217,29 @@ serializePxfFilterQuals(List *quals)
 }
 
 /*
- * Adds a given number of AND expression items to an existing list of expression items
+ * Takes list of expression items which supposed to be just a list of OpExpr
+ * and adds needed number of AND items
+ *
  */
-void
-add_extra_and_expression_items(List *expressionItems, int extraAndOperatorsNum)
-{
-	if (!expressionItems || extraAndOperatorsNum < 1)
+void enrich_trivial_expression(List *expressionItems) {
+
+
+	int logicalOpsNumNeeded = expressionItems->length - 1;
+
+	if (logicalOpsNumNeeded > 0)
 	{
-		return;
-	}
+		ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
+		BoolExpr *andExpr = makeNode(BoolExpr);
 
-	ExpressionItem *andExpressionItem = (ExpressionItem *) palloc0(sizeof(ExpressionItem));
+		andExpr->boolop = AND_EXPR;
 
-	BoolExpr   *andExpr = makeNode(BoolExpr);
+		andExpressionItem->node = (Node *) andExpr;
+		andExpressionItem->parent = NULL;
+		andExpressionItem->processed = false;
 
-	andExpr->boolop = AND_EXPR;
-
-	andExpressionItem->node = (Node *) andExpr;
-	andExpressionItem->parent = NULL;
-	andExpressionItem->processed = false;
-
-	for (int i = 0; i < extraAndOperatorsNum; i++)
-	{
-		expressionItems = lappend(expressionItems, andExpressionItem);
+		for (int i = 0; i < logicalOpsNumNeeded; i++) {
+			expressionItems = lappend(expressionItems, andExpressionItem);
+		}
 	}
 }
 
@@ -1309,16 +1251,11 @@ add_extra_and_expression_items(List *expressionItems, int extraAndOperatorsNum)
  * List might contain duplicates.
  * Caller should release memory once result is not needed.
  */
-List* extractPxfAttributes(List* quals, bool* qualsAreSupported)
+List* extractPxfAttributes(List* quals)
 {
 
-	if (!(*qualsAreSupported)) {
-		return NIL;
-	}
 	ListCell		*lc = NULL;
 	List *attributes = NIL;
-	bool expressionIsSupported;
-	*qualsAreSupported = true;
 
 	if (list_length(quals) == 0)
 		return NIL;
@@ -1334,23 +1271,14 @@ List* extractPxfAttributes(List* quals, bool* qualsAreSupported)
 			case T_ScalarArrayOpExpr:
 			{
 				Expr* expr = (Expr *) node;
-				List			*attrs = get_attrs_from_expr(expr, &expressionIsSupported);
-				if (!expressionIsSupported) {
-					*qualsAreSupported = false;
-					return NIL;
-				}
+				List			*attrs = get_attrs_from_expr(expr);
 				attributes = list_concat(attributes, attrs);
 				break;
 			}
 			case T_BoolExpr:
 			{
 				BoolExpr* expr = (BoolExpr *) node;
-				bool innerBoolQualsAreSupported = true;
-				List *inner_result = extractPxfAttributes(expr->args, &innerBoolQualsAreSupported);
-				if (!innerBoolQualsAreSupported) {
-					*qualsAreSupported = false;
-					return NIL;
-				}
+				List *inner_result = extractPxfAttributes(expr->args);
 				attributes = list_concat(attributes, inner_result);
 				break;
 			}

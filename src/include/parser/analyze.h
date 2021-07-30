@@ -7,7 +7,8 @@
  * Portions Copyright (c) 1996-2009, PostgreSQL Global Development Group
  * Portions Copyright (c) 1994, Regents of the University of California
  *
- * $PostgreSQL: pgsql/src/include/parser/analyze.h,v 1.34.2.1 2008/12/13 02:00:53 tgl Exp $
+ * $PostgreSQL: pgsql/src/include/parser/analyze.h,v 1.34.2.1 2008/12/13
+ *02:00:53 tgl Exp $
  *
  *-------------------------------------------------------------------------
  */
@@ -15,21 +16,28 @@
 #define ANALYZE_H
 
 #include "parser/parse_node.h"
-
+#include "utils/relcache.h"
+#include "utils/uri.h"
 
 /* fwd declarations */
 struct GpPolicy;
 
 extern List *parse_analyze(Node *parseTree, const char *sourceText,
-			  Oid *paramTypes, int numParams);
+                           Oid *paramTypes, int numParams);
 extern List *parse_analyze_varparams(Node *parseTree, const char *sourceText,
-						Oid **paramTypes, int *numParams);
+                                     Oid **paramTypes, int *numParams);
 extern List *parse_sub_analyze(Node *parseTree, ParseState *parentParseState);
 extern bool analyze_requires_snapshot(Node *parseTree);
 extern List *analyzeCreateSchemaStmt(CreateSchemaStmt *stmt);
 extern void CheckSelectLocking(Query *qry);
-extern void applyLockingClause(Query *qry, Index rtindex,
-				   bool forUpdate, bool noWait);
+extern void applyLockingClause(Query *qry, Index rtindex, bool forUpdate,
+                               bool noWait);
+
+extern uint64 GetExternalTotalBytes(Relation rel);
+extern uint64 GetExternalTotalBytesHDFS(Uri *uri);
+extern uint64 GetExternalTotalBytesHIVE(Uri *uri);
+extern int64 GetExternalTotalBytesMAGMA(Relation rel);
+extern int64 GetDatabaseTotalBytesMAGMA(Oid dbOid);
 
 Datum partition_arg_get_val(Node *node, bool *isnull);
 
@@ -64,31 +72,27 @@ typedef struct {
 } CreateStmtContext;
 
 Query *transformCreateStmt(ParseState *pstate, CreateStmt *stmt,
-						   List **extras_before, List **extras_after);
+                           List **extras_before, List **extras_after);
 
-int validate_partition_spec(ParseState 			*pstate,
-							CreateStmtContext 	*cxt, 
-							CreateStmt 			*stmt, 
-							PartitionBy 		*partitionBy, 	
-							char	   			*at_depth,
-							int					 partNumber);
+int validate_partition_spec(ParseState *pstate, CreateStmtContext *cxt,
+                            CreateStmtBase *stmt, PartitionBy *partitionBy,
+                            char *at_depth, int partNumber);
 
-List *make_partition_rules(ParseState *pstate,
-						   CreateStmtContext *cxt, CreateStmt *stmt,
-						   Node *partitionBy, PartitionElem *pElem,
-						   char *at_depth, char *child_name_str,
-						   int partNumId, int maxPartNum,
-						   int everyOffset, int maxEveryOffset,
-						   ListCell	**pp_lc_anp,
-						   bool doRuleStmt);
+List *make_partition_rules(ParseState *pstate, CreateStmtContext *cxt,
+                           CreateStmtBase *stmt, Node *partitionBy,
+                           PartitionElem *pElem, char *at_depth,
+                           char *child_name_str, int partNumId, int maxPartNum,
+                           int everyOffset, int maxEveryOffset,
+                           ListCell **pp_lc_anp, bool doRuleStmt);
 Node *coerce_partition_value(Node *node, Oid typid, int32 typmod,
-							 PartitionByType partype);
+                             PartitionByType partype);
 List *transformStorageEncodingClause(List *options);
 List *TypeNameGetStorageDirective(TypeName *typname);
-extern List * form_default_storage_directive(List *enc);
+extern List *form_default_storage_directive(List *enc);
 
 extern struct GpPolicy *createRandomDistribution(int maxattrs);
 
 extern void recognizeExternalRelationFormatterOptions(
     CreateExternalStmt *createExtStmt);
-#endif   /* ANALYZE_H */
+
+#endif /* ANALYZE_H */

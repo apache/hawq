@@ -409,7 +409,7 @@ validate_format_params(FormatConfig *format_in_config, TupleDesc tupdesc)
 				break;
 			}			
 		}
-		
+
 		if (is_in_both_lists == false)
 		{
 			ereport(ERROR,
@@ -701,7 +701,7 @@ fixedwidth_in(PG_FUNCTION_ARGS)
 	tupdesc = FORMATTER_GET_TUPDESC(fcinfo);
 	
 	/* Get our internal description of the formatter */
-	ncolumns = tupdesc->natts;	
+	ncolumns = tupdesc->natts;
 	myData = (format_t *) FORMATTER_GET_USER_CTX(fcinfo);
 	
 	if (myData == NULL)

@@ -474,9 +474,9 @@ DefineQueryRewrite(RuleStmt *stmt)
 	{
 		PersistentFileSysRelStorageMgr relStorageMgr;
 
-		relStorageMgr = ((RelationIsAoRows(event_relation) || RelationIsParquet(event_relation)) ?
+		relStorageMgr = (RelationIsAo(event_relation)) ?
 				PersistentFileSysRelStorageMgr_AppendOnly:
-				PersistentFileSysRelStorageMgr_BufferPool);
+				PersistentFileSysRelStorageMgr_BufferPool;
 		
 		if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool)
 		{

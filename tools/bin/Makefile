@@ -60,7 +60,7 @@ PYGRESQL_DIR=PyGreSQL-$(PYGRESQL_VERSION)
 
 pygresql:
 	@echo "--- PyGreSQL"
-	cd $(PYLIB_SRC)/$(PYGRESQL_DIR) && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="-L$(top_builddir)/src/interfaces/libpq ${LDFLAGS}" DESTDIR="${DESTDIR}" python setup.py build
+	cd $(PYLIB_SRC)/$(PYGRESQL_DIR) && CC="$(CC)" CFLAGS="-O3 -g ${CFLAGS}" LDFLAGS="-L$(top_builddir)/src/interfaces/libpq ${LDFLAGS}" DESTDIR="${DESTDIR}" python setup.py build
 	mkdir -p $(PYLIB_DIR)/pygresql
 	cp -r $(PYLIB_SRC)/$(PYGRESQL_DIR)/build/lib.*/* $(PYLIB_DIR)/pygresql
 	touch $(PYLIB_DIR)/__init__.py
@@ -103,7 +103,7 @@ PSI_DIR=PSI-$(PSI_VERSION)
 
 psi:
 	@echo "--- psi"
-	cd $(PYLIB_SRC)/$(PSI_DIR)/ && CC="$(CC)" CFLAGS="${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
+	cd $(PYLIB_SRC)/$(PSI_DIR)/ && CC="$(CC)" CFLAGS="-O3 -g ${CFLAGS}" LDFLAGS="${LDFLAGS}" python setup.py build
 	cp -r $(PYLIB_SRC)/$(PSI_DIR)/build/lib.*/psi $(PYLIB_DIR)
 
 #
@@ -184,6 +184,8 @@ clean :
 	[ "x$(PYGRESQL_DIR)" != "x" ] && rm -rf $(PYLIB_SRC)/$(PYGRESQL_DIR)/build; true
 	rm -rf $(STREAM_DIR)/stream lib/stream  
 	rm -rf *.pyc lib/*.pyc
+	find $(SRC) -type f -name "*.so" -exec rm {} +
+	find $(SRC) -type f -name "*.o" -exec rm {} +
 
 distclean: clean
 

@@ -136,12 +136,11 @@ typedef struct PlannerGlobal
 typedef struct CtePlanInfo
 {
 	/*
-	 * List of subplans that are associated with a CTE.
-	 * If a CTE is referenced once, this list contains one element.
-	 * If a CTE is referenced multiple times, this list contains multiple plans,
-	 * each of which has ShareNode on top.
+	 * A subplan, prepared for sharing among many CTE references by
+	 * prepare_plan_for_sharing(), that implements the CTE. NULL if the
+	 * CTE is not shared among references.
 	 */
-	List *subplans;
+	Plan *shared_plan;
 
 	/*
 	 * The rtable corresponding to the subplan.
@@ -152,16 +151,6 @@ typedef struct CtePlanInfo
 	 * The pathkeys corresponding to the subplan.
 	 */
 	List *pathkeys;
-
-	/*
-	 * The next plan id in subplans that should be used (starting with 0).
-	 */
-	int nextPlanId;
-
-	/*
-	 * Number of non-shared plans generated for this cte.
-	 */
-	int numNonSharedPlans;
 } CtePlanInfo;
 
 /*----------
@@ -496,6 +485,7 @@ typedef struct RelOptInfo
 	Relids		index_outer_relids;		/* other relids in indexable join
 										 * clauses */
 	List	   *index_inner_paths;		/* InnerIndexscanInfo nodes */
+	char			ext;
 
 	/*
 	 * Inner indexscans are not in the main pathlist because they are not
@@ -549,9 +539,12 @@ typedef struct IndexOptInfo
 	List	   *indexprs;		/* expressions for non-simple index columns */
 	List	   *indpred;		/* predicate if a partial index, else NIL */
 
+	List	   *indextlist;		/* targetlist representing index columns */
+
 	bool		predOK;			/* true if predicate matches query */
 	bool		unique;			/* true if a unique index */
 	bool		amoptionalkey;	/* can query omit key for the first column? */
+	bool		indexonly;	/* index only or not */
     bool        cdb_default_stats_used; /* true if ANALYZE needed */
     int         num_leading_eq; /* CDB: always 0, except amcostestimate proc may
                                  * set it briefly; it is transferred forthwith
@@ -751,7 +744,6 @@ typedef struct ExternalPath
 	/* for now it's pretty plain.. */
 } ExternalPath;
 
-
 /*----------
  * IndexPath represents an index scan over a single index.
  *
@@ -799,6 +791,7 @@ typedef struct IndexPath
 	IndexOptInfo *indexinfo;
 	List	   *indexclauses;
 	List	   *indexquals;
+	bool	   indexonly;
 	bool		isjoininner;
 	ScanDirection indexscandir;
 	Cost		indextotalcost;

@@ -169,6 +169,10 @@ extern void name##Close(Relation relation);
 
 DirectOpenDefineExtern(DirectOpen_PgClass);
 
+DirectOpenDefineExtern(DirectOpen_PgExtTable);
+
+DirectOpenDefineExtern(DirectOpen_PgNameSpace);
+
 DirectOpenDefineExtern(DirectOpen_GpRelfileNode);
 
 DirectOpenDefineExtern(DirectOpen_PgAppendOnly);

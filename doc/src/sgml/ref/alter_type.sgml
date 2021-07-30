@@ -26,8 +26,7 @@ PostgreSQL documentation
   <synopsis>
 ALTER TYPE <replaceable class="PARAMETER">name</replaceable> 
    SET DEFAULT ENCODING ( storage_directive )
-     OWNER TO <replaceable class="PARAMETER">new_owner</replaceable> 
-   | SET SCHEMA <replaceable class="PARAMETER">new_schema</replaceable>
+     SET SCHEMA <replaceable class="PARAMETER">new_schema</replaceable>
   </synopsis>
  </refsynopsisdiv>
 
@@ -36,7 +35,7 @@ ALTER TYPE <replaceable class="PARAMETER">name</replaceable>
 
   <para>
    <command>ALTER TYPE</command> changes the definition of an existing type.
-   The only currently available capabilities are changing the owner and schema
+   The only currently available capabilities are changing the schema
    of a type.
   </para>
 
@@ -44,11 +43,6 @@ ALTER TYPE <replaceable class="PARAMETER">name</replaceable>
    You must own the type to use <command>ALTER TYPE</>.
    To change the schema of a type, you must also have
    <literal>CREATE</literal> privilege on the new schema.
-   To alter the owner, you must also be a direct or indirect member of the new
-   owning role, and that role must have <literal>CREATE</literal> privilege on
-   the type's schema.  (These restrictions enforce that altering the owner
-   doesn't do anything you couldn't do by dropping and recreating the type.
-   However, a superuser can alter ownership of any type anyway.)
   </para>
  </refsect1>
 
@@ -63,15 +57,6 @@ ALTER TYPE <replaceable class="PARAMETER">name</replaceable>
        <para>
         The name (possibly schema-qualified) of an existing type to
         alter.
-       </para>
-      </listitem>
-     </varlistentry>
-
-     <varlistentry>
-      <term><replaceable class="PARAMETER">new_owner</replaceable></term>
-      <listitem>
-       <para>
-        The user name of the new owner of the type.
        </para>
       </listitem>
      </varlistentry>
@@ -108,14 +93,6 @@ ALTER TYPE <replaceable class="PARAMETER">name</replaceable>
 
  <refsect1>
   <title>Examples</title>
-
-  <para> 
-   To change the owner of the user-defined type <literal>email</literal>
-   to <literal>joe</literal>:
-   <programlisting>
-ALTER TYPE email OWNER TO joe;
-   </programlisting>
-  </para>
 
   <para>
    To change the schema of the user-defined type <literal>email</literal>

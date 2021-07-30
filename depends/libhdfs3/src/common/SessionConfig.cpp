@@ -83,8 +83,6 @@ SessionConfig::SessionConfig(const Config & conf) {
         }, {
             &rpcTimeout, "rpc.client.timeout", 3600 * 1000
         }, {
-            &rpcMaxDataLength, "ipc.maximum.data.length", 64 * 1024 * 1024
-        }, {
             &defaultReplica, "dfs.default.replica", 3, bind(CheckRangeGE<int32_t>, _1, _2, 1)
         }, {
             &inputConnTimeout, "input.connect.timeout", 600 * 1000
@@ -128,29 +126,19 @@ SessionConfig::SessionConfig(const Config & conf) {
             &socketCacheExpiry, "dfs.client.socketcache.expiryMsec", 3000, bind(CheckRangeGE<int32_t>, _1, _2, 0)
         }, {
             &socketCacheCapacity, "dfs.client.socketcache.capacity", 16, bind(CheckRangeGE<int32_t>, _1, _2, 0)
-        }, {
-            &cryptoBufferSize, "hadoop.security.crypto.buffer.size", 8192
-        }, {
-            &httpRequestRetryTimes, "kms.send.request.retry.times", 0
         }
     };
     ConfigDefault<int64_t> i64Values [] = {
         {
             &defaultBlockSize, "dfs.default.blocksize", 64 * 1024 * 1024, bind(CheckMultipleOf<int64_t>, _1, _2, 512)
-        },
-        {
-            &curlTimeout, "kms.send.request.timeout", 20L
         }
     };
-
     ConfigDefault<std::string> strValues [] = {
         {&defaultUri, "dfs.default.uri", "hdfs://localhost:8020" },
         {&rpcAuthMethod, "hadoop.security.authentication", "simple" },
         {&kerberosCachePath, "hadoop.security.kerberos.ticket.cache.path", "" },
         {&logSeverity, "dfs.client.log.severity", "INFO" },
-        {&domainSocketPath, "dfs.domain.socket.path", "/var/lib/hadoop-hdfs/dn_socket"},
-        {&kmsUrl, "dfs.encryption.key.provider.uri", "" },
-        {&kmsAuthMethod, "hadoop.kms.authentication.type", "simple" }
+        {&domainSocketPath, "dfs.domain.socket.path", ""}
     };
 
     for (size_t i = 0; i < ARRAYSIZE(boolValues); ++i) {

@@ -23,6 +23,7 @@
 #include "access/subtrans.h"
 #include "access/twophase.h"
 #include "access/appendonlywriter.h"
+#include "access/read_cache.h"
 #include "cdb/cdbfilerep.h"
 #include "cdb/cdbfilesystemcredential.h"
 #include "cdb/cdbpersistentdatabase.h"
@@ -139,6 +140,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 		if (Gp_role == GP_ROLE_DISPATCH)
 		{
 			size = add_size(size, AppendOnlyWriterShmemSize());
+			size = add_size(size, ReadCacheShmemSize());
 		}
 
 		size = add_size(size, ProcGlobalShmemSize());
@@ -276,6 +278,7 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 	MultiXactShmemInit();
     FtsShmemInit();
 	InitBufferPool();
+	InitJumpHashMap();
 
 	/*
 	 * Set up lock manager
@@ -284,10 +287,12 @@ CreateSharedMemoryAndSemaphores(bool makePrivate, int port)
 
 	/*
 	 * Set up append only writer
+	 * Set up cache read
 	 */
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{
 		InitAppendOnlyWriter();
+		InitReadCache();
 	}
 	PersistentFileSysObj_ShmemInit();
 	PersistentFilespace_ShmemInit();

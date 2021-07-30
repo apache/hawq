@@ -2460,6 +2460,12 @@ RelationGetNumberOfBlocks(Relation relation)
 		return ((BlockNumber)RelationGuessNumberOfBlocks(fstotal->totalbytes));
 	}
 
+	if (RelationIsOrc(relation))
+  {
+	  FileSegTotals *fstotal = getOrcSegFileStats(relation, SnapshotNow);
+    return ((BlockNumber)RelationGuessNumberOfBlocks(fstotal->totalbytes));
+  }
+
 	/* For non-AO tables, open it at the smgr level if not already done */
 	RelationOpenSmgr(relation);
 	
@@ -2497,7 +2503,7 @@ RelationTruncate(Relation rel, BlockNumber nblocks, bool markPersistentAsPhysica
 	/* Make sure rd_targblock isn't pointing somewhere past end */
 	rel->rd_targblock = InvalidBlockNumber;
 
-	if (!RelationIsAoRows(rel) && !RelationIsParquet(rel))
+	if (!RelationIsAo(rel))
 	{
 		smgrtruncate(
 				rel->rd_smgr, 

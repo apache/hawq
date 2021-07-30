@@ -150,6 +150,14 @@ void AppendOnly_Overwrite(RelFileNode *relFileNode, int32 segmentFileNum, int *p
 
 	*primaryError = 0;
 
+	if (IsBuiltinTablespace(relFileNode->spcNode)) {
+	  ereport(ERROR,
+	                  (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+	                      errmsg("Can not create ao format table on pg_default tablespace"),
+	                      errOmitLocation(true)));
+
+	}
+
 	PersistentTablespace_GetFilespacePath(
 										relFileNode->spcNode,
 										TRUE,
@@ -198,6 +206,13 @@ void MirroredAppendOnly_Create(
 	MirroredAppendOnlyOpen mirroredOpen;
 
 	*primaryError = 0;
+
+  if (IsBuiltinTablespace(relFileNode->spcNode)) {
+    ereport(ERROR,
+                    (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+                        errmsg("Can not create ao format table on pg_default tablespace"),
+                        errOmitLocation(true)));
+  }
 
 	MirroredAppendOnly_DoOpen(
 					&mirroredOpen, 

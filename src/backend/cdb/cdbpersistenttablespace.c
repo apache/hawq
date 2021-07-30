@@ -545,7 +545,6 @@ void PersistentTablespace_GetFilespacePath(
 	 * special case.
 	 */
 
-
 	if (Gp_role != GP_ROLE_EXECUTE || IsBootstrapProcessingMode() || !needDispatchedTablespaceInfo)
 	{
 		tablespaceGetFilespaces =

@@ -128,12 +128,16 @@ ExecDML(DMLState *node)
 
 		Assert(!isnull);
 
+	    Datum segmentid = slot_getattr(slot, GpSegmentIdAttributeNumber, &isnull);
+
+	    Assert(!isnull);
+
 		ItemPointer  tupleid = (ItemPointer) DatumGetPointer(ctid);
 		ItemPointerData tuple_ctid = *tupleid;
 		tupleid = &tuple_ctid;
 
 		/* Correct tuple count by ignoring deletes when splitting tuples. */
-		ExecDelete(tupleid, node->cleanedUpSlot, NULL /* DestReceiver */, node->ps.state,
+		ExecDelete(tupleid, segmentid, node->cleanedUpSlot, NULL /* DestReceiver */, node->ps.state,
 				PLANGEN_OPTIMIZER /* Plan origin */, isUpdate);
 	}
 

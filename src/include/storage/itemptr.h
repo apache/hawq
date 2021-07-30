@@ -82,6 +82,8 @@ typedef ItemPointerData *ItemPointer;
 	(pointer)->ip_posid \
 )
 
+uint32 ItemPointerGetRowIdFromFakeCtid(ItemPointer pointer);
+
 /*
  * ItemPointerSet
  *		Sets a disk item pointer to the specified block and offset.
@@ -112,6 +114,8 @@ typedef ItemPointerData *ItemPointer;
 	AssertMacro(PointerIsValid(pointer)), \
 	(pointer)->ip_posid = (offsetNumber) \
 )
+
+void ItemPointerSetRowIdToFakeCtid(ItemPointer tid, uint64 rowId);
 
 /*
  * ItemPointerCopy

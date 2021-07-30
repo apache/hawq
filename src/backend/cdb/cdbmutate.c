@@ -42,6 +42,7 @@
 #include "commands/tablecmds.h"
 #include "commands/tablespace.h"
 #include "catalog/catalog.h"
+#include "catalog/catquery.h"
 #include "catalog/gp_policy.h"
 #include "catalog/pg_type.h"
 
@@ -75,7 +76,7 @@ typedef struct ApplyMotionState
 	plan_tree_base_prefix base; /* Required prefix for plan_tree_walker/mutator */
 	int			nextMotionID;
     int         sliceDepth;
-    int         numInitPlanMotionNodes;
+    bool		containMotionNodes;
     List       *initPlans;
 }	ApplyMotionState;
 
@@ -111,6 +112,9 @@ static bool
 doesUpdateAffectPartitionCols(PlannerInfo  *root,
 							  Plan         *plan,
                               Query        *query);
+
+static bool
+doesUpdateAffectIndexCols(PlannerInfo  *root,Plan *plan, Query *query);
 
 /*
  * Given an expression, return true if it contains anything non-constant.
@@ -227,7 +231,11 @@ directDispatchCalculateHash(Plan *plan, GpPolicy *targetPolicy)
 	plan->directDispatch.isDirectDispatch = directDispatch;
 	if (directDispatch)
 	{
-		uint32 hashcode = cdbhashreduce(h);
+		// uint32 hashcode = cdbhashreduce(h);
+	  int *map = NULL;
+	  int nmap = 0;
+	  get_magma_range_vseg_map(&map, &nmap, h->numsegs);
+	  uint32 hashcode = magichashreduce(h, map, nmap);
 
 		plan->directDispatch.contentIds = list_make1_int(hashcode );
 
@@ -265,7 +273,7 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 	planner_init_plan_tree_base(&state.base, root); /* error on attempt to descend into subplan plan */
 	state.nextMotionID = 1;		/* Start at 1 so zero will mean "unassigned". */
     state.sliceDepth = 0;
-    state.numInitPlanMotionNodes = 0;
+    state.containMotionNodes = false;
     state.initPlans = NIL;
 
 	Assert(is_plan_node((Node *) plan) && IsA(query, Query));
@@ -672,6 +680,16 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 									errOmitLocation(true)));
 				}
 				
+				/*
+				 * Magma does not support updating any of the index columns.
+				 */
+				if (query->commandType == CMD_UPDATE && doesUpdateAffectIndexCols(root, plan, query))
+				{
+					ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+									errmsg("Cannot parallelize an UPDATE statement that updates the magma index columns"),
+									errOmitLocation(true)));
+				}
+
 				if (IsA(plan, Append))
 				{
 					/* updating a partitioned table */					
@@ -762,7 +780,7 @@ apply_motion(PlannerInfo *root, Plan *plan, Query *query)
 			Assert(list_length(root->resultRelations) == 1);
 			Assert(result->flow->flotype == FLOW_SINGLETON && result->flow->segindex == -1);
 		}
-		else if (result->nMotionNodes > state.numInitPlanMotionNodes)
+		else if (state.containMotionNodes)
 		{
 			/* target table is distributed and plan involves motion nodes */
 			/*
@@ -827,7 +845,25 @@ apply_motion_mutator(Node *node, ApplyMotionState * context)
 	
     /* An expression node might have subtrees containing plans to be mutated. */
     if (!is_plan_node(node))
-		return plan_tree_mutator(node, apply_motion_mutator, context);
+	{
+		/*
+		 * The containMotionNodes flag keeps track of whether there are any
+		 * Motion nodes, ignoring any in InitPlans. So if we recurse into an
+		 * InitPlan, save and restore the flag.
+		 */
+		if (IsA(node, SubPlan) && ((SubPlan *) node)->is_initplan)
+		{
+			bool		saveContainMotionNodes = context->containMotionNodes;
+
+			node = plan_tree_mutator(node, apply_motion_mutator, context);
+
+			context->containMotionNodes = saveContainMotionNodes;
+
+			return node;
+		}
+		else
+			return plan_tree_mutator(node, apply_motion_mutator, context);
+	}
 
     plan = (Plan *)node;
     flow = plan->flow;
@@ -860,7 +896,6 @@ apply_motion_mutator(Node *node, ApplyMotionState * context)
     {
         ListCell   *cell;
         SubPlan    *subplan;
-        int         nMotion = 0;
 
         foreach(cell, plan->initPlan)
         {
@@ -869,12 +904,9 @@ apply_motion_mutator(Node *node, ApplyMotionState * context)
             Assert(IsA(subplan, SubPlan));
             Assert(root);
             Assert(planner_subplan_get_plan(root, subplan));
-            nMotion += planner_subplan_get_plan(root, subplan)->nMotionNodes;
+
             context->initPlans = lappend(context->initPlans, subplan);
         }
-
-        /* Keep track of the number of Motion nodes found in Init Plans. */
-        context->numInitPlanMotionNodes += nMotion;
     }
 
     /* Pre-existing Motion nodes must be renumbered. */
@@ -956,7 +988,7 @@ apply_motion_mutator(Node *node, ApplyMotionState * context)
         	/* add an ExplicitRedistribute motion node only if child plan nodes
         	 * have a motion node
         	 */ 
-        	if (context->nextMotionID - context->numInitPlanMotionNodes - saveNextMotionID > 0)
+        	if (context->containMotionNodes)
         	{
         		/* motion node in child nodes: add a ExplicitRedistribute motion */
 				newnode = (Node *) make_explicit_motion(plan,
@@ -1017,6 +1049,19 @@ done:
     plan = (Plan *)newnode;
     plan->nMotionNodes = context->nextMotionID - saveNextMotionID;
     plan->nInitPlans = list_length(context->initPlans) - saveNumInitPlans;
+
+	/*
+	 * Remember if this was a Motion node. This is used at the top of the
+	 * tree, with MOVEMENT_EXPLICIT, to avoid adding an explicit motion, if
+	 * there were no Motion in the subtree. Note that this does not take
+	 * InitPlans containing Motion nodes into account. InitPlans are
+	 * executed as a separate step before the main plan, and hence any
+	 * Motion nodes in them don't need to affect the way the main plan is
+	 * executed.
+	 */
+	if (IsA(newnode, Motion))
+		context->containMotionNodes = true;
+
 	return newnode;
 }                               /* apply_motion_mutator */
 
@@ -1365,7 +1410,6 @@ getExprListFromTargetList(List         *tlist,
 	return elist;
 }
 
-
 /*
  * isAnyColChangedByUpdate
  */
@@ -1404,6 +1448,50 @@ isAnyColChangedByUpdate(Index       targetvarno,
 
 	return false;
 }                               /* isAnyColChangedByUpdate */
+
+/*
+ * isAnyIndexColChangeByUpdate
+ */
+static bool
+isAnyIndexColChangedByUpdate(Index resultRelation, Plan *plan, Relation relation)
+{
+	Relation indrel;
+	HeapTuple htup;
+	cqContext cqc;
+	cqContext *pcqCtx;
+	MemoryContext oldcxt;
+
+	indrel = heap_open(IndexRelationId, AccessShareLock);
+
+	pcqCtx = caql_beginscan(
+			caql_syscache(caql_indexOK(caql_addrel(cqclr(&cqc), indrel), true), false),
+			cql("SELECT * FROM pg_index "
+				" WHERE indrelid = :1 ",
+				ObjectIdGetDatum(RelationGetRelid(relation))));
+
+	if (!RelationIsMagmaTable2(ObjectIdGetDatum(RelationGetRelid(relation)))) {
+		caql_endscan(pcqCtx);
+		heap_close(indrel, AccessShareLock);
+		return false;
+	}
+
+	while (HeapTupleIsValid(htup = caql_getnext(pcqCtx)))
+	{
+		Form_pg_index index = (Form_pg_index) GETSTRUCT(htup);
+		bool colChange = isAnyColChangedByUpdate(resultRelation, plan->targetlist,
+																						 index->indnatts, index->indkey.values);
+		if (colChange) {
+			caql_endscan(pcqCtx);
+			heap_close(indrel, AccessShareLock);
+			return true;
+		}
+	}
+
+	caql_endscan(pcqCtx);
+	heap_close(indrel, AccessShareLock);
+
+	return false;
+}
 
 /*
  * Request an ExplicitRedistribute motion node for a plan node
@@ -1488,6 +1576,68 @@ AttrNumber find_segid_column(List *tlist, Index relid)
 	
 	// no segid column found
 	return -1;
+}
+
+static bool
+doesUpdateAffectIndexCols(PlannerInfo  *root, Plan *plan,
+													Query *query)
+{
+  Append     *append;
+  ListCell   *rticell;
+  ListCell   *plancell;
+
+  if (list_length(root->resultRelations) == 1)
+  {
+    RangeTblEntry  *rte;
+    Relation        relation;
+    int   resultRelation = linitial_int(root->resultRelations);
+    rte = rt_fetch(resultRelation, query->rtable);
+    Assert(rte->rtekind == RTE_RELATION);
+
+    relation = relation_open(rte->relid, NoLock);
+
+    if (!RelationIsMagmaTable2(relation->rd_id))
+    {
+      relation_close(relation, NoLock);
+      return false;
+    }
+    /*
+     * Single target relation?
+     */
+    bool changed = isAnyIndexColChangedByUpdate(resultRelation, plan, relation);
+    relation_close(relation, NoLock);
+    return changed;
+  }
+
+  /*
+   * Multiple target relations (inheritance)...
+   * Plan should have an Append node on top, with a subplan per target.
+   */
+  append = (Append *)plan;
+
+  Insist(IsA(append, Append) && append->isTarget &&
+         list_length(append->appendplans) == list_length(root->resultRelations));
+
+  forboth(rticell, root->resultRelations, plancell, append->appendplans)
+  {
+    int     rti = lfirst_int(rticell);
+    Plan   *subplan = (Plan *)lfirst(plancell);
+
+    RangeTblEntry  *rte;
+    Relation  relation;
+    rte = rt_fetch(rti, query->rtable);
+    Assert(rte->rtekind == RTE_RELATION);
+    relation = relation_open(rte->relid, NoLock);
+
+    if (isAnyIndexColChangedByUpdate(rti, subplan, relation))
+    {
+      relation_close(relation, NoLock);
+      return true;
+    }
+    relation_close(relation, NoLock);
+  }
+
+  return false;
 }
 
 /*

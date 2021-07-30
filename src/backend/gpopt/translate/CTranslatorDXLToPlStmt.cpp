@@ -1035,12 +1035,6 @@ CTranslatorDXLToPlStmt::PlExternalScanUriList
 {
 	ExtTableEntry *extentry = gpdb::Pexttable(oidRel);
 	
-	if (extentry->iswritable)
-	{
-		GPOS_RAISE(gpdxl::ExmaDXL, gpdxl::ExmiDXL2PlStmtExternalScanError,
-				GPOS_WSZ_LIT("It is not possible to read from a WRITABLE external table. Create the table as READABLE instead."));
-	}
-
 	//get the total valid primary segdb count
 	List *segments = gpdb::PcdbComponentDatabases();
 	ListCell *lc;
@@ -1089,7 +1083,11 @@ CTranslatorDXLToPlStmt::PlExternalScanUriList
 		pUri = gpdb::PuriParseExternalTable(szFirstUri);
 	}
 
-	if (fUsingLocation && (URI_FILE == pUri->protocol || URI_HTTP == pUri->protocol))
+	if (fUsingLocation && (pUri->protocol == URI_HDFS || pUri->protocol == URI_MAGMA)) {
+	  for (ULONG i = 0; i < ulTotalPrimaries; ++i)
+	    rgszSegFileMap[i] = PStrDup(szFirstUri);
+	}
+	else if (fUsingLocation && (URI_FILE == pUri->protocol || URI_HTTP == pUri->protocol))
 	{
 	  if (ulTotalPrimaries > 0)
 	  {

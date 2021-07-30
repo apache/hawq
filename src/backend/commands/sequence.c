@@ -493,7 +493,7 @@ DefineSequence(CreateSeqStmt *seq)
 	stmt->oidInfo.comptypeOid = seq->comptypeOid;
 	stmt->ownerid = GetUserId();
 
-	seqoid = DefineRelation(stmt, RELKIND_SEQUENCE, RELSTORAGE_HEAP, NonCustomFormatType);
+	seqoid = DefineRelation(stmt, RELKIND_SEQUENCE, RELSTORAGE_HEAP, NULL);
 
     /*
      * Open and lock the new sequence.  (This lock is redundant; an

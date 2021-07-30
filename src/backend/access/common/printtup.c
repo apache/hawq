@@ -14,13 +14,16 @@
  *-------------------------------------------------------------------------
  */
 #include "postgres.h"
+#include "miscadmin.h"
 
 #include "access/printtup.h"
+#include "access/read_cache.h"
 #include "libpq/libpq.h"
 #include "libpq/pqformat.h"
 #include "tcop/pquery.h"
 #include "utils/lsyscache.h"
 #include "catalog/pg_type.h"
+
 extern void varattrib_untoast_ptr_len(Datum d, char **datastart, int *len, void **tofree);
 extern char * pg_server_to_client(const char *s, int len);
 
@@ -31,6 +34,9 @@ static void printtup_20(TupleTableSlot *slot, DestReceiver *self);
 static void printtup_internal_20(TupleTableSlot *slot, DestReceiver *self);
 static void printtup_shutdown(DestReceiver *self);
 static void printtup_destroy(DestReceiver *self);
+
+static void printtup_newplan(const char **value, uint64_t *len,
+					bool *isNull, int natts);
 
 
 /* ----------------------------------------------------------------
@@ -91,6 +97,7 @@ printtup_create_DR(CommandDest dest, Portal portal)
 	self->pub.rShutdown = printtup_shutdown;
 	self->pub.rDestroy = printtup_destroy;
 	self->pub.mydest = dest;
+	self->pub.receiveSlotNewPlan = printtup_newplan;
 
 	self->portal = portal;
 
@@ -276,9 +283,22 @@ printtup_prepare_info(DR_printtup *myState, TupleDesc typeinfo, int numAttrs)
 static void
 printtup(TupleTableSlot *slot, DestReceiver *self)
 {
-	TupleDesc	typeinfo = slot->tts_tupleDescriptor;
+  StringInfoData buf;
+
+  if (readCacheEnabled()) {
+    int cachedLen;
+    char *cachedStr;
+    cachedStr = readCache(&cachedLen);
+    if (!readCacheEof()) {
+      pq_beginmessage(&buf, 'D');
+      appendBinaryStringInfo(&buf, cachedStr, cachedLen);
+      pq_endmessage(&buf);
+    }
+    return;
+  }
+
+        TupleDesc	typeinfo = slot->tts_tupleDescriptor;
 	DR_printtup *myState = (DR_printtup *) self;
-	StringInfoData buf;
 	int			natts = typeinfo->natts;
 	int			i;
 
@@ -559,7 +579,49 @@ printtup(TupleTableSlot *slot, DestReceiver *self)
 			pfree(DatumGetPointer(attr));
 	}
 
+	if (writeCacheEnabled())
+	  writeCache(buf.data, buf.len);
+
 	pq_endmessage(&buf);
+}
+
+void printtup_newplan(const char **value, uint64_t *len, bool *isNull,
+                      int natts) {
+  StringInfoData buf;
+
+  if (readCacheEnabled()) {
+    int cachedLen;
+    char *cachedStr;
+    cachedStr = readCache(&cachedLen);
+    if (!readCacheEof()) {
+      pq_beginmessage(&buf, 'D');
+      appendBinaryStringInfo(&buf, cachedStr, cachedLen);
+      pq_endmessage(&buf);
+    }
+    return;
+  }
+
+  pq_beginmessage(&buf, 'D');
+  pq_sendint(&buf, natts, 2);
+  int valueLen;
+  int32 n32;
+  for (int i = 0; i < natts; ++i) {
+    if (isNull[i]) {
+      valueLen = -1;
+      n32 = htonl((uint32)valueLen);
+      appendBinaryStringInfo(&buf, (char *)&n32, 4);
+    } else {
+      valueLen = len[i];
+      n32 = htonl((uint32)valueLen);
+      appendBinaryStringInfo(&buf, (char *)&n32, 4);
+      appendBinaryStringInfo(&buf, value[i], valueLen);
+    }
+  }
+
+  if (writeCacheEnabled())
+    writeCache(buf.data, buf.len);
+
+  pq_endmessage(&buf);
 }
 
 /* ----------------

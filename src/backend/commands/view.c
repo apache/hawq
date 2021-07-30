@@ -61,6 +61,7 @@
 
 #include "catalog/pg_exttable.h"
 
+
 static void checkViewTupleDesc(TupleDesc newdesc, TupleDesc olddesc);
 static bool isViewOnTempTable_walker(Node *node, void *context);
 
@@ -259,7 +260,8 @@ DefineVirtualRelation(const RangeVar *relation, List *tlist, bool replace, Oid v
 		 * existing view, so we don't need more code to complain if "replace"
 		 * is false).
 		 */
-		newviewOid =  DefineRelation(createStmt, RELKIND_VIEW, RELSTORAGE_VIRTUAL, NonCustomFormatType);
+		newviewOid =  DefineRelation(createStmt, RELKIND_VIEW,
+		                             RELSTORAGE_VIRTUAL, NULL);
 		if(comptypeOid)
 			*comptypeOid = createStmt->oidInfo.comptypeOid;
 		return newviewOid;

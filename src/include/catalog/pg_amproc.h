@@ -37,9 +37,9 @@
    CREATE TABLE pg_amproc
    with (camelcase=AccessMethodProcedure, oid=false, relid=2603)
    (
-   amopclaid      oid, 
-   amprocsubtype  oid, 
-   amprocnum      smallint, 
+   amopclaid      oid,
+   amprocsubtype  oid,
+   amprocnum      smallint,
    amproc         regproc
    );
 
@@ -378,5 +378,16 @@ DATA(insert (	3046	0 1  377 ));	/* money */
 DATA(insert (	3047	0 1 380 ));		/* reltime */
 DATA(insert (	3048	0 1 381 ));		/* tinterval */
 
-
+DATA(insert ( 4033 0 1 4044 ));
+DATA(insert ( 4034 0 1 4045 ));
+DATA(insert ( 4036 0 1 3480 ));
+DATA(insert ( 4036 0 2 3482 ));
+DATA(insert ( 4036 0 3 3483 ));
+DATA(insert ( 4036 0 4 3484 ));
+DATA(insert ( 4036 0 6 3488 ));
+DATA(insert ( 4037 0 1 351 ));
+DATA(insert ( 4037 0 2 3485 ));
+DATA(insert ( 4037 0 3 3486 ));
+DATA(insert ( 4037 0 4 3487 ));
+DATA(insert ( 4037 0 6 3489 ));
 #endif   /* PG_AMPROC_H */

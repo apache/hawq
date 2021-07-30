@@ -30,7 +30,7 @@ from optparse import OptionParser
 
 PLUGIN_VERSION = '${release}'
 DEFAULT_STACK = '${default.stack}'
-SUPPORTED_OS_LIST = ['redhat6', 'redhat7']
+SUPPORTED_OS_LIST = ['redhat7']
 HAWQ_LIB_STAGING_DIR = '${hawq.lib.staging.dir}'
 REPO_VERSION = '${repository.version}'
 HAWQ_REPO = '${hawq.repo.prefix}'
@@ -103,7 +103,7 @@ class APIClient:
     Returns stack information (stack name, stack version, repository version) of stack installed on cluster
     """
     _, response_json = self.__request('GET',
-                                      '/clusters/{0}/stack_versions?ClusterStackVersions/state.matches(CURRENT)'.format(
+                                          '/clusters/{0}/stack_versions'.format(
                                           cluster_name))
     if 'items' not in response_json or len(response_json['items']) == 0:
       raise Exception('No Stack found to be installed on the cluster {0}'.format(cluster_name))

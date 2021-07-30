@@ -47,6 +47,7 @@
 #include "access/extprotocol.h"
 #include "access/filesplit.h"
 #include "access/nbtree.h"
+#include "access/orcam.h"
 #include "access/reloptions.h"
 #include "access/xact.h"
 #include "access/transam.h"
@@ -83,6 +84,7 @@
 #include "cdb/cdbparquetam.h"
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbsharedstorageop.h"
+#include "cdb/cdbinmemheapam.h"
 #include "commands/cluster.h"
 #include "commands/copy.h"
 #include "commands/dbcommands.h"
@@ -120,6 +122,7 @@
 #include "storage/smgr.h"
 #include "tcop/utility.h"
 #include "utils/acl.h"
+#include "utils/array.h"
 #include "utils/builtins.h"
 #include "utils/datum.h"
 #include "utils/fmgroids.h"
@@ -148,8 +151,10 @@
 #include "cdb/cdbpersistentfilesysobj.h"
 #include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/cdbdispatchresult.h"
 #include "optimizer/planmain.h"
+
 
 /*
  * ON COMMIT action list
@@ -198,6 +203,10 @@ static List *on_commits = NIL;
 #define AT_PASS_MISC			8		/* other stuff */
 #define AT_NUM_PASSES			9
 
+#define ORC_FORMAT				"orc"
+#define TEXT_FORMAT				"text"
+#define CSV_FORMAT				"csv"
+#define PG_DEFAULT_TABLESPACE	"pg_default"
 typedef struct AlteredTableInfo
 {
 	/* Information saved before any work commences: */
@@ -408,6 +417,7 @@ static void checkCustomFormatEncoding(const char *formatterName,
                                       const char *encodingName);
 static char *checkCustomFormatOptions(const char *formatterName,
                                       List *formatOpts,
+                                      TupleDesc tupDesc,
                                       const bool isWritable,
                                       const char *delimiter);
 static void checkCustomFormatDateTypes(const char *formatterName,
@@ -416,11 +426,23 @@ static Datum transformFormatOpts(char formattype,
                                  char *formatname,
                                  char *formattername,
                                  List *formatOpts,
+                                 TupleDesc tupDesc,
                                  int numcols,
                                  bool iswritable,
                                  GpPolicy *policy);
 
-Oid DefineRelation(CreateStmt *stmt, char relkind, char relstorage, const char *formattername);
+static void InvokeMagmaCreateTable(FmgrInfo *func,
+                                         char *dbname,
+                                         char *schemaname,
+                                         char *tablename,
+                                         MagmaSnapshot *snapshot,
+                                         List *tableelements,
+                                         IndexStmt *primarykey,
+                                         List *distributedkey,
+                                         char *formatter_name,
+                                         bool isexternal,
+                                         List *locations);
+
 static Oid DefineRelation_int(CreateStmt *stmt, char relkind,
                               char relstorage, const char *formattername);
 
@@ -439,11 +461,18 @@ static bool prebuild_temp_table(Relation rel, RangeVar *tmpname, List *distro,
 static void ATPartitionCheck(AlterTableType subtype, Relation rel, bool rejectroot, bool recursing);
 static void InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, bool forceCreateDir,
 		List *locs, List* fmtopts);
+
 static char *alterTableCmdString(AlterTableType subtype);
 
 static bool isPgDefaultTablespace(const char *tablespacename);
 
 static Oid LookupCustomProtocolValidatorFunc(char *protoname);
+
+static char *getLocation(HeapTuple *tuple, TupleDesc *tupleDesc);
+static char *getNewLocation(const char *oldlocation, const char *oldrelname, const char *newrelname);
+static char *changePartitionPath(const char *location, const char *oldrelname, const char *newrelname);
+static void changeHdfsPath(const char *oldlocation, const char *newlocation);
+static void updateCatlog(cqContext* pcqCtx, HeapTuple *tuple, const char *newlocation);
 
 bool
 isPgDefaultTablespace(const char *tablespacename){
@@ -464,7 +493,8 @@ isPgDefaultTablespace(const char *tablespacename){
  * ----------------------------------------------------------------
  */
 Oid
-DefineRelation(CreateStmt *stmt, char relkind, char relstorage, const char *formattername)
+DefineRelation(CreateStmt *stmt, char relkind, char relstorage,
+               const char *formattername)
 {
     Oid reloid = 0;
     Assert(stmt->base.relation->schemaname == NULL || strlen(stmt->base.relation->schemaname)>0);
@@ -574,6 +604,13 @@ DefineRelation_int(CreateStmt *stmt,
 		 * Tablespace specified on the command line, or was passed down by
 		 * dispatch.
 		 */
+	  if (pg_strcasecmp("pg_default", stmt->base.tablespacename) == 0)
+	        ereport(ERROR,
+	            (errcode(ERRCODE_UNDEFINED_OBJECT),
+	             errmsg("can not create ao format table on tablespace \"%s\" ",
+	                stmt->base.tablespacename),
+	             errOmitLocation(true)));
+
 		tablespaceId = get_tablespace_oid(stmt->base.tablespacename);
 		if (!OidIsValid(tablespaceId))
 			ereport(ERROR,
@@ -592,8 +629,9 @@ DefineRelation_int(CreateStmt *stmt,
 		tablespaceId = (gp_upgrade_mode) ? DEFAULTTABLESPACE_OID : GetDefaultTablespace();
 
 		/* Need the real tablespace id for dispatch */
-		if (!OidIsValid(tablespaceId))
+		if (!OidIsValid(tablespaceId)) {
 			tablespaceId = get_database_dts(MyDatabaseId);
+		}
 	}
 
 	/* Goh tablespace check. */
@@ -750,12 +788,13 @@ DefineRelation_int(CreateStmt *stmt,
 										  /* bufferPoolBulkLoad */ false,
 										  parentOidCount,
 										  stmt->base.oncommit,
-                                          stmt->policy,  /*CDB*/
-                                          reloptions,
+										  stmt->policy,  /*CDB*/
+										  reloptions,
 										  allowSystemTableModsDDL,
 										  &stmt->oidInfo.comptypeOid,
 										  &persistentTid,
-										  &persistentSerialNum);
+										  &persistentSerialNum,
+										  formattername);
 
 	StoreCatalogInheritance(relationId, inheritOids);
 
@@ -994,8 +1033,22 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	bool 					  forceCreateDir = createExtStmt->forceCreateDir;
 
 	bool 					  isExternalHdfs = false;
+	bool 					  isExternalMagma = false;
+	bool						  isExternalHive = false;
 	char*					  location = NULL;
 	int						  location_len = NULL;
+	TupleDesc       descriptor;
+
+	if ((pg_strcasecmp(createExtStmt->format, ORC_FORMAT) == 0 || pg_strcasecmp(createExtStmt->format, TEXT_FORMAT) == 0 ||
+	    (pg_strcasecmp(createExtStmt->format, CSV_FORMAT) == 0)) &&
+	    pg_strcasecmp(default_tablespace, PG_DEFAULT_TABLESPACE) == 0)
+	{
+		ereport(ERROR,
+		        (errcode(ERRCODE_SYNTAX_ERROR),
+		         errmsg("cannot create non magma table on pg_default tablespace"),
+		         errhint("change default_tablespace to dfs_default or other hdfs tablespace instead"),
+		         errOmitLocation(true)));
+	}
 
 	/*
 	 * now set the parameters for keys/inheritance etc. Most of these are
@@ -1024,6 +1077,16 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	{
 		tablespace_id = get_database_dts(MyDatabaseId);
 	}
+
+	char *filespace_name = NULL;
+	GetFilespacePathForTablespace(tablespace_id, &filespace_name);
+
+	if (filespace_name) {
+	  int len = strlen(filespace_name);
+	  if ((len > 0) && (filespace_name[len - 1] == '/'))
+	    filespace_name[len - 1] = '\0';
+	}
+
 	char *tablespace_name = get_tablespace_name(tablespace_id);
 
 	// get database name for the relation
@@ -1038,22 +1101,36 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	/*
 	 * Do some special logic when we use custom
 	 */
-	if (exttypeDesc->exttabletype == EXTTBL_TYPE_LOCATION)
+	if (exttypeDesc->exttabletype == EXTTBL_TYPE_MAGMA)   /* Magma table */
 	{
 		if (exttypeDesc->location_list == NIL)
 		{
-			if (dfs_url == NULL)
+			location_len = strlen(PROTOCOL_MAGMA) +         /* magma://          */
+			               strlen(magma_nodes_url) + 1;        /* magma_nodes_url + '\0' */
+
+			char *path = (char *)palloc(sizeof(char) * location_len);
+
+			sprintf(path, "%s%s", PROTOCOL_MAGMA, magma_nodes_url);
+
+			exttypeDesc->location_list = list_make1((Node *) makeString(path));
+		}
+		isExternalMagma = true;
+	}
+	else if (exttypeDesc->exttabletype == EXTTBL_TYPE_LOCATION)
+	{
+		if (exttypeDesc->location_list == NIL)
+		{
+			if (filespace_name == NULL)
 			{
 				ereport(ERROR,
 				        (errcode(ERRCODE_SYNTAX_ERROR),
-				         errmsg("Cannot create table on HDFS when the service is not available"),
-				         errhint("Check HDFS service and hawq_dfs_url configuration"),
+				         errmsg("cannot create table on HDFS when the service is not available"),
+				         errhint("check HDFS service, hawq_dfs_url configuration and other hdfs filespaces"),
 				         errOmitLocation(true)));
 			}
 
-			location_len = strlen(PROTOCOL_HDFS) +         /* hdfs:// */
-			               strlen(dfs_url) +               /* hawq_dfs_url */
-			               // 1 + strlen(filespace_name) + /* '/' + filespace name */
+			location_len =
+			               strlen(filespace_name) + /* '/' + filespace name */
 			               1 + strlen(tablespace_name) +   /* '/' + tablespace name */
 			               1 + strlen(database_name) +     /* '/' + database name */
 			               1 + strlen(schema_name) +       /* '/' + schema name */
@@ -1063,17 +1140,15 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 
 			if (createExtStmt->parentPath == NULL) {
 				path = (char *)palloc(sizeof(char) * location_len);
-				sprintf(path, "%s%s/%s/%s/%s/%s",
-						PROTOCOL_HDFS,
-						dfs_url, /* filespace_name, */ tablespace_name,
+				sprintf(path, "%s/%s/%s/%s/%s",
+						filespace_name, /* filespace_name, */ tablespace_name,
 						database_name, schema_name, table_name);
 			}
 			else {
 				path = (char *)palloc(sizeof(char) *
 						(location_len + strlen(createExtStmt->parentPath)+1));
-				sprintf(path, "%s%s/%s/%s/%s/%s/%s",
-						PROTOCOL_HDFS,
-						dfs_url, /* filespace_name, */ tablespace_name,
+				sprintf(path, "%s/%s/%s/%s/%s/%s",
+						filespace_name, /* filespace_name, */ tablespace_name,
 						database_name, schema_name,
 						createExtStmt->parentPath, table_name);
 			}
@@ -1087,6 +1162,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		char		*uri_str = pstrdup(v->val.str);
 		Uri			*uri = ParseExternalTableUri(uri_str);
 		bool 		isHdfs = is_hdfs_protocol(uri);
+		bool 		isHive = is_hive_protocol(uri);
 
 		pfree(uri_str);
 		FreeExternalTableUri(uri);
@@ -1097,7 +1173,15 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			isExternalHdfs = true;
 		}
 
+		if (isHive)
+		{
+			/* We have an HIVE external protocol */
+			isExternalHive = true;
+		}
 	}
+
+	if (filespace_name)
+		pfree(filespace_name);
 
 	if (isExternalHdfs)
 	{
@@ -1109,8 +1193,17 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 									list_length(exttypeDesc->location_list))));
 	}
 
+	if (isExternalHive)
+	{
+		if (list_length(exttypeDesc->location_list)!= 1)
+			ereport(ERROR,
+					(errcode(ERRCODE_SYNTAX_ERROR),
+							errmsg("Only support 1 external HIVE location. "
+									"Now input %d location(s)",
+									list_length(exttypeDesc->location_list))));
+	}
 
-	if (isExternalHdfs)
+	if (isExternalHdfs || isExternalMagma || isExternalHive)
 	{
 		/*
 		 * We force any specified formatter to be custom.
@@ -1154,6 +1247,14 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	bool isCustom = false;
 	switch(exttypeDesc->exttabletype)
 	{
+		case EXTTBL_TYPE_MAGMA:
+
+			/* Parse and validate URI strings (LOCATION clause) */
+			locationUris = transformLocationUris(exttypeDesc->location_list,
+					createExtStmt->base.options,
+					isweb, iswritable, forceCreateDir, &isCustom);
+			break;
+
 		case EXTTBL_TYPE_LOCATION:
 
 			/* Parse and validate URI strings (LOCATION clause) */
@@ -1199,11 +1300,11 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 * - Always allow if superuser.
 	 * - Never allow EXECUTE or 'file' exttables if not superuser.
 	 * - Allow http, gpfdist or gpfdists tables if pg_auth has the right permissions
-	 *   for this role and for this type of table, or if gp_external_grant_privileges
+	 *   for this role and for this type of table, or if gp_external_grant_privileges 
 	 *   is on (gp_external_grant_privileges should be deprecated at some point).
 	 */
 	if(!superuser() && Gp_role == GP_ROLE_DISPATCH)
-	{
+	{		
 		if(exttypeDesc->exttabletype == EXTTBL_TYPE_EXECUTE)
 		{
 			ereport(ERROR,
@@ -1218,14 +1319,14 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			char *uri_str;
 			Uri *uri;
 
-			if(exttypeDesc->exttabletype == EXTTBL_TYPE_LOCATION)
+			if(exttypeDesc->exttabletype == EXTTBL_TYPE_LOCATION ||
+					exttypeDesc->exttabletype == EXTTBL_TYPE_MAGMA)
 			{
 				first_uri = list_head(exttypeDesc->location_list);
 				v = lfirst(first_uri);
 				uri_str = pstrdup(v->val.str);
 				uri = ParseExternalTableUri(uri_str);
 			}
-
 
 			if(uri->protocol == URI_FILE)
 			{
@@ -1241,7 +1342,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 				 * permissions in pg_auth for creating this table.
 				 */
 
-				bool		 isnull;
+				bool		 isnull;				
 				Oid			 userid = GetUserId();
 				cqContext	*pcqCtx;
 				HeapTuple	 tuple;
@@ -1254,16 +1355,16 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 							 ObjectIdGetDatum(userid)));
 
 				tuple = caql_getnext(pcqCtx);
-
+								
 				if (!HeapTupleIsValid(tuple))
 					ereport(ERROR,
 							(errcode(ERRCODE_UNDEFINED_OBJECT),
-							 errmsg("role \"%s\" does not exist (in DefineExternalRelation)",
+							 errmsg("role \"%s\" does not exist (in DefineExternalRelation)", 
 									 GetUserNameFromId(userid))));
 
 				if ( (uri->protocol == URI_GPFDIST || uri->protocol == URI_GPFDISTS) && iswritable)
 				{
-					Datum 	d_wextgpfd = caql_getattr(pcqCtx, Anum_pg_authid_rolcreatewextgpfd,
+					Datum 	d_wextgpfd = caql_getattr(pcqCtx, Anum_pg_authid_rolcreatewextgpfd, 
 													  &isnull);
 					bool	createwextgpfd = (isnull ? false : DatumGetBool(d_wextgpfd));
 
@@ -1275,7 +1376,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 				}
 				else if ( (uri->protocol == URI_GPFDIST || uri->protocol == URI_GPFDISTS) && !iswritable)
 				{
-					Datum 	d_rextgpfd = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterextgpfd,
+					Datum 	d_rextgpfd = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterextgpfd, 
 													  &isnull);
 					bool	createrextgpfd = (isnull ? false : DatumGetBool(d_rextgpfd));
 
@@ -1288,7 +1389,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 				}
 				else if (uri->protocol == URI_HTTP && !iswritable)
 				{
-					Datum 	d_exthttp = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterexthttp,
+					Datum 	d_exthttp = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterexthttp, 
 													 &isnull);
 					bool	createrexthttp = (isnull ? false : DatumGetBool(d_exthttp));
 
@@ -1304,20 +1405,20 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 					char*		protname = uri->customprotocol;
 					Oid			ptcId = LookupExtProtocolOid(protname, false);
 					AclResult	aclresult;
-
+					
 					/* Check we have the right permissions on this protocol */
 					if (!pg_extprotocol_ownercheck(ptcId, ownerId))
-					{
+					{	
 						AclMode mode = (iswritable ? ACL_INSERT : ACL_SELECT);
-
+						
 						aclresult = pg_extprotocol_aclcheck(ptcId, ownerId, mode);
-
+						
 						if (aclresult != ACLCHECK_OK)
 							aclcheck_error(aclresult, ACL_KIND_EXTPROTOCOL, protname);
 					}
 				}
-				/* magma follow the same ack check as HDFS */
-				else if (uri->protocol == URI_HDFS )
+				/* check HDFS privilage*/
+				else if (uri->protocol == URI_HDFS)
 				{
 					Datum d_wexthdfs = caql_getattr(pcqCtx, Anum_pg_authid_rolcreatewexthdfs, &isnull);
 					bool createwexthdfs = (isnull ? false : DatumGetBool(d_wexthdfs));
@@ -1345,15 +1446,71 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 						}
 					}
 				}
+				else if (uri->protocol == URI_HIVE)
+				{
+					Datum d_wexthive = caql_getattr(pcqCtx, Anum_pg_authid_rolcreatewexthive, &isnull);
+					bool createwexthive = (isnull ? false : DatumGetBool(d_wexthive));
+					if (iswritable) {
+						if (!createwexthive)
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+									errmsg("permission denied: no privilege to create a writable hive external table"),
+											errOmitLocation(true)));
+						}
+					}
+					else
+					{
+						/* A role that can create writable external hive table can always
+						 * create readable external hive table.*/
+						Datum d_rexthive = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterexthive, &isnull);
+						bool createrexthive = (isnull ? false : DatumGetBool(d_rexthive));
+						if (!createrexthive && !createwexthive)
+						{
+							ereport(ERROR,
+								(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+								errmsg("permission denied: no privilege to create a readable hive external table"),
+										errOmitLocation(true)));
+						}
+					}
+				}
+				else if (uri->protocol == URI_MAGMA)
+				{
+					Datum d_wextmagma = caql_getattr(pcqCtx, Anum_pg_authid_rolcreatewextmagma, &isnull);
+					bool createwextmagma = (isnull ? false : DatumGetBool(d_wextmagma));
+					if (iswritable) {
+						if (!createwextmagma)
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+											errmsg("permission denied: no privilege to create a writable magma external table"),
+											errOmitLocation(true)));
+						}
+					}
+					else
+					{
+						/* A role that can create writable external magma table can always
+						 * * create readable external magma table.*/
+						Datum d_rextmagma = caql_getattr(pcqCtx, Anum_pg_authid_rolcreaterextmagma, &isnull);
+						bool createrextmagma = (isnull ? false : DatumGetBool(d_rextmagma));
+						if (!createrextmagma && !createwextmagma)
+						{
+							ereport(ERROR,
+									(errcode(ERRCODE_INSUFFICIENT_PRIVILEGE),
+											errmsg("permission denied: no privilege to create a readable magma external table"),
+											errOmitLocation(true)));
+						}
+					}
+				}
 				else
 				{
 					ereport(ERROR,
 							(errcode(ERRCODE_INTERNAL_ERROR),
 							errmsg("internal error in DefineExternalRelation. "
-								   "protocol is %d, writable is %d",
+								   "protocol is %d, writable is %d", 
 								   uri->protocol, iswritable)));
 				}
-
+				
 				caql_endscan(pcqCtx);
 			}
 			FreeExternalTableUri(uri);
@@ -1395,10 +1552,12 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 *
 	 * We force formatter as 'custom' if it is external hdfs protocol
 	 */
-	formattype = (isExternalHdfs) ?
+	formattype = (isExternalHdfs || isExternalMagma || isExternalHive) ?
 	             'b' : transformFormatType(createExtStmt->format);
 
-	if ((formattype == 'b') )
+	if ((formattype == 'b') &&
+	    pg_strncasecmp(formattername, "text", strlen("text")) &&
+	    pg_strncasecmp(formattername, "csv", strlen("csv")))
 	{
 		Oid procOid = InvalidOid;
 
@@ -1418,10 +1577,13 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		}
 	}
 
+	List     *schema = createExtStmt->base.tableElts;
+	descriptor = BuildDescForRelation(schema);
 	formatOptStr = transformFormatOpts(formattype,
 	                                   createExtStmt->format,
 	                                   formattername,
 	                                   createExtStmt->base.options,
+	                                   descriptor,
 	                                   list_length(createExtStmt->base.tableElts),
 	                                   iswritable,
 	                                   createExtStmt->policy);
@@ -1453,7 +1615,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 			encoding_name = pg_encoding_to_char(encoding);
 
 			/* custom format */
-			if (formattername)
+			if (!fmttype_is_text(formattype) && !fmttype_is_csv(formattype))
 			{
 				checkCustomFormatEncoding(formattername, encoding_name);
 			}
@@ -1470,12 +1632,14 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		{
 			encoding_name = strVal(dencoding->arg);
 
-			if (formattername)
+			/* custom format */
+			if (!fmttype_is_text(formattype) && !fmttype_is_csv(formattype) &&
+			    formattername &&
+			    pg_strncasecmp(formattername, "text", strlen("text")) &&
+			    pg_strncasecmp(formattername, "csv", strlen("csv")))
 			{
 				checkCustomFormatEncoding(formattername, encoding_name);
 			}
-
-			/* custom format */
 
 			if (pg_valid_client_encoding(encoding_name) < 0)
 				ereport(ERROR,
@@ -1488,6 +1652,10 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		else
 			elog(ERROR, "unrecognized node type: %d",
 				 nodeTag(dencoding->arg));
+	}
+	if (!dencoding && isExternalMagma)
+	{
+		encoding = PG_SQL_ASCII;
 	}
 
 	/* If encoding is defaulted, use database encoding */
@@ -1560,6 +1728,126 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	 * Add primary key constraint in pg_constraint for custom external table.
 	 * We don't add primary key index in pg_index for now.
 	 */
+	if (formattername &&
+	    (pg_strncasecmp(formattername, "magma", strlen("magma")) == 0))
+	{
+		/* Prepare arguments for ext_contraint_create, primarily an IndexInfo structure */
+		int nColInPk = 0;
+		int nColInTable = 0;
+
+		/* Support single column primary key for now */
+		IndexInfo *indexInfo = makeNode(IndexInfo);
+
+		// magma table support with no column
+		// Insist(createExtStmt->base.tableElts);
+		nColInTable = list_length(createExtStmt->base.tableElts);
+		if (nColInTable <= 0)
+		{
+			elog(DEBUG1, "this table with no column");
+		}
+
+		if ((createExtStmt->pkey != NULL) && (createExtStmt->pkey->indexParams != NULL))
+		{
+			nColInPk = list_length(createExtStmt->pkey->indexParams);
+			Assert(nColInPk >= 1);
+
+			if (nColInPk <= nColInTable)
+			{
+				//calculate indexInfo->ii_NumIndexAttrs in function below.
+				ComputeConstraintAttrs(indexInfo, createExtStmt->pkey->indexParams, reloid);
+			}
+			else   /* may error somehow while nColInPk > nColInTable */
+			{
+				elog(ERROR, "invalid columns for primary key: %d. "
+				            "Specify column(s) for primary key at table "
+				            "creation.", nColInPk);
+			}
+		}
+
+		for (int i = 0; i < nColInPk; i++)
+		{
+			/* Make sure primary key is fixed width data type */
+			IndexElem *attribute = (IndexElem *)(list_nth(createExtStmt->base.tableElts,
+					indexInfo->ii_KeyAttrNumbers[i]-1));
+			Oid atttype = InvalidOid;
+
+			if (attribute->name != NULL)
+			{
+				HeapTuple	atttuple;
+				Form_pg_attribute attform;
+				cqContext	*pcqCtx;
+
+				// Assert(attribute->expr == NULL);
+
+				pcqCtx = caql_getattname_scan(NULL, reloid, attribute->name);
+				atttuple = caql_get_current(pcqCtx);
+
+				if (!HeapTupleIsValid(atttuple))
+				{
+					ereport(ERROR,
+						(errcode(ERRCODE_UNDEFINED_COLUMN),
+						 errmsg("column \"%s\" does not exist",
+						 attribute->name)));
+				}
+				attform = (Form_pg_attribute) GETSTRUCT(atttuple);
+				atttype = attform->atttypid;
+
+				caql_endscan(pcqCtx);
+			}
+
+			if (i == nColInPk - 1)
+			{
+			    /*
+			     * for key mode:
+			     * 1) only one column
+			     * 2) the last column in multiple primary key
+			     * no matter it's fixed width or variable length
+			     * theoretically any type is supported as the key in the mode
+			     * so no check for the key
+			     */
+			    break;
+			}
+			/*get rid of the constraints that primary key must be fixed width */
+		}
+
+		indexInfo->ii_Expressions = NIL;
+		indexInfo->ii_ExpressionsState = NIL;
+		indexInfo->ii_Predicate = NIL;
+		indexInfo->ii_PredicateState = NIL;
+		indexInfo->ii_Unique = false;
+		indexInfo->ii_Concurrent = false;
+		indexInfo->opaque = NULL;
+
+		/* create catalog in magma */
+		Oid	procOid = LookupMagmaFunc("magma", "createtable");
+		FmgrInfo procInfo;
+		if (OidIsValid(procOid))
+		{
+			fmgr_info(procOid, &procInfo);
+		}
+		else
+		{
+			elog(ERROR, "magma_createtable function was not found for pluggable storage");
+		}
+
+		// start transaction in magma for CREATE TABLE
+		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+		{
+		    PlugStorageBeginTransaction(NULL);
+		}
+		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+		InvokeMagmaCreateTable(&procInfo,
+		                       database_name,
+		                       schema_name,
+		                       table_name,
+		                       PlugStorageGetTransactionSnapshot(),
+		                       createExtStmt->base.tableElts,
+		                       createExtStmt->pkey,
+		                       createExtStmt->base.distributedBy,
+		                       formattername,
+		                       createExtStmt->isexternal,
+		                       ((ExtTableTypeDesc *)createExtStmt->exttypedesc)->location_list);
+	}
 
 	if (formattername)
 	{
@@ -1596,7 +1884,8 @@ DefineForeignRelation(CreateForeignStmt *createForeignStmt)
 	 * QEs.
 	 */
 	if(Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_UTILITY)
-		reloid = DefineRelation(createStmt, RELKIND_RELATION, RELSTORAGE_FOREIGN, NonCustomFormatType);
+		reloid = DefineRelation(createStmt, RELKIND_RELATION,
+		                        RELSTORAGE_FOREIGN, NULL);
 
 	/*
 	 * Now we take care of pg_foreign_table
@@ -1641,7 +1930,8 @@ DefineForeignRelation(CreateForeignStmt *createForeignStmt)
     /* Dispatch the statement tree to all primary and mirror segdbs.
      * Doesn't wait for the QEs to finish execution.
      */
-    dispatch_statement_node((Node *) createForeignStmt, NULL, NULL, NULL);
+    ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+        errmsg("Cannot support DefineForeignRelation")));
   }
 }
 
@@ -1792,6 +2082,27 @@ RemoveRelation(const RangeVar *relation, DropBehavior behavior,
 	{
 		DropErrorMsgNonExistent(relation, relkind, stmt->missing_ok);
 		return;
+	}
+
+	// handle to remove hdfs protocol external error table dir
+	// which breaks the transaction mechanism, should be refined later
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
+		Relation rel = relation_open(relOid, AccessExclusiveLock);
+		if (RelationIsExternal(rel))
+		{
+			ExtTableEntry *exttbl = GetExtTableEntry(rel->rd_id);
+			char *path = (char *) strVal(linitial(exttbl->locations));
+			char *searchKey = (char *) palloc0 (MAXPGPATH);
+			char *fileSpacePath = NULL;
+			GetFilespacePathForTablespace(get_database_dts(MyDatabaseId),
+			                              &fileSpacePath);
+			sprintf(searchKey, "%s/ExtErrTbl/",fileSpacePath);
+			char *match = strstr(path,searchKey);
+			if (match)
+				RemovePath(path,1);
+		}
+		relation_close(rel, AccessExclusiveLock);
 	}
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -1985,35 +2296,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 			Relation	rel;
 			PartitionNode *pNode;
 
-			PG_TRY();
-			{
-				rel = heap_openrv(rv, AccessExclusiveLock);
-			}
-			
-			PG_CATCH();
-			{
-				/* 
-				 * In the case of the table being dropped concurrently, 
-				 * throw a friendlier error than:
-				 * 
-				 * "could not open relation with relid 1234"
-				 */
-				if (rv->schemaname)
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_TABLE),
-							 errmsg("relation \"%s.%s\" does not exist",
-									rv->schemaname, rv->relname),
-							 errOmitLocation(true)));
-				else
-					ereport(ERROR,
-							(errcode(ERRCODE_UNDEFINED_TABLE),
-							 errmsg("relation \"%s\" does not exist",
-									rv->relname),
-							 errOmitLocation(true)));
-				PG_RE_THROW();
-			}
-			PG_END_TRY();
-			
+		  rel = heap_openrv(rv, AccessExclusiveLock);
 			truncate_check_rel(rel);
 
 			if (partcheck == 2)
@@ -2131,6 +2414,15 @@ ExecuteTruncate(TruncateStmt *stmt)
 		Oid			aoblkdir_relid = InvalidOid;
 		List	   *indoids = NIL;
 
+		if (RelationIsExternal(rel) && RelationIsPluggableStorage(rel->rd_id)) {
+			ExtTableEntry *exttbl = GetExtTableEntry(rel->rd_id);
+			ListCell *entry_location = list_head(exttbl->locations);
+			char *url = ((Value*)lfirst(entry_location))->val.str;
+			HdfsRemoveFilesInDir(url);
+			heap_close(rel, NoLock);
+			continue;
+		}
+
 		/*
 		 * Create a new empty storage file for the relation, and assign it
 		 * as the relfilenode value. The old storage file is scheduled for
@@ -2142,7 +2434,7 @@ ExecuteTruncate(TruncateStmt *stmt)
 		toast_relid = rel->rd_rel->reltoastrelid;
 		heap_close(rel, NoLock);
 
-		if (RelationIsAoRows(rel) || RelationIsParquet(rel)){
+		if (RelationIsAo(rel)){
 			GetAppendOnlyEntryAuxOids(heap_relid, SnapshotNow,
 											  &aoseg_relid, NULL,
 											  &aoblkdir_relid, NULL);
@@ -2202,13 +2494,20 @@ truncate_check_rel(Relation rel)
 							RelationGetRelationName(rel)),
 									   errOmitLocation(true)));
 
-	if (RelationIsExternal(rel))
+	if (RelationIsExternal(rel) && !RelationIsPluggableStorage(rel->rd_id))
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is an external relation and can't be truncated",
 						RelationGetRelationName(rel)),
 								   errOmitLocation(true)));
 
+
+	if (RelationIsExternal(rel) && RelationIsMagmaTable(rel->rd_id))
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("\"%s\" is an magma relation and not supported to be truncated now",
+						RelationGetRelationName(rel)),
+								   errOmitLocation(true)));
 
 	/* Permissions checks */
 	if (!pg_class_ownercheck(RelationGetRelid(rel), GetUserId()))
@@ -3121,10 +3420,10 @@ renameatt(Oid myrelid,
 				 errmsg("permission denied: \"%s\" is a system catalog",
 						RelationGetRelationName(targetrelation))));
 
-	if (RelationIsParquet(targetrelation))
+	if (RelationIsParquet(targetrelation) || RelationIsOrc(targetrelation))
 		ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_SUPPORTED),
-				 errmsg("Unsupported Rename column command for table type parquet"),
+				 errmsg("Unsupported Rename column command"),
 				 errOmitLocation(true)));
 
 	/*
@@ -3512,6 +3811,7 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 				}
 			}
 		}
+		renameHdfsPath(myrelid, pNode, oldrelname, newrelname);
 	}
 
 	/* MPP-6929: metadata tracking */
@@ -3809,7 +4109,6 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 	if(stmt->relkind == OBJECT_INDEX)
 		return;
 	
-
 	/* 
 	 * Verify the object specified against relstorage in the catalog.
 	 * Enforce correct syntax usage. 
@@ -3822,19 +4121,32 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 				 errhint("Use ALTER FOREIGN TABLE instead"),
 				 errOmitLocation(true)));
 	}
-	else if (RelationIsExternal(rel) && stmt->relkind != OBJECT_EXTTABLE)
+	else if (RelationIsExternal(rel) && stmt->relkind != OBJECT_EXTTABLE && !stmt->greenWay)
 	{
-		ereport(ERROR,
+		/* only enable alter table for magma */
+		if (!(RelationIsMagmaTable2(rel->rd_id)))
+		{
+			ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-				 errmsg("\"%s\" is an external table", RelationGetRelationName(rel)),
-				 errhint("Use ALTER EXTERNAL TABLE instead"),
-				 errOmitLocation(true)));
+					errmsg("\"%s\" is an external table", RelationGetRelationName(rel)),
+					errhint("Use ALTER EXTERNAL TABLE instead"),
+					errOmitLocation(true)));
+		}
 	}
 	else if (!RelationIsExternal(rel) && !RelationIsForeign(rel) && stmt->relkind != OBJECT_TABLE)
 	{
 		ereport(ERROR,
 				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 				 errmsg("\"%s\" is a base table", RelationGetRelationName(rel)),
+				 errhint("Use ALTER TABLE instead"),
+				 errOmitLocation(true)));
+	}
+	/* disable alter external table for magma */
+	else if ((RelationIsExternal(rel) && RelationIsMagmaTable2(rel->rd_id) && stmt->relkind == OBJECT_EXTTABLE && !stmt->greenWay))
+	{
+		ereport(ERROR,
+				(errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				 errmsg("\"%s\" is a magma table", RelationGetRelationName(rel)),
 				 errhint("Use ALTER TABLE instead"),
 				 errOmitLocation(true)));
 	}
@@ -3852,19 +4164,31 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 
 			switch(cmd->subtype)
 			{
+			  case AT_AddInherit:
+			  case AT_PartAdd:
+			  case AT_PartAddInternal:
+				case AT_PartAlter:
+				case AT_PartDrop:
+				case AT_PartRename:
+				case AT_PartTruncate:
+					if (stmt->greenWay) {
+						break;
+					}
 				/* FOREIGN and EXTERNAL tables doesn't support the following AT */
+				case AT_PartCoalesce:
+				case AT_PartExchange:
+				case AT_PartMerge:
+				case AT_PartModify:
+				case AT_PartSetTemplate:
+				case AT_PartSplit:
+
 				case AT_ColumnDefault:		
 				case AT_DropNotNull:			
 				case AT_SetNotNull:			
 				case AT_SetStatistics:		
 				case AT_SetStorage:			
-				case AT_AddIndex:			
-				case AT_ReAddIndex:			
-				case AT_AddConstraint:		
 				case AT_AddConstraintRecurse:
 				case AT_ProcessedConstraint:	
-				case AT_DropConstraint:		
-				case AT_DropConstraintQuietly:			
 				case AT_ClusterOn:			
 				case AT_DropCluster:			
 				case AT_DropOids:			
@@ -3877,21 +4201,8 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 				case AT_DisableTrigAll:		
 				case AT_EnableTrigUser:		
 				case AT_DisableTrigUser:		
-				case AT_AddInherit:			
 				case AT_DropInherit:			
 				case AT_SetDistributedBy:	
-				case AT_PartAdd:				
-				case AT_PartAlter:			
-				case AT_PartCoalesce:		
-				case AT_PartDrop:			
-				case AT_PartExchange:		
-				case AT_PartMerge:			
-				case AT_PartModify:			
-				case AT_PartRename:			
-				case AT_PartSetTemplate:		
-				case AT_PartSplit:			
-				case AT_PartTruncate:		
-				case AT_PartAddInternal:		
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
 							 errmsg("Unsupported ALTER command for table type %s", 
@@ -3909,7 +4220,23 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 										 (RelationIsExternal(rel) ? "external" : "foreign")),
 								 errOmitLocation(true)));
 					break;
-					
+
+				case AT_AddIndex:
+				case AT_ReAddIndex:
+				case AT_AddConstraint:
+				case AT_DropConstraint:
+				case AT_DropConstraintQuietly:
+					/* only support alter table for magma */
+					if (!RelationIsMagmaTable(rel->rd_id))
+					{
+						ereport(ERROR,
+								(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
+								 errmsg("Unsupported ALTER command for table type %s",
+										 (RelationIsExternal(rel) ? "external" : "foreign")),
+								 errOmitLocation(true)));
+					}
+					break;
+
 				default:
 					/* ALTER type supported */
 					break;
@@ -3935,7 +4262,7 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 		else
 			crel = heap_open(relid, AccessShareLock);
 
-		if (RelationIsParquet(crel)) {
+		if (RelationIsParquet(crel) || RelationIsOrc(crel)) {
 			ListCell *lcmd;
 
 			foreach(lcmd, stmt->cmds)
@@ -3966,7 +4293,7 @@ void ATVerifyObject(AlterTableStmt *stmt, Relation rel)
 				case AT_DisableTrigUser:
 					ereport(ERROR,
 							(errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
-									errmsg("Unsupported ALTER command for parquet table \"%s\"",
+									errmsg("Unsupported ALTER command for table \"%s\"",
 									NameStr(crel->rd_rel->relname)),
 									errOmitLocation(true)));
 					break;
@@ -4140,11 +4467,14 @@ AlterTable(Oid relid, AlterTableStmt *stmt)
 			ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter foreign table statement yet") ));
 	}
-	else if (stmt->relkind == OBJECT_EXTTABLE)
+	else if (stmt->relkind == OBJECT_EXTTABLE && !stmt->greenWay)
 	{
+		/* in order to support index for magma, disabled this exception */
+		/*
 		if (!gp_called_by_pgdump)
 			ereport(ERROR,
 				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter external table statement yet") ));
+		*/
 	}
 
 	/* check if this is an hcatalog table */
@@ -4160,6 +4490,17 @@ AlterTable(Oid relid, AlterTableStmt *stmt)
 	/* Caller is required to provide an adequate lock. */
 	rel = relation_open(relid, NoLock);
 	int			expected_refcnt;
+
+	if (stmt->relkind == OBJECT_TABLE && RelationIsExternal(rel) &&
+			RelationIsPluggableStorage(rel->rd_id) && !stmt->greenWay)
+	{
+		/* in order to support index for magma, disabled this exception */
+		/*
+		if (!gp_called_by_pgdump)
+			ereport(ERROR,
+				(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter table statement yet") ));
+		*/
+	}
 
 	ATVerifyObject(stmt, rel);
 	
@@ -4421,9 +4762,17 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 	 * Do permissions checking, recursion to child tables if needed, and any
 	 * additional phase-1 processing needed.
 	 */
+	Oid relationOid = RelationGetRelid(rel);
 	switch (cmd->subtype)
 	{
 		case AT_AddColumn:		/* ADD COLUMN */
+			// disable alter grammar for magma
+			if (RelationIsMagmaTable2(relationOid))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+						 errmsg("ALTER TABLE ... ADD COLUMN is not supported for magma")));
+			}
 			ATSimplePermissions(rel, false);
 			/*
 			 * test that this is allowed for partitioning, but only if we aren't
@@ -4483,6 +4832,13 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			break;
 		case AT_DropColumn:		/* DROP COLUMN */
 		case AT_DropColumnRecurse:
+			// disable alter grammar for magma
+			if (RelationIsMagmaTable2(relationOid))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+						 errmsg("ALTER TABLE ... DROP COLUMN is not supported for magma")));
+			}
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Recursion occurs during execution phase */
@@ -4492,9 +4848,12 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_AddIndex:		/* ADD INDEX */
+			/* in order to support index for magma, disabled this exception */
+			/*
 			ereport(ERROR,
 					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
 					 errmsg("ALTER TABLE ... ADD INDEX is not supported")));
+			*/
 			ATSimplePermissions(rel, false);
 			/* Any recursion for partitioning is done in ATExecAddIndex() itself */
 			/* However, if the index supports a PK or UNIQUE constraint and the
@@ -4590,6 +4949,13 @@ ATPrepCmd(List **wqueue, Relation rel, AlterTableCmd *cmd,
 			pass = AT_PASS_DROP;
 			break;
 		case AT_AlterColumnType:		/* ALTER COLUMN TYPE */
+			// disable alter grammar for magma
+			if (RelationIsMagmaTable2(relationOid))
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+						 errmsg("ALTER TABLE ... ALTER COLUMN TYPE is not supported for magma")));
+			}
 			ATSimplePermissions(rel, false);
 			ATPartitionCheck(cmd->subtype, rel, false, recursing);
 			/* Performs own recursion */
@@ -6635,6 +7001,146 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 			}
 			pfree(proj);
 		}
+		else if(relstorage == RELSTORAGE_ORC && Gp_role != GP_ROLE_DISPATCH)
+		{
+      int segno = list_nth_int(tab->ao_segnos, GetQEIndex());
+      OrcInsertDescData *idesc = NULL;
+      OrcScanDescData *sdesc = NULL;
+      int nvp = oldrel->rd_att->natts;
+      bool *proj = palloc0(sizeof(bool) * nvp);
+      /*
+       * We use the old tuple descriptor instead of oldrel's tuple descriptor,
+       * which may already contain altered column.
+       */
+      if (oldTupDesc)
+      {
+        Assert(oldTupDesc->natts <= nvp);
+        memset(proj, true, oldTupDesc->natts);
+      }
+      else
+        memset(proj, true, nvp);
+
+      if(newrel)
+      {
+        ResultRelSegFileInfo *segfileinfo = InitResultRelSegFileInfo(segno, RELSTORAGE_PARQUET, 1);
+        idesc = orcBeginInsert(newrel, segfileinfo);
+      }
+
+      List *splits = GetFileSplitsOfSegment(tab->scantable_splits,
+                            oldrel->rd_id, GetQEIndex());
+      sdesc = orcBeginRead(oldrel, SnapshotNow, oldTupDesc, splits, proj, NULL);
+      orcReadNext(sdesc, oldslot);
+
+      while(!TupIsNull(oldslot))
+      {
+        oldCxt = MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
+        econtext->ecxt_scantuple = oldslot;
+
+        if(newrel)
+        {
+          Datum *slotvalues = slot_get_values(oldslot);
+          bool  *slotnulls = slot_get_isnull(oldslot);
+          Datum *newslotvalues = slot_get_values(newslot);
+          bool *newslotnulls = slot_get_isnull(newslot);
+
+          int nv = Min(oldslot->tts_tupleDescriptor->natts, newslot->tts_tupleDescriptor->natts);
+
+          /* aocs does not do oid yet */
+          Assert(!oldTupDesc->tdhasoid);
+          Assert(!newTupDesc->tdhasoid);
+
+          /* Dropped att should be set correctly by aocs_getnext */
+          /* transfer values from old to new slot */
+
+          memcpy(newslotvalues, slotvalues, sizeof(Datum) * nv);
+          memcpy(newslotnulls, slotnulls, sizeof(bool) * nv);
+          TupSetVirtualTupleNValid(newslot, nv);
+
+          /* Process supplied expressions */
+          foreach(l, tab->newvals)
+          {
+            NewColumnValue *ex = lfirst(l);
+
+            newslotvalues[ex->attnum-1] =
+              ExecEvalExpr(ex->exprstate,
+                     econtext,
+                     &newslotnulls[ex->attnum-1],
+                     NULL
+                );
+
+            if (ex->attnum > nv)
+              TupSetVirtualTupleNValid(newslot, ex->attnum);
+          }
+
+          /* Use the modified tuple to check constraints below */
+          econtext->ecxt_scantuple = newslot;
+        }
+
+        /* Check constraints */
+        foreach (l, tab->constraints)
+        {
+          NewConstraint *con = lfirst(l);
+          switch(con->contype)
+          {
+            case CONSTR_CHECK:
+              if(!ExecQual(con->qualstate, econtext, true))
+                ereport(ERROR,
+                    (errcode(ERRCODE_CHECK_VIOLATION),
+                     errmsg("check constraint \"%s\" is violated",
+                        con->name
+                       ),
+                     errOmitLocation(true)));
+              break;
+            case CONSTR_FOREIGN:
+              /* Nothing to do */
+              break;
+            default:
+              elog(ERROR, "Unrecognized constraint type: %d",
+                 (int) con->contype);
+          }
+        }
+
+        if(newrel)
+        {
+          MemoryContextSwitchTo(oldCxt);
+          orcInsert(idesc, newslot);
+        }
+
+        ResetExprContext(econtext);
+        CHECK_FOR_INTERRUPTS();
+
+        MemoryContextSwitchTo(oldCxt);
+        orcReadNext(sdesc, oldslot);
+      }
+
+      orcEndRead(sdesc);
+
+      if(newrel)
+      {
+        StringInfo buf = NULL;
+        QueryContextDispatchingSendBack sendback = NULL;
+
+        if (Gp_role == GP_ROLE_EXECUTE)
+          buf = PreSendbackChangedCatalog(1);
+
+        sendback = CreateQueryContextDispatchingSendBack(
+            idesc->rel->rd_att->natts);
+
+        idesc->sendback = sendback;
+        sendback->relid = RelationGetRelid(idesc->rel);
+
+        orcEndInsert(idesc);
+
+        if (Gp_role == GP_ROLE_EXECUTE)
+          AddSendbackChangedCatalogContent(buf, sendback);
+
+        DropQueryContextDispatchingSendBack(sendback);
+
+        if (Gp_role == GP_ROLE_EXECUTE)
+          FinishSendbackChangedCatalog(buf);
+      }
+      pfree(proj);
+		}
 		else if(relstorage_is_ao(relstorage) && Gp_role == GP_ROLE_DISPATCH)
 		{
 			/*
@@ -6721,7 +7227,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
      */
     if (newrel)
     {
-      CreateAppendOnlyParquetSegFileForRelationOnMaster(newrel, segment_segnos);
+      CreateAoSegFileForRelationOnMaster(newrel, segment_segnos);
     }
 
 		/* prepare for the metadata dispatch */
@@ -6738,7 +7244,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 		prepareDispatchedCatalogRelation(contextdisp,
 										 tab->relid,
 										 false,
-										 NULL);
+										 NULL, true);
 		ar_tab->scantable_splits = AssignAOSegFileSplitToSegment(tab->relid, NIL,
 		                    target_segment_num, ar_tab->scantable_splits);
 		/*
@@ -6753,7 +7259,7 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
 
 		ar_tab->newheap_oid = OIDNewHeap;
 
-    dispatch_statement_node((Node *) ar_tab, contextdisp, resource, &result);
+		mainDispatchStmtNode((Node *) ar_tab, contextdisp, resource, &result);
     cdbdisp_iterate_results_sendback(result.result, result.numresults,
                 UpdateCatalogModifiedOnSegments);
     dispatch_free_result(&result);
@@ -7221,7 +7727,7 @@ ATExecAddColumn(AlteredTableInfo *tab, Relation rel,
 	 * specified. 
  	*/
 	 
-	if ((RelationIsAoRows(rel) || RelationIsParquet(rel)) &&
+	if (RelationIsAo(rel) &&
 		(!colDef->default_is_null && !colDef->raw_default))
 	{
 		ereport(ERROR,
@@ -10502,7 +11008,7 @@ ATExecChangeOwner(Oid relationOid, Oid newOwnerId, bool recursing)
 				ATExecChangeOwner(tuple_class->reltoastrelid, newOwnerId,
 								  true);
 
-			if(RelationIsAoRows(target_rel) || RelationIsParquet(target_rel))
+			if(RelationIsAo(target_rel))
 			{
 				Oid segrelid, blkdirrelid;
 				GetAppendOnlyEntryAuxOids(relationOid, SnapshotNow,
@@ -10830,7 +11336,7 @@ ATExecSetRelOptions(Relation rel, List *defList, bool isReset)
 		case RELKIND_TOASTVALUE:
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
-			if(RelationIsAoRows(rel) || RelationIsParquet(rel))
+			if(RelationIsAo(rel))
 				ereport(ERROR,
 						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
 						 errmsg("altering reloptions for append only tables"
@@ -11459,7 +11965,7 @@ ATExecSetTableSpace_Relation(Oid tableOid, Oid newTableSpace, Oid newrelfilenode
 
 	heap_freetuple(tuple);
 
-	if (RelationIsAoRows(rel) || RelationIsParquet(rel))
+	if (RelationIsAo(rel))
 		ATExecSetTableSpace_AppendOnly(
 								tableOid,
 								rel, 
@@ -12486,8 +12992,7 @@ build_ctas_with_dist(Relation rel, List *dist_clause,
 
 	pre_built = prebuild_temp_table(rel, tmprel, dist_clause,
 									storage_opts, hidden_types,
-									(RelationIsAoRows(rel) ||
-									 RelationIsParquet(rel)));
+									RelationIsAo(rel));
 	if (pre_built)
 	{
 		InsertStmt *i = makeNode(InsertStmt);
@@ -15598,12 +16103,15 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 	HeapScanDesc heapscan = NULL;
 	AppendOnlyScanDesc aoscan = NULL;
   ParquetScanDesc parquetscan = NULL;
+  OrcScanDescData *orcScan = NULL;
   bool *aocsproj = NULL;
 	MemoryContext oldCxt;
 	AppendOnlyInsertDesc aoinsertdesc_a = NULL;
 	AppendOnlyInsertDesc aoinsertdesc_b = NULL;
   ParquetInsertDesc parquetinsertdesc_a = NULL;
   ParquetInsertDesc parquetinsertdesc_b = NULL;
+  OrcInsertDescData *orcInsertDescA = NULL;
+  OrcInsertDescData *orcInsertDescB = NULL;
 	ExprState *achk = NULL;
 	ExprState *bchk = NULL;
 
@@ -15661,6 +16169,14 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 		parquetscan = parquet_beginscan(temprel, SnapshotNow, NULL /* relationTupleDesc */, aocsproj);
 		parquetscan->splits = splits;
 	}
+	else if (RelationIsOrc(temprel))
+	{
+	  int natts = temprel->rd_att->natts;
+    aocsproj = (bool *) palloc(sizeof(bool) * natts);
+    for(int i=0; i<natts; ++i)
+      aocsproj[i] = true;
+    orcScan = orcBeginRead(temprel, SnapshotNow, NULL, splits, aocsproj, NULL);
+	}
 	else
 	{
 		Assert(false);
@@ -15675,6 +16191,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 		Relation targetRelation;
 		AppendOnlyInsertDesc *targetAODescPtr;
 		ParquetInsertDesc *targetParquetDescPtr;
+		OrcInsertDescData **targetOrcDescPtr;
 		TupleTableSlot	   *targetSlot;
 		ItemPointer			tid;
 		ResultRelInfo	   *targetRelInfo = NULL;
@@ -15707,6 +16224,11 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 			if (TupIsNull(slotT))
 				break;
 		}
+		else if (RelationIsOrc(temprel)) {
+		  orcReadNext(orcScan, slotT);
+      if (TupIsNull(slotT))
+        break;
+		}
 
 		/* prepare for ExecQual */
 		econtext->ecxt_scantuple = slotT;
@@ -15729,6 +16251,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 			targetRelation = intoa;
 			targetAODescPtr = &aoinsertdesc_a;
 			targetParquetDescPtr = &parquetinsertdesc_a;
+			targetOrcDescPtr = &orcInsertDescA;
 			targetRelInfo = rria;
 		}
 		else
@@ -15736,6 +16259,7 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 			targetRelation = intob;
 			targetAODescPtr = &aoinsertdesc_b;
 			targetParquetDescPtr = &parquetinsertdesc_b;
+			targetOrcDescPtr = &orcInsertDescB;
 			targetRelInfo = rrib;
 		}
 
@@ -15793,6 +16317,23 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 			/* cache TID for later updating of indexes */
 			tid = slot_get_ctid(targetSlot);
 		}
+		else if (RelationIsOrc(targetRelation))
+		{
+		  if (!*targetOrcDescPtr)
+      {
+        ResultRelSegFileInfo *segfileinfo = NULL;
+        MemoryContextSwitchTo(oldCxt);
+        segfileinfo = InitResultRelSegFileInfo(segno, RELSTORAGE_ORC, 1);
+        *targetOrcDescPtr = orcBeginInsert(targetRelation,
+                            segfileinfo);
+        MemoryContextSwitchTo(GetPerTupleMemoryContext(estate));
+      }
+
+		  orcInsert(*targetOrcDescPtr, targetSlot);
+
+      /* cache TID for later updating of indexes */
+      tid = slot_get_ctid(targetSlot);
+		}
 		else
 		{
 			Assert(false);
@@ -15825,6 +16366,10 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 		++aocount;
 	if (parquetinsertdesc_b)
 		++aocount;
+	if (orcInsertDescA)
+    ++aocount;
+  if (orcInsertDescB)
+    ++aocount;
 
 	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
 		buf = PreSendbackChangedCatalog(aocount);
@@ -15882,6 +16427,33 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 		DropQueryContextDispatchingSendBack(sendback);
 	}
 
+	if (orcInsertDescA)
+  {
+    sendback = CreateQueryContextDispatchingSendBack(1);
+    orcInsertDescA->sendback = sendback;
+    sendback->relid = RelationGetRelid(orcInsertDescA->rel);
+
+    orcEndInsert(orcInsertDescA);
+
+    if (Gp_role == GP_ROLE_EXECUTE)
+      AddSendbackChangedCatalogContent(buf, sendback);
+
+    DropQueryContextDispatchingSendBack(sendback);
+  }
+  if (orcInsertDescB)
+  {
+    sendback = CreateQueryContextDispatchingSendBack(1);
+    orcInsertDescB->sendback = sendback;
+    sendback->relid = RelationGetRelid(orcInsertDescB->rel);
+
+    orcEndInsert(orcInsertDescB);
+
+    if (Gp_role == GP_ROLE_EXECUTE)
+      AddSendbackChangedCatalogContent(buf, sendback);
+
+    DropQueryContextDispatchingSendBack(sendback);
+  }
+
 	if (Gp_role == GP_ROLE_EXECUTE && aocount > 0)
 		FinishSendbackChangedCatalog(buf);
 
@@ -15916,6 +16488,10 @@ split_rows(Relation intoa, Relation intob, Relation temprel, List *splits, int s
 	else if(RelationIsParquet(temprel)){
 		pfree(aocsproj);
 		parquet_endscan(parquetscan);
+	}
+	else if (RelationIsOrc(temprel)) {
+	  pfree(aocsproj);
+	  orcEndRead(orcScan);
 	}
 
 	destroy_split_resultrel(rria);
@@ -16049,8 +16625,7 @@ make_orientation_options(Relation rel)
 {
 	List *l = NIL;
 
-	if (RelationIsAoRows(rel) ||
-		RelationIsParquet(rel) )
+	if (RelationIsAo(rel))
 	{
 		l = lappend(l, makeDefElem("appendonly", (Node *)makeString("true")));
 
@@ -16058,6 +16633,9 @@ make_orientation_options(Relation rel)
 		{
 			l = lappend(l, makeDefElem("orientation",
 									   (Node *)makeString("parquet")));
+		} else if (RelationIsOrc(rel)) {
+		  l = lappend(l, makeDefElem("orientation",
+		                 (Node *)makeString("orc")));
 		}
 	}
 	return l;
@@ -16343,6 +16921,8 @@ ATPExecPartSplit(Relation rel,
 		ct->base.relKind = RELKIND_RELATION;
 		ct->ownerid = rel->rd_rel->relowner;
 		ct->is_split_part = true;
+		if (!ct->base.options) ct->base.options = existstorage_opts;
+
 		parsetrees = parse_analyze((Node *)ct, NULL, NULL, 0);
 
 		q = (Query *)linitial(parsetrees);
@@ -16564,7 +17144,7 @@ ATPExecPartSplit(Relation rel,
 			if (colencs)
 				mycs->base.tableElts = list_copy(colencs);
 
-			mycs->base.options = orient;
+			mycs->base.options = existstorage_opts;
 
 			mypid->idtype = AT_AP_IDNone;
 			mypid->location = -1;
@@ -16933,7 +17513,7 @@ ATPExecPartSplit(Relation rel,
 	{
     List *split = NIL;
     int segno = 0;
-    if (RelationIsAoRows(temprel) || RelationIsParquet(temprel))
+    if (RelationIsAo(temprel))
     {
       split = GetFileSplitsOfSegment(pc->scantable_splits,
             temprel->rd_id, GetQEIndex());
@@ -16976,8 +17556,9 @@ ATPExecPartSplit(Relation rel,
       Assert(targetPolicy);
       if (target_segment_num != targetPolicy->bucketnum)
       {
+      	int bucketNum = targetPolicy->bucketnum;
         pfree(targetPolicy);
-        elog(ERROR, "target segment num %d IS NOT equal to the bucket number of this relation %d", target_segment_num, targetPolicy->bucketnum);
+        elog(ERROR, "target segment num %d IS NOT equal to the bucket number of this relation %d", target_segment_num, bucketNum);
       }
       pfree(targetPolicy);
 
@@ -16985,8 +17566,9 @@ ATPExecPartSplit(Relation rel,
       Assert(targetPolicy);
       if (target_segment_num != targetPolicy->bucketnum)
       {
+      	int bucketNum = targetPolicy->bucketnum;
         pfree(targetPolicy);
-        elog(ERROR, "target segment num %d IS NOT equal to the bucket number of this relation %d", target_segment_num, targetPolicy->bucketnum);
+        elog(ERROR, "target segment num %d IS NOT equal to the bucket number of this relation %d", target_segment_num, bucketNum);
       }
       pfree(targetPolicy);
 
@@ -16999,9 +17581,9 @@ ATPExecPartSplit(Relation rel,
     scantable_splits = NIL;
 
 		/* create the segfiles for the new relations here */
-		CreateAppendOnlyParquetSegFileForRelationOnMaster(intoa, segment_segnos);
+    CreateAoSegFileForRelationOnMaster(intoa, segment_segnos);
 
-		CreateAppendOnlyParquetSegFileForRelationOnMaster(intob, segment_segnos);
+    CreateAoSegFileForRelationOnMaster(intob, segment_segnos);
 
 		/* prepare for the metadata dispatch */	
 		contextdisp = CreateQueryContextInfo();
@@ -17019,7 +17601,7 @@ ATPExecPartSplit(Relation rel,
 		prepareDispatchedCatalogRelation(contextdisp,
 							(Oid)intVal((Value *)pc->partid), 
 							false,
-							NULL);
+							NULL, true);
 
     /*
      * Dispatch split-related metadata.
@@ -17031,7 +17613,7 @@ ATPExecPartSplit(Relation rel,
     pc->newpart_aosegnos = segment_segnos;
 
     FinalizeQueryContextInfo(contextdisp);
-    dispatch_statement_node((Node *) pc, contextdisp, resource, &result);
+    mainDispatchStmtNode((Node *) pc, contextdisp, resource, &result);
     cdbdisp_iterate_results_sendback(result.result, result.numresults,
                 UpdateCatalogModifiedOnSegments);
     dispatch_free_result(&result);
@@ -17719,7 +18301,6 @@ AtEOSubXact_on_commit_actions(bool isCommit, SubTransactionId mySubid,
 	}
 }
 
-
 /*
  * Transform the URI string list into a text array (the form that is
  * used in the catalog table pg_exttable). While at it we validate
@@ -17801,6 +18382,14 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 	        errOmitLocation(true)));
 		}
 
+		// Oushu will not support pxf anymore
+		if (is_pxf_protocol(uri))
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+					errmsg("the pxf protocol for external tables is deprecated"),
+					errOmitLocation(true)));
+		}
 
 		/* no port was specified for gpfdist, gpfdists or hdfs. add the default */
 		if ((uri->protocol == URI_GPFDIST || uri->protocol == URI_GPFDISTS) && uri->port == -1)
@@ -17861,6 +18450,31 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 			}
 		}
 
+		if (first_uri && uri->protocol == URI_HIVE)
+		{
+			Oid   procOid = InvalidOid;
+			procOid = LookupCustomProtocolValidatorFunc("hive");
+			if (OidIsValid(procOid) && Gp_role == GP_ROLE_DISPATCH)
+			{
+				InvokeProtocolValidation(procOid,
+										uri->customprotocol,
+										iswritable, forceCreateDir,
+										locs, fmtopts);
+			}
+		}
+
+		if (first_uri && uri->protocol == URI_MAGMA)
+		{
+			Oid procOid = LookupCustomProtocolValidatorFunc("magma");
+			if (OidIsValid(procOid) && Gp_role == GP_ROLE_DISPATCH)
+			{
+				InvokeProtocolValidation(procOid,
+										 uri->customprotocol,
+										 iswritable, forceCreateDir,
+										 locs, fmtopts);
+			}
+		}
+
 		if(first_uri)
 		{
 		    first_protocol = uri->protocol;
@@ -17902,7 +18516,7 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 					 errhint("Writable external tables may use \'gpfdist(s)\' URIs only."),
 							   errOmitLocation(true)));
 
-		if(uri->protocol != URI_CUSTOM && iswritable && strchr(uri->path, '*'))
+		if(uri->protocol != URI_CUSTOM && uri->protocol != URI_MAGMA && iswritable && strchr(uri->path, '*'))
 			ereport(ERROR,
 					(errcode(ERRCODE_SYNTAX_ERROR),
 					errmsg("Unsupported use of wildcard in a writable external web table definition: "
@@ -18125,28 +18739,34 @@ static Datum transformExecOnClause(List	*on_clause, int *preferred_segment_num, 
 /*
  * transform format name to format code and validate that
  * the format is supported. Currently the only supported formats
- * are "text" (type 't') ,"csv" (type 'c') and "custom" (type 'b')
+ * are
+ *
+ * 1) built-in formats including "text" (type 't') ,"csv" (type 'c')
+ * 2) plugable formats (type 'b'), i.e., "orc"
  */
 static char transformFormatType(char *formatname)
 {
-	char	result = '\0';
+	char result = NonCustomFormatType;
 
 	if(pg_strcasecmp(formatname, "text") == 0)
+	{
 		result = 't';
+	}
 	else if(pg_strcasecmp(formatname, "csv") == 0)
+	{
 		result = 'c';
-	else if(pg_strcasecmp(formatname, "custom") == 0)
-		result = 'b';
+	}
 	else
+	{
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR),
-				 errmsg("unsupported format '%s'", formatname),
-				 errhint("available formats are \"text\", \"csv\", or \"custom\""),
-						   errOmitLocation(true)));
+			    (errcode(ERRCODE_SYNTAX_ERROR),
+			    errmsg("unsupported format '%s'", formatname),
+			    errhint("available formats are \"text\", \"csv\""),
+			    errOmitLocation(true)));
+	}
 
 	return result;
 }
-
 
 /*
  * Check if values for options of custom external table are valid
@@ -18198,6 +18818,7 @@ static void checkCustomFormatOptString(char **opt,
 		        errOmitLocation(true)));
 	}
 }
+
 /*
  * Check if given encoding for custom external table is supported.
  *
@@ -18224,6 +18845,7 @@ static void checkCustomFormatEncoding(const char *formatterName,
  */
 static char *checkCustomFormatOptions(const char *formattername,
                                      List *formatOpts,
+                                     TupleDesc tupDesc,
                                      const bool isWritable,
                                      const char *delimiter)
 {
@@ -18313,12 +18935,13 @@ static char *checkCustomFormatOptions(const char *formattername,
 		if (OidIsValid(procOid))
 		{
 			InvokePlugStorageValidationFormatOptions(procOid, formatOpts,
-			                                         format_str, isWritable);
+			                                         format_str, tupDesc, isWritable);
 		}
 	}
 
 	return format_str;
 }
+
 /*
  * Check if the data types for custom external table are valid
  *
@@ -18349,7 +18972,7 @@ static void checkCustomFormatDateTypes(const char *formatterName,
  *
  * The result is a text field that includes the format string.
  */
-static Datum transformFormatOpts(char formattype, char *formatname, char *formattername, List *formatOpts, int numcols, bool iswritable, GpPolicy *policy)
+static Datum transformFormatOpts(char formattype, char *formatname, char *formattername, List *formatOpts, TupleDesc tupDesc, int numcols, bool iswritable, GpPolicy *policy)
 {
 	ListCell   *option;
 	Datum		result;
@@ -18371,7 +18994,9 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 
 	Assert(fmttype_is_custom(formattype) || 
 		   fmttype_is_text(formattype) ||
-		   fmttype_is_csv(formattype));
+		   fmttype_is_csv(formattype) ||
+		   fmttype_is_parquet(formattype) ||
+		   fmttype_is_orc(formattype));
 	
 	/* Extract options from the statement node tree */
 	if (fmttype_is_text(formattype) || fmttype_is_csv(formattype))
@@ -18380,7 +19005,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 		{
 			DefElem    *defel = (DefElem *)lfirst(option);
 
-			if (strcmp(defel->defname, "delimiter") == 0 || strcmp(defel->defname, "delimiter_as") == 0 )
+			if (strcmp(defel->defname, "delimiter") == 0)
 			{
 				if (delim)
 					ereport(ERROR,
@@ -18389,7 +19014,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				delim = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "null") == 0 || strcmp(defel->defname, "null_as") == 0)
+			else if (strcmp(defel->defname, "null") == 0)
 			{
 				if (null_print)
 					ereport(ERROR,
@@ -18398,7 +19023,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				null_print = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "header") == 0 || strcmp(defel->defname, "header_as") == 0)
+			else if (strcmp(defel->defname, "header") == 0)
 			{
 				if (header_line)
 					ereport(ERROR,
@@ -18407,7 +19032,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				header_line = intVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "quote") == 0 || strcmp(defel->defname, "quote_as") == 0)
+			else if (strcmp(defel->defname, "quote") == 0)
 			{
 				if (quote)
 					ereport(ERROR,
@@ -18416,7 +19041,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				quote = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "escape") == 0 || strcmp(defel->defname, "escape_as") == 0)
+			else if (strcmp(defel->defname, "escape") == 0)
 			{
 				if (escape)
 					ereport(ERROR,
@@ -18425,7 +19050,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				escape = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "force_notnull") == 0 || strcmp(defel->defname, "force_notnull_as") == 0)
+			else if (strcmp(defel->defname, "force_notnull") == 0)
 			{
 				if (force_notnull)
 					ereport(ERROR,
@@ -18435,7 +19060,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 					
 				force_notnull = (List *) defel->arg;
 			}
-			else if (strcmp(defel->defname, "force_quote") == 0 || strcmp(defel->defname, "force_quote_as") == 0)
+			else if (strcmp(defel->defname, "force_quote") == 0)
 			{
 				if (force_quote)
 					ereport(ERROR,
@@ -18445,7 +19070,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 					
 				force_quote = (List *) defel->arg;
 			}
-			else if (strcmp(defel->defname, "fill_missing_fields") == 0 || strcmp(defel->defname, "fill_missing_fields_as") == 0)
+			else if (strcmp(defel->defname, "fill_missing_fields") == 0)
 			{
 				if (fill_missing)
 					ereport(ERROR,
@@ -18454,7 +19079,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				fill_missing = intVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "newline") == 0 || strcmp(defel->defname, "newline_as") == 0)
+			else if (strcmp(defel->defname, "newline") == 0)
 			{
 				if (eol_str)
 					ereport(ERROR,
@@ -18463,7 +19088,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 									   errOmitLocation(true)));
 				eol_str = strVal(defel->arg);
 			}
-			else if (strcmp(defel->defname, "formatter") == 0 || strcmp(defel->defname, "formatter_as") == 0)
+			else if (strcmp(defel->defname, "formatter") == 0)
 			{
 				ereport(ERROR,
 						(errcode(ERRCODE_SYNTAX_ERROR),
@@ -18606,7 +19231,7 @@ static Datum transformFormatOpts(char formattype, char *formatname, char *format
 	else
 	{
 		/* custom/parquet/orc format */
-		format_str = checkCustomFormatOptions(formattername, formatOpts, iswritable, delim);
+		format_str = checkCustomFormatOptions(formattername, formatOpts, tupDesc, iswritable, delim);
 
 		/* set default hash key */
 		ListCell *opt;
@@ -18866,4 +19491,677 @@ InvokeProtocolValidation(Oid procOid, char *procName, bool iswritable, bool forc
 
 	pfree(validator_data);
 	pfree(validator_udf);
+}
+
+Oid LookupMagmaFunc(char *formatter,
+                    char *func)
+{
+	List*	funcname	= NIL;
+	Oid		procOid		= InvalidOid;
+	Oid		argList[1];
+	Oid		returnOid;
+
+	elog(DEBUG3, "find magma function for %s_%s", formatter, func);
+
+	char *new_func_name = (char *)palloc0(strlen(formatter)+strlen(func) + 2);
+	sprintf(new_func_name, "%s_%s", formatter, func);
+	funcname = lappend(funcname, makeString(new_func_name));
+	returnOid = VOIDOID;
+	procOid = LookupFuncName(funcname, 0, argList, true);
+
+	pfree(new_func_name);
+
+	return procOid;
+}
+
+static void InvokeMagmaCreateTable(FmgrInfo *func,
+                                   char *dbname,
+                                   char *schemaname,
+                                   char *tablename,
+                                   MagmaSnapshot *snapshot,
+                                   List *tableelements,
+                                   IndexStmt *primarykey,
+                                   List *distributedkey,
+                                   char *formatter_name,
+                                   bool isexternal,
+                                   List *locations)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_db_name = dbname;
+	psdata.ps_schema_name = schemaname;
+	psdata.ps_table_name = tablename;
+
+	psdata.ps_snapshot.currentTransaction.txnId = 0;
+	psdata.ps_snapshot.currentTransaction.txnStatus = NULL;
+	psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+	psdata.ps_snapshot.txnActions.txnActions = NULL;
+	psdata.ps_snapshot.txnActions.txnActionSize = 0;
+	if (snapshot != NULL)
+	{
+    // save current transaction in snapshot
+    psdata.ps_snapshot.currentTransaction.txnId =
+        snapshot->currentTransaction.txnId;
+    psdata.ps_snapshot.currentTransaction.txnStatus =
+        snapshot->currentTransaction.txnStatus;
+    psdata.ps_snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+    // allocate txnActions
+    psdata.ps_snapshot.txnActions.txnActionStartOffset =
+        snapshot->txnActions.txnActionStartOffset;
+    psdata.ps_snapshot.txnActions.txnActions = (MagmaTxnAction *)palloc0(
+        sizeof(MagmaTxnAction) * snapshot->txnActions.txnActionSize);
+
+    // save txnActions
+    psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions.txnActionSize;
+    for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+    {
+      psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+          snapshot->txnActions.txnActions[i].txnId;
+      psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+          snapshot->txnActions.txnActions[i].txnStatus;
+    }
+  }
+
+	psdata.ps_table_elements = tableelements;
+	psdata.ps_primary_key = primarykey;
+	psdata.ps_distributed_key = distributedkey;
+	psdata.ps_is_external = isexternal;
+	psdata.ps_ext_locations = locations;
+	psdata.ps_formatter_name = formatter_name;
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return;
+}
+
+/* Interfaces for magma index ddl */
+void InvokeMagmaCreateIndex(FmgrInfo *func,
+                            char *dbname,
+                            char *schemaname,
+                            char *tablename,
+                            MagmaIndexInfo *index,
+                            MagmaSnapshot *snapshot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_db_name = dbname;
+	psdata.ps_schema_name = schemaname;
+	psdata.ps_table_name = tablename;
+
+	psdata.magma_idx.indexName = index->indexName;
+	psdata.magma_idx.indexType = index->indexType;
+	psdata.magma_idx.primary = index->primary;
+	psdata.magma_idx.unique = index->unique;
+	int idxCount = index->indkey->dim1;
+	psdata.magma_idx.colCount = idxCount;
+	psdata.magma_idx.indkey = (int*)palloc0(idxCount * sizeof(int));
+	for (int i = 0; i < idxCount; ++i)
+	{
+		psdata.magma_idx.indkey[i] = index->indkey->values[i];
+	}
+
+	psdata.ps_snapshot.currentTransaction.txnId = 0;
+	psdata.ps_snapshot.currentTransaction.txnStatus = NULL;
+	psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+	psdata.ps_snapshot.txnActions.txnActions = NULL;
+	psdata.ps_snapshot.txnActions.txnActionSize = 0;
+	if (snapshot != NULL)
+	{
+		// save current transaction in snapshot
+		psdata.ps_snapshot.currentTransaction.txnId =
+				snapshot->currentTransaction.txnId;
+		psdata.ps_snapshot.currentTransaction.txnStatus =
+				snapshot->currentTransaction.txnStatus;
+		psdata.ps_snapshot.cmdIdInTransaction = GetCurrentCommandId();
+		// allocate txnActions
+		psdata.ps_snapshot.txnActions.txnActionStartOffset =
+				snapshot->txnActions.txnActionStartOffset;
+		psdata.ps_snapshot.txnActions.txnActions =
+				(MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->
+				                          txnActions.txnActionSize);
+
+		// save txnActions
+		psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions.txnActionSize;
+		for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+		{
+			psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+					snapshot->txnActions.txnActions[i].txnId;
+			psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+					snapshot->txnActions.txnActions[i].txnStatus;
+		}
+	}
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+	pfree(psdata.magma_idx.indkey);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return;
+}
+
+void InvokeMagmaDropIndex(FmgrInfo *func,
+                          char *dbname,
+                          char *schemaname,
+                          char *tablename,
+                          char *indexname,
+                          MagmaSnapshot *snapshot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_db_name = dbname;
+	psdata.ps_schema_name = schemaname;
+	psdata.ps_table_name = tablename;
+	psdata.magma_idx.indexName = indexname;
+
+	psdata.ps_snapshot.currentTransaction.txnId = 0;
+	psdata.ps_snapshot.currentTransaction.txnStatus = 0;
+	psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+	psdata.ps_snapshot.txnActions.txnActions = NULL;
+	psdata.ps_snapshot.txnActions.txnActionSize = 0;
+	if (snapshot != NULL)
+	{
+		// save current transaction in snapshot
+		psdata.ps_snapshot.currentTransaction.txnId =
+				snapshot->currentTransaction.txnId;
+		psdata.ps_snapshot.currentTransaction.txnStatus =
+				snapshot->currentTransaction.txnStatus;
+		psdata.ps_snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+		// allocate txnActions
+		psdata.ps_snapshot.txnActions.txnActionStartOffset =
+				snapshot->txnActions.txnActionStartOffset;
+		psdata.ps_snapshot.txnActions.txnActions =
+				(MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+				                          .txnActionSize);
+
+		// save txnActionsp
+		psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions
+		    .txnActionSize;
+		for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+		{
+			psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+					snapshot->txnActions.txnActions[i].txnId;
+			psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+					snapshot->txnActions.txnActions[i].txnStatus;
+		}
+	}
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+	return;
+}
+
+void InvokeMagmaReindexIndex(FmgrInfo *func,
+                             char *dbname,
+                             char *schemaname,
+                             char *tablename,
+                             char *indexname,
+                             MagmaSnapshot *snapshot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_db_name = dbname;
+	psdata.ps_schema_name = schemaname;
+	psdata.ps_table_name = tablename;
+	psdata.magma_idx.indexName = indexname;
+
+	psdata.ps_snapshot.currentTransaction.txnId = 0;
+	psdata.ps_snapshot.currentTransaction.txnStatus = 0;
+	psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+	psdata.ps_snapshot.txnActions.txnActions = NULL;
+	psdata.ps_snapshot.txnActions.txnActionSize = 0;
+	if (snapshot != NULL)
+	{
+		// save current transaction in snapshot
+		psdata.ps_snapshot.currentTransaction.txnId =
+				snapshot->currentTransaction.txnId;
+		psdata.ps_snapshot.currentTransaction.txnStatus =
+				snapshot->currentTransaction.txnStatus;
+		psdata.ps_snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+		// allocate txnActions
+		psdata.ps_snapshot.txnActions.txnActionStartOffset =
+				snapshot->txnActions.txnActionStartOffset;
+		psdata.ps_snapshot.txnActions.txnActions =
+				(MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->
+				                          txnActions.txnActionSize);
+
+		// save txnActionsp
+		psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions.txnActionSize;
+		for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+		{
+			psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+					snapshot->txnActions.txnActions[i].txnId;
+			psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+					snapshot->txnActions.txnActions[i].txnStatus;
+		}
+	}
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+	return;
+}
+
+void InvokeMagmaDropTable(FmgrInfo *func,
+                          ExtTableEntry *exttable,
+                          char *dbname,
+                          char *schemaname,
+                          char *tablename,
+						              MagmaSnapshot *snapshot)
+{
+	PlugStorageData psdata;
+	FunctionCallInfoData fcinfo;
+
+	psdata.type = T_PlugStorageData;
+	psdata.ps_db_name = dbname;
+	psdata.ps_schema_name = schemaname;
+	psdata.ps_table_name = tablename;
+	psdata.ps_exttable = exttable;
+
+    psdata.ps_snapshot.currentTransaction.txnId = 0;
+    psdata.ps_snapshot.currentTransaction.txnStatus = 0;
+    psdata.ps_snapshot.txnActions.txnActionStartOffset = 0;
+    psdata.ps_snapshot.txnActions.txnActions = NULL;
+    psdata.ps_snapshot.txnActions.txnActionSize = 0;
+    if (snapshot != NULL)
+    {
+        // save current transaction in snapshot
+        psdata.ps_snapshot.currentTransaction.txnId =
+            snapshot->currentTransaction.txnId;
+        psdata.ps_snapshot.currentTransaction.txnStatus =
+            snapshot->currentTransaction.txnStatus;
+        psdata.ps_snapshot.cmdIdInTransaction = GetCurrentCommandId();
+
+        // allocate txnActions
+        psdata.ps_snapshot.txnActions.txnActionStartOffset =
+            snapshot->txnActions.txnActionStartOffset;
+        psdata.ps_snapshot.txnActions.txnActions =
+            (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->
+                                      txnActions.txnActionSize);
+
+        // save txnActions
+        psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions.
+            txnActionSize;
+        for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+        {
+            psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+                snapshot->txnActions.txnActions[i].txnId;
+            psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+                snapshot->txnActions.txnActions[i].txnStatus;
+        }
+    }
+
+	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
+	                         func,    // FmgrInfo
+	                         0,       // nArgs
+	                         (Node *)(&psdata), // Call Context
+	                         NULL);             // ResultSetInfo
+
+	// Invoke function
+	FunctionCallInvoke(&fcinfo);
+
+	// Free snapshot memory
+	pfree(psdata.ps_snapshot.txnActions.txnActions);
+
+	// We do not expect a null result
+	if (fcinfo.isnull)
+	{
+		elog(ERROR, "function %u returned NULL", fcinfo.flinfo->fn_oid);
+	}
+
+	return;
+}
+
+/*
+ * Simple implementation of converting external table format option string to json sting.
+ *
+ * Currently support orc, need to extend for text/csv.
+ */
+void buildExternalTableFormatOptionStringInJson(const char *fmtOptsStr,
+                                                char **fmtOptsJson)
+{
+	*fmtOptsJson = NULL;
+	struct json_object *optJsonObj = json_object_new_object();
+
+	/* search key value pair and convert to json string */
+	char *key_start = NULL;
+	char *key_end = NULL;
+	char *val_start = NULL;
+	char *val_end = NULL;
+	char key_tmp = '\0';
+	char val_tmp = '\0';
+	char *p = NULL;
+	char c = '\0';
+
+	enum states {S_NULL, S_KEY, S_VALUE} state = S_NULL;
+
+	for (p = fmtOptsStr; *p != '\0'; p++)
+	{
+		c = *p;
+
+		switch (state)
+		{
+			/* not in a key, not in a single quoted value */
+			case S_NULL:
+				if (isspace(c))
+				{
+					/* skip current char as it is still not in a key or value */
+					continue;
+				}
+				else if (c == '\'')
+				{
+					/* start a value if it is a single quote we go to value */
+					state = S_VALUE;
+					val_start = p + 1; /* value start at *next* char */
+					continue;
+				}
+				else
+				{
+					/* otherwise, it start a key */
+					state = S_KEY;
+					key_start = p; /* key start at "current" char */
+					continue;
+				}
+
+			case S_VALUE:
+				/* keep searching until it hit a close if it is currently in a single quoted value */
+				if (c == '\'')
+				{
+					/* value start from val_start to p-1 */
+					val_end = p;
+					val_tmp = *p;
+
+					/* find a key value pair and do the convert */
+					*key_end = '\0';
+					*val_end = '\0';
+
+					json_object_object_add(optJsonObj, key_start, json_object_new_string(val_start));
+
+					*key_end = key_tmp;
+					*val_end = val_tmp;
+
+					state = S_NULL; /* back to "not in key, not in value" state */
+				}
+				continue; /* either still S_KEY or we handled the end above */
+
+			case S_KEY:
+				/* keep searching until it hit a space as it is currently in a key */
+				if (isspace(c))
+				{
+					/* key start from key_start to p-1 */
+					key_end = p;
+					key_tmp = *p;
+
+					/* search for value for current key */
+					state = S_NULL; /* back to "not in key, not in value" state */
+				}
+				continue; /* either still S_KEY or we handled the end above */
+		}
+	}
+
+	if (optJsonObj != NULL)
+	{
+		const char *str = json_object_to_json_string(optJsonObj);
+		*fmtOptsJson = (char *)palloc0(strlen(str) + 1);
+		strcpy(*fmtOptsJson, str);
+		json_object_put(optJsonObj);
+	}
+}
+
+char *get_current_schema_name(void)
+{
+	List *search_path = fetch_search_path(false);
+	char *nspname = NULL;
+
+	if (search_path == NIL)
+		return NULL;
+
+	nspname = get_namespace_name(linitial_oid(search_path));
+	list_free(search_path);
+
+	return nspname;
+}
+
+int renameHdfsPath(Oid relid, PartitionNode *pNode, const char *oldrelname, const char *newrelname){
+  cqContext* pcqCtx = caql_beginscan(
+      NULL,
+      cql("SELECT * FROM pg_exttable "
+      " WHERE reloid = :1",
+      ObjectIdGetDatum(relid)));
+  Relation relation = RelationIdGetRelation(ExtTableRelationId);
+  TupleDesc tupleDesc = RelationGetDescr(relation);
+  HeapTuple tuple = caql_getnext(pcqCtx);
+  if(tuple){
+    if(pNode) {
+      ListCell *cell;
+      foreach(cell, pNode->rules) {
+        PartitionRule *ruleNode = (PartitionRule *)lfirst(cell);
+        Oid partitionid = ruleNode->parchildrelid;
+        cqContext* pcqCtxPartition = caql_beginscan(
+            NULL,
+            cql("SELECT * FROM pg_exttable "
+            " WHERE reloid = :1",
+            ObjectIdGetDatum(partitionid)));
+        HeapTuple tuplePartition = caql_getnext(pcqCtxPartition);
+        if(tuplePartition){
+          char *oldlocation = getLocation(&tuplePartition, &tupleDesc);
+          char *newlocation = getNewLocation(oldlocation, oldrelname, newrelname);
+          changeHdfsPath(oldlocation, newlocation);
+          char *newlocationNew = changePartitionPath(newlocation, oldrelname, newrelname);
+          updateCatlog(pcqCtxPartition, &tuplePartition, newlocationNew);
+          pfree(oldlocation);
+          pfree(newlocation);
+          pfree(newlocationNew);
+          heap_freetuple(tuplePartition);
+        }
+        caql_endscan(pcqCtxPartition);
+      }
+    }
+    char *oldlocation = getLocation(&tuple,&tupleDesc);
+    char *newlocation = getNewLocation(oldlocation, oldrelname, newrelname);
+    changeHdfsPath(oldlocation,newlocation);
+    updateCatlog(pcqCtx,&tuple,newlocation);
+    pfree(oldlocation);
+    pfree(newlocation);
+    heap_freetuple(tuple);
+    caql_endscan(pcqCtx);
+    RelationClose(relation);
+    return 0;
+  } else {
+    // close relation
+    caql_endscan(pcqCtx);
+    RelationClose(relation);
+    return 1;
+  }
+}
+
+static char *getLocation(HeapTuple *tuple,TupleDesc *tupleDesc){
+  Datum locations = tuple_getattr(*tuple, *tupleDesc, Anum_pg_exttable_location);
+  Datum* elems = NULL;
+  int nelems;
+  deconstruct_array(DatumGetArrayTypeP(locations),
+                TEXTOID, -1, false, 'i',
+                &elems, NULL, &nelems);
+  Assert(nelems > 0);
+  char *oldlocation = DatumGetCString(DirectFunctionCall1(textout, elems[0]));
+
+  return oldlocation;
+}
+
+static char *getNewLocation(const char *oldlocation,const char *oldrelname, const char *newrelname) {
+  char *newlocation = NULL;
+  const char *tmp = oldlocation;
+  while(*tmp!='\0')
+    tmp++;
+  while(*tmp!='/')
+    tmp--;
+
+  int pathlength = tmp - oldlocation + 1;
+  int newnamelength = strlen(newrelname);
+  int oldnamelength = strlen(oldrelname);
+  int oldlocationlenth = strlen(oldlocation);
+  tmp += oldnamelength + 1;
+  int taillength = strlen(tmp);
+
+  newlocation=(char *)palloc(oldlocationlenth + newnamelength - oldnamelength + 1);
+  memcpy(newlocation,oldlocation, pathlength);
+  memcpy(newlocation + pathlength, newrelname, newnamelength);
+  memcpy(newlocation + pathlength + newnamelength, tmp, taillength);
+  newlocation[pathlength + newnamelength + taillength] = '\0';
+  return newlocation;
+}
+
+static char *changePartitionPath(const char *location,const char *oldrelname, const char *newrelname) {
+  char *newlocation = NULL;
+  const char *tmp = location;
+  while(*tmp!='\0')
+    tmp++;
+  while(*tmp!='/')
+    tmp--;
+  tmp--;
+  while(*tmp!='/')
+    tmp--;
+
+  int pathlength = tmp - location + 1;
+  int newnamelength = strlen(newrelname);
+  int oldnamelength = strlen(oldrelname);
+  int oldlocationlenth = strlen(location);
+  tmp += oldnamelength + 1;
+  int taillength = strlen(tmp);
+
+  newlocation=(char *)palloc(oldlocationlenth + newnamelength - oldnamelength + 1);
+  memcpy(newlocation,location, pathlength);
+  memcpy(newlocation + pathlength, newrelname, newnamelength);
+  memcpy(newlocation + pathlength + newnamelength, tmp, taillength);
+  newlocation[pathlength + newnamelength + taillength] = '\0';
+  return newlocation;
+}
+
+static void changeHdfsPath(const char *oldlocation,const char *newlocation) {
+  Uri *olduri = ParseExternalTableUri(oldlocation);
+  Uri *newuri = ParseExternalTableUri(newlocation);
+  ExtProtocolRenameData *validator_data = (ExtProtocolRenameData *) palloc0 (sizeof(ExtProtocolRenameData));
+  validator_data->type = T_ExtProtocolRenameData;
+  validator_data->newduri = newuri;
+  validator_data->olduri = olduri;
+  validator_data->newlocation = newlocation;
+  validator_data->oldlocation = oldlocation;
+  Oid procOid = LookupCustomProtocolValidatorFunc("hdfs");
+  FmgrInfo           *validator_udf;
+  FunctionCallInfoData    fcinfo;
+  validator_udf = palloc(sizeof(FmgrInfo));
+  fmgr_info(procOid, validator_udf);
+  InitFunctionCallInfoData(/* FunctionCallInfoData */ fcinfo,
+               /* FmgrInfo */ validator_udf,
+               /* nArgs */ 0,
+               /* Call Context */ (Node *) validator_data,
+               /* ResultSetInfo */ NULL);
+
+  /* invoke validator. if this function returns - validation passed */
+  FunctionCallInvoke(&fcinfo);
+  if (fcinfo.isnull)
+    elog(ERROR, "rename function %u returned NULL",
+          fcinfo.flinfo->fn_oid);
+  pfree(validator_data);
+  pfree(validator_udf);
+  pfree(olduri);
+  pfree(newuri);
+}
+
+static void updateCatlog(cqContext* pcqCtx, HeapTuple *tuple,const char *newlocation) {
+  int len = VARHDRSZ + strlen(newlocation);
+  text * t = (text *) palloc(len + 1);
+  SET_VARSIZE(t, len);
+  sprintf((char *) VARDATA(t), "%s", newlocation);
+  ArrayBuildState *astate = NULL;
+  astate = accumArrayResult(astate, PointerGetDatum(t),
+                false, TEXTOID,
+                CurrentMemoryContext);
+  Datum result = makeArrayResult(astate, CurrentMemoryContext);
+
+  Datum   values[Natts_pg_exttable];
+  bool    nulls[Natts_pg_exttable];
+  bool    replaces[Natts_pg_exttable];
+  for (int i = 0; i < Natts_pg_exttable; i++)
+  {
+    values[i] = (Datum) 0;
+    replaces[i] = false;
+    nulls[i] = false;
+  }
+  values[Anum_pg_exttable_location - 1] = result;
+  replaces[Anum_pg_exttable_location - 1] = true;
+
+  *tuple = caql_modify_current(pcqCtx, values, nulls, replaces);
+  caql_update_current(pcqCtx, *tuple);
+  pfree((ArrayType *)DatumGetPointer(result));
+  pfree(t);
 }

@@ -40,7 +40,6 @@
 #include "access/plugstorage_utils.h"
 
 
-
 /*
  * ExternalInsertDescData is used for storing state related
  * to inserting data into a writable external table.
@@ -55,13 +54,17 @@ typedef struct ExternalInsertDescData
 	TupleDesc		ext_tupDesc;
 	Datum*			ext_values;
 	bool*			ext_nulls;
+	Datum           ext_rangeId;
+	Datum           ext_rowId;
 	
-	FormatterData* ext_formatter_data;
-	ExternalTableType ext_formatter_type;
-	char* ext_formatter_name;
+	FormatterData*	ext_formatter_data;
+	int				ext_formatter_type;
+	char*			ext_formatter_name;
 
 	/* current insert information for pluggable storage */
 	PlugStorageInsertFuncs ext_ps_insert_funcs;   /* insert functions */
+	PlugStorageDeleteFuncs ext_ps_delete_funcs;   /* delete functions */
+	PlugStorageUpdateFuncs ext_ps_update_funcs;   /* update functions */
 	void *ext_ps_user_data;                       /* user data */
 
 	struct CopyStateData *ext_pstate; 	/* data parser control chars and state */
@@ -69,6 +72,12 @@ typedef struct ExternalInsertDescData
 } ExternalInsertDescData;
 
 typedef ExternalInsertDescData *ExternalInsertDesc;
+
+typedef struct ExternalInsertDescHashEntry
+{
+    Oid ext_ins_oid;
+    ExternalInsertDesc ext_ins_desc;
+} ExternalInsertDescHashEntry;
 
 /*
  * ExternalSelectDescData is used for storing state related
@@ -97,22 +106,30 @@ extern FileScanDesc external_beginscan(ExternalScan *extScan,
 extern void external_rescan(FileScanDesc scan);
 extern void external_endscan(FileScanDesc scan);
 extern void external_stopscan(FileScanDesc scan);
-extern ExternalSelectDesc external_getnext_init(PlanState *state, ExternalScanState *es_state);
+extern ExternalSelectDesc external_getnext_init(PlanState *state,
+                                                ExternalScanState *es_state);
 extern bool external_getnext(FileScanDesc scan,
                              ScanDirection direction,
                              ExternalSelectDesc desc,
                              ScanState *ss,
                              TupleTableSlot *slot);
-
-extern ExternalInsertDesc external_insert_init(Relation rel, int errAosegno,
-        int formatterType, char *formatterName, PlannedStmt* plannedstmt);
-
+extern ExternalInsertDesc external_insert_init(Relation rel,
+                                               int errAosegno,
+                                               int formatterType,
+                                               char *formatterName,
+											  PlannedStmt* plannedstmt);
 extern Oid external_insert(ExternalInsertDesc extInsertDesc,
                            TupleTableSlot *tupTableSlot);
 extern void external_insert_finish(ExternalInsertDesc extInsertDesc);
-extern void external_set_env_vars(extvar_t *extvar, char* uri, bool csv, char* escape, char* quote, bool header, uint32 scancounter);
+extern void external_set_env_vars(extvar_t *extvar,
+                                  char* uri,
+                                  bool csv,
+                                  char* escape,
+                                  char* quote,
+                                  bool header,
+                                  uint32 scancounter);
 extern void AtAbort_ExtTables(void);
-char*	linenumber_atoi(char buffer[20],int64 linenumber);
+char *linenumber_atoi(char buffer[20],int64 linenumber);
 
 extern bool hasErrTblInFmtOpts(List *fmtOpts);
 extern char getExtTblFormatterTypeInFmtOpts(List *fmtOpts);

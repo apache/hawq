@@ -51,8 +51,6 @@
  * ----------------
  */
 
-
-
 GpRoleValue Gp_role;			/* Role paid by this Greenplum Database backend */
 char	   *gp_role_string;	/* Staging area for guc.c */
 bool		gp_set_read_only;	/* Staging area for guc.c */
@@ -90,6 +88,8 @@ int			gp_safefswritesize;  /* set for safe AO writes in non-mature fs */
 
 int			gp_connections_per_thread; /* How many libpq connections are
 										 * handled in each thread */
+int     main_disp_connections_per_thread;
+int     proxy_disp_connections_per_thread;
 
 int			gp_cached_gang_threshold; /*How many gangs to keep around from stmt to stmt.*/
 
@@ -137,6 +137,9 @@ bool	Debug_print_combocid_detail = false;
  */
 int			Gp_listener_port;
 
+// two listener ports for NewExecutor
+int			my_listener_port;
+
 int			Gp_max_packet_size;	/* max Interconnect packet size */
 
 int			Gp_interconnect_queue_depth=4;	/* max number of messages
@@ -169,12 +172,12 @@ bool gp_interconnect_cache_future_packets=true;
 
 int			Gp_udp_bufsize_k; /* UPD recv buf size, in KB */
 
+#ifdef USE_ASSERT_CHECKING
 /*
  * UDP-IC Test hooks (for fault injection).
  *
  * Dropseg: specifies which segment to apply the drop_percent to.
  */
-#ifdef USE_ASSERT_CHECKING
 int gp_udpic_dropseg = UNDEF_SEGMENT;
 int gp_udpic_dropxmit_percent = 0;
 int gp_udpic_dropacks_percent = 0;
@@ -291,6 +294,9 @@ bool debug_fake_segmentnum;
 bool debug_datalocality_time;
 bool enable_prefer_list_to_rm;
 
+/* HAWQ magma GUCs */
+int   scheduler_rpc_base_port;
+
 /* New HAWQ 2.0 basic GUCs. Some of these are duplicate variables, they are
  * reserved to facilitate showing settings in hawq-site.xml. */
 char  *master_addr_host;
@@ -298,6 +304,7 @@ int    master_addr_port;
 char  *standby_addr_host;
 int    seg_addr_port;
 char  *dfs_url;
+char  *magma_nodes_url;
 char  *master_directory;
 char  *seg_directory;
 int    segment_history_keep_period;

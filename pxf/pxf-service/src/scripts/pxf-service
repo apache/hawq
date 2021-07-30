@@ -6,9 +6,9 @@
 # to you under the Apache License, Version 2.0 (the
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
-#
+# 
 #   http://www.apache.org/licenses/LICENSE-2.0
-#
+# 
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -20,25 +20,25 @@
 # pxf-service	start/stop/initialize/status the PXF instance
 #
 
-if [ -z ${PXF_HOME} ]; then
-    parent_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
-    env_script=${parent_script_dir}/conf/pxf-env.sh
+
+if [ -z $PXF_HOME ]; then
+    env_script=/etc/pxf/conf/pxf-env.sh
 else
-    env_script=${PXF_HOME}/conf/pxf-env.sh
+    env_script=$PXF_HOME/conf/pxf-env.sh
 fi
 
 # load pxf-env.sh script
-if [ ! -f ${env_script} ]; then
+if [ ! -f $env_script ]; then
 	echo WARNING: failed to find $env_script
 else
-	source ${env_script}
+	source $env_script
 fi
 
-pxf_user=${PXF_USER}
-instance_port=${PXF_PORT:-@pxfPortNum@}
+pxf_user=${PXF_USER:-pxf}
+instance_port=${PXF_PORT:-51200}
 instance_name=pxf-service
 
-if [ -z ${PXF_HOME} ]; then
+if [ -z $PXF_HOME ]; then
     # RPM based setup
     pxf_root=/usr/lib/pxf
     tomcat_root=/opt/apache-tomcat
@@ -47,48 +47,86 @@ if [ -z ${PXF_HOME} ]; then
     instance_owner=$pxf_user:$pxf_user
 else
     # OSS/Source code based setup
-    pxf_root=${PXF_HOME}/lib
-    tomcat_root=${PXF_HOME}/apache-tomcat
-    tomcat_templates=${PXF_HOME}/tomcat-templates
-    instance_root=${PXF_HOME}
-    instance_owner=${pxf_user}
+    pxf_root=$PXF_HOME/lib
+    tomcat_root=$PXF_HOME/apache-tomcat
+    tomcat_templates=$PXF_HOME/tomcat-templates
+    instance_root=$PXF_HOME
+    instance_owner=$pxf_user
 fi
 
 curl=`which curl`
 
-# print error message and return with error code
-function fail()
-{
-    echo "ERROR: $1"
-    exit 1
-}
+
+# validate JAVA_HOME
+if [ ! -x $JAVA_HOME/bin/java ]; then
+	echo ERROR: \$JAVA_HOME is invalid
+	exit 1
+fi
 
 #
-# createInstance creates a tomcat instance and
-# configures based on pre-configured template files.
+# createInstance creates a tomcat instance 
+# configuration files 
 #
 function createInstance()
 {
-	mkdir -p ${instance_root}
-	mkdir -p ${instance_root}/${instance_name}
-	cp -r ${tomcat_root}/* ${instance_root}/${instance_name}/.
+	mkdir -p $instance_root 
+	mkdir -p $instance_root/$instance_name 
+	cp -r $tomcat_root/* $instance_root/$instance_name/.
 
 	if [ $? -gt 0 ]; then
 		echo ERROR: instance creation failed
 		return 1
 	fi
 
-    if [ ! -z ${pxf_user} ]; then
-        chown -R ${instance_owner} ${instance_root}
-    fi
-    chmod 700 ${instance_root}/${instance_name}
+	chown -R $instance_owner $instance_root
+	chmod 700 $instance_root/$instance_name
+	return 0
+}
 
-    # copy configuration files into instance
-    cp ${tomcat_templates}/bin/setenv.sh ${instance_root}/${instance_name}/bin/setenv.sh
-    cp ${tomcat_templates}/conf/catalina.properties ${instance_root}/${instance_name}/conf/.
-    cp ${tomcat_templates}/conf/server.xml ${instance_root}/${instance_name}/conf/.
-    cp ${tomcat_templates}/conf/web.xml ${instance_root}/${instance_name}/conf/.
-    return 0
+#
+# configureInstance configures the tomcat instance
+# based on pre-configured template files.
+#
+# specifically:
+#	support up to 30,000 header fields
+#	support up to 1MB size header
+#	change connection timeout to 60 seconds
+#	set port to 51200
+#
+function configureInstance()
+{
+	# copy configuration files into instance
+	cp $tomcat_templates/bin/setenv.sh $instance_root/$instance_name/bin/setenv.sh
+	cp $tomcat_templates/conf/catalina.properties $instance_root/$instance_name/conf/.
+	cp $tomcat_templates/conf/server.xml $instance_root/$instance_name/conf/.
+	cp $tomcat_templates/conf/web.xml $instance_root/$instance_name/conf/.
+	
+	# set port
+	catalinaProperties=$instance_root/$instance_name/conf/catalina.properties
+	cat $catalinaProperties | \
+	sed "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" \
+	> ${catalinaProperties}.tmp
+
+	rm $catalinaProperties
+	mv ${catalinaProperties}.tmp $catalinaProperties
+
+	# set pid
+	catalinaEnv=$instance_root/$instance_name/bin/setenv.sh
+	cat $catalinaEnv | \
+	sed -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=$PXF_RUNDIR/catalina.pid|g" \
+	> ${catalinaEnv}.tmp
+	rm $catalinaEnv
+	mv ${catalinaEnv}.tmp $catalinaEnv
+
+	# set log directories
+	catalinaLog=$instance_root/$instance_name/conf/logging.properties
+	cat $catalinaLog | \
+	sed "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = $PXF_LOGDIR|g" \
+	> ${catalinaLog}.tmp
+	rm $catalinaLog
+	mv ${catalinaLog}.tmp $catalinaLog
+
+	return 0
 }
 
 #
@@ -97,8 +135,8 @@ function createInstance()
 #
 function deployWebapp()
 {
-	cp ${pxf_root}/pxf.war ${instance_root}/${instance_name}/webapps/ || return 1
-	cp ${pxf_root}/pxf-service-*[0-9].jar ${instance_root}/${instance_name}/lib/ || return 1
+	cp $pxf_root/pxf.war $instance_root/$instance_name/webapps/ || return 1
+	cp $pxf_root/pxf-service-*[0-9].jar $instance_root/$instance_name/lib/ || return 1
 
 	return 0
 }
@@ -110,9 +148,9 @@ function deployWebapp()
 function waitForTomcat()
 {
 	attempts=0
-	max_attempts=$1 # number of attempts to connect
+	max_attempts=$1 # number of attempts to connect 
 	sleep_time=1 # sleep 1 second between attempts
-
+	
 	# wait until tomcat is up:
 	echo Checking if tomcat is up and running...
 	until [[ "`curl --silent --connect-timeout 1 -I http://localhost:${instance_port} | grep 'Coyote'`" != "" ]];
@@ -123,7 +161,7 @@ function waitForTomcat()
 			return 1
 		fi
 		echo "tomcat not responding, re-trying after ${sleep_time} second (attempt number ${attempts})"
-		sleep ${sleep_time}
+		sleep $sleep_time
 	done
 
 	return 0
@@ -136,16 +174,16 @@ function waitForTomcat()
 function checkWebapp()
 {
 	waitForTomcat $1 || return 1
-
+	
 	echo Checking if PXF webapp is up and running...
-	curlResponse=$(${curl} -s "http://localhost:${instance_port}/pxf/v0")
+	curlResponse=$($curl -s "http://localhost:${instance_port}/pxf/v0")
 	expectedResponse="Wrong version v0, supported version is v[0-9]+"
-
-	if [[ ${curlResponse} =~ $expectedResponse ]]; then
-		echo PXF webapp is listening on port ${instance_port}
+	
+	if [[ $curlResponse =~ $expectedResponse ]]; then
+		echo PXF webapp is up
 		return 0
 	fi
-
+	
 	echo ERROR: PXF webapp is inaccessible but tomcat is up. Check logs for more information
 	return 1
 }
@@ -158,7 +196,7 @@ function instanceExists()
 		return 1
 	fi
 
-	${instance_root}/${instance_name}/bin/catalina.sh version > /dev/null 2>&1
+	$instance_root/$instance_name/bin/catalina.sh version > /dev/null 2>&1
 	return $?
 }
 
@@ -167,228 +205,56 @@ function doInit()
 {
 	instanceExists
 	if [ $? -eq 0 ]; then
-		echo WARNING: instance already exists in ${instance_root}, nothing to do...
+		echo WARNING: instance already exists in $instance_root, nothing to do...
 		return 0
 	fi
-	determineHadoopDistro
-	generatePrivateClasspath || return 1
-	createInstance || return 1
+
+    createInstance || return 1
+	configureInstance || return 1
 	deployWebapp || return 1
-	createLogsDir || return 1
-	createRunDir  || return 1
 }
 
 #
-# configureWebapp patches the webapp with pxf and user overriden configs
-# applied only if PXF_HOME is defined
+# patchWebapp patches the webapp config files
+# patch applied only if PXF_HOME is defined
 #
-function configureWebapp()
+function patchWebapp()
 {
-    if [ -z ${PXF_HOME} ]; then
+    if [ -z $PXF_HOME ]; then
         # webapp doesn't require patch
         return 0
     fi
-    pushd ${instance_root}/${instance_name}/webapps > /dev/null || return 1
+    pushd $instance_root/$instance_name/webapps || return 1
     rm -rf pxf
     mkdir pxf
     cd pxf
     unzip -q ../pxf.war
-    popd > /dev/null
+    popd
 
-    context_file=${instance_root}/${instance_name}/webapps/pxf/META-INF/context.xml
-    sed -i -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"${PXF_HOME}\/conf\/pxf-private.classpath\":" ${context_file}
-    sed -i -e "s:secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\":secondaryClasspathFiles=\"${PXF_HOME}\/conf\/pxf-public.classpath\":" ${context_file}
+    context_file=$instance_root/$instance_name/webapps/pxf/META-INF/context.xml
+    cat $context_file | \
+    sed  -e "s:classpathFiles=\"[a-zA-Z0-9\/\;.-]*\":classpathFiles=\"$PXF_HOME\/conf\/pxf-private.classpath\":" \
+    -e "s:secondaryClasspathFiles=\"[a-zA-Z0-9\/\;.-]*\":secondaryClasspathFiles=\"$PXF_HOME\/conf\/pxf-public.classpath\":" > context.xml.tmp
+    mv context.xml.tmp $context_file
 
-    web_file=${instance_root}/${instance_name}/webapps/pxf/WEB-INF/web.xml
-    sed -i -e "s:<param-value>.*pxf-log4j.properties<\/param-value>:<param-value>$PXF_HOME\/conf\/pxf-log4j.properties<\/param-value>:" ${web_file}
-
-    # set port
-    catalinaProperties=${instance_root}/${instance_name}/conf/catalina.properties
-    sed -i -e "s|^[[:blank:]]*connector.http.port=.*$|connector.http.port=$instance_port|g" ${catalinaProperties}
-
-    # set container configs
-    catalinaEnv=${instance_root}/${instance_name}/bin/setenv.sh
-    sed -i -e "s|JVM_OPTS=.*$|JVM_OPTS=\"${PXF_JVM_OPTS}\"|g" ${catalinaEnv}
-    sed -i -e "s|-Dpxf.log.dir=[^[:space:]^\"]*|-Dpxf.log.dir=${PXF_LOGDIR} |g" ${catalinaEnv}
-    sed -i -e "s|-Dpxf.service.kerberos.keytab=[^[:space:]^\"]*|-Dpxf.service.kerberos.keytab=${PXF_KEYTAB} |g" ${catalinaEnv}
-    sed -i -e "s|-Dpxf.service.kerberos.principal=[^[:space:]^\"]*|-Dpxf.service.kerberos.principal=${PXF_PRINCIPAL} |g" ${catalinaEnv}
-    sed -i -e "s|^[[:blank:]]*PXF_USER_IMPERSONATION=.*$|PXF_USER_IMPERSONATION=\"${PXF_USER_IMPERSONATION}\"|g" ${catalinaEnv}
-    sed -i -e "s|^[[:blank:]]*CATALINA_PID=.*$|CATALINA_PID=${PXF_RUNDIR}/catalina.pid|g" ${catalinaEnv}
-    sed -i -e "s|^[[:blank:]]*CATALINA_OUT=.*$|CATALINA_OUT=${PXF_LOGDIR}/catalina.out|g" ${catalinaEnv}
-
-    # set log directories
-    catalinaLog=${instance_root}/$instance_name/conf/logging.properties
-    sed -i -e "s|juli.FileHandler.directory\s*=.*$|juli.FileHandler.directory = ${PXF_LOGDIR}|g" ${catalinaLog}
+    web_file=$instance_root/$instance_name/webapps/pxf/WEB-INF/web.xml
+    cat $web_file | \
+    sed "s:<param-value>.*pxf-log4j.properties<\/param-value>:<param-value>$PXF_HOME\/conf\/pxf-log4j.properties<\/param-value>:" > web.xml.tmp
+    mv web.xml.tmp $web_file
 }
 
 function commandWebapp()
 {
     command=$1
-    pushd ${instance_root} > /dev/null
-    if [ ! -z ${pxf_user} ]; then
-        # Run command as a pxf_user
-        su ${pxf_user} -c "$instance_root/$instance_name/bin/catalina.sh $command"
-    else
-        # Run command as a current user
-        ${instance_root}/${instance_name}/bin/catalina.sh ${command}
-    fi
+    pushd $instance_root
+    su $pxf_user -c "$instance_root/$instance_name/bin/catalina.sh $command"
     if [ $? -ne 0 ]; then
         return 1
     fi
-    popd > /dev/null
+    popd
 }
 
-function createLogsDir()
-{
-    mkdir -p ${PXF_LOGDIR}
-    if [ ! -z ${pxf_user} ]; then
-        chown -R ${instance_owner} ${PXF_LOGDIR}
-    fi
-    chmod 700 ${PXF_LOGDIR}
-    return 0
-}
-
-function createRunDir()
-{
-    mkdir -p ${PXF_RUNDIR}
-    if [ ! -z ${pxf_user} ]; then
-        chown -R ${instance_owner} ${PXF_RUNDIR}
-    fi
-    chmod 700 ${PXF_RUNDIR}
-    return 0
-}
-
-function check_hadoop_install()
-{
-    local distro_type=${1}
-    case "${distro_type}" in
-        hdp|HDP)
-            if [ -d "/usr/hdp/current/hadoop-client/client" ]; then
-                DISTRO="hdp"
-                return 0;
-            fi
-            ;;
-        cdh|CDH)
-            if [ -d "/usr/lib/hadoop/client" ]; then
-                DISTRO="cdh"
-                return 0;
-            fi
-            ;;
-        tar|TAR)
-            if [ -n "${HADOOP_ROOT}" ] && [ -d "${HADOOP_ROOT}/hadoop/share/hadoop/common/lib" ]; then
-                DISTRO="tar"
-                return 0;
-            fi
-            ;;
-        custom|CUSTOM)
-            # use tarball template for custom distro, do not require HADOOP_ROOT to be set
-            DISTRO="tar"
-            return 0;
-            ;;
-        *)
-            fail "Unknown hadoop distribution type: HADOOP_DISTRO=${distro_type}"
-            ;;
-    esac
-    # the distro type was not found installed, return failure code
-    return 1
-}
-
-function determineHadoopDistro()
-{
-    DISTRO=""
-    # check if the distro is explicitly specified
-    if [ -z "${HADOOP_DISTRO}" ]; then
-        # if distro is not specified, try checking for HDP and then CDH
-        check_hadoop_install "hdp" || check_hadoop_install "cdh"
-    else
-        # check distro specified in the config file
-        check_hadoop_install "${HADOOP_DISTRO}"
-    fi
-
-    # if still not determined, check tarball-based install
-    if [ -z "${DISTRO}" ]; then
-        check_hadoop_install "tar"
-        # if still unknown, then error out
-        if [ -z "${DISTRO}" ]; then
-            fail "Can not determine Hadoop distribution, please install Hadoop clients."
-        fi
-    fi
-}
-
-function generatePrivateClasspath()
-{
-    # distro must have been determined by now, but double check
-    if [ -z "${DISTRO}" ]; then
-        fail "Hadoop distribution was not determined"
-    fi
-
-    # verify that a template file for the distribution exists
-    local template_file="${PXF_HOME}/conf-templates/pxf-private-${DISTRO}.classpath.template"
-    if [ ! -f "${template_file}" ]; then
-        fail "Template file ${template_file} not found"
-    fi
-
-    echo "Generating ${PXF_HOME}/conf/pxf-private.classpath file from ${template_file} ..."
-
-    # create initial version of the file by replacing PXF_HOME token (applicable to all templates)
-    sed -e "s|PXF_HOME|${PXF_HOME}|g" ${template_file} > ${PXF_HOME}/conf/pxf-private.classpath
-
-    # substitute HADOOP_ROOT value if defined
-    if [ -n "${HADOOP_ROOT}" ]; then
-        sed -i -e "s|HADOOP_ROOT|${HADOOP_ROOT}|g" ${PXF_HOME}/conf/pxf-private.classpath
-    fi
-}
-
-function printUsage()
-{
-    echo $"Usage: $0 {start|stop|restart|init|status}"
-}
-
-function validateParameters()
-{
-
-    # validate curl
-    which curl &> /dev/null
-    if [ "$?" -ne "0" ]
-    then
-        echo "ERROR: curl is not installed, please install"
-        exit 1
-    fi
-
-    # validate unzip
-    which unzip &> /dev/null
-    if [ "$?" -ne "0" ]
-    then
-        echo "ERROR: unzip is not installed, please install"
-        exit 1
-    fi
-
-    # validate pxf user
-    if [ ! -z ${pxf_user} ]; then
-        id ${pxf_user}  &> /dev/null;
-        if [ "$?" -ne "0" ]
-        then
-            echo "ERROR: User $pxf_user doesn't exist. Please set valid user via \$PXF_USER variable"
-            exit 1
-        fi
-    fi
-
-    # make sure current user is not root
-    if [ $EUID -eq 0 ]; then
-        echo "ERROR: Cannot run as root user"
-        exit 1
-    fi
-
-    # validate JAVA_HOME
-    if [ ! -x ${JAVA_HOME}/bin/java ]; then
-        echo ERROR: \$JAVA_HOME is invalid
-        exit 1
-    fi
-
-    return 0
-}
-
-#
+# 
 # doStart handles start command
 # command is executed as the user $pxf_user
 #
@@ -402,7 +268,7 @@ function doStart()
 		echo ERROR: cant find PXF instance, maybe call init?
 		return 1
 	fi
-	configureWebapp || return 1
+	patchWebapp || return 1
 	commandWebapp start || return 1
 	checkWebapp 300 || return 1
 }
@@ -431,29 +297,24 @@ command=$1
 
 case "$command" in
 	"init" )
-		validateParameters
 		doInit
 		;;
 	"start" )
-		validateParameters
 		doStart
 		;;
 	"stop" )
-		validateParameters
 		doStop
 		;;
 	"restart" )
-		validateParameters
 		doStop
 		sleep 1s
 		doStart
 		;;
 	"status" )
-		validateParameters
 		doStatus
 		;;
 	* )
-		printUsage
+		echo $"Usage: $0 {start|stop|restart|init|status}"
 		exit 2
 		;;
 esac

@@ -34,6 +34,8 @@ typedef enum UriProtocol
 	URI_CUSTOM,
 	URI_GPFDISTS,
 	URI_HDFS,
+	URI_HBASE,
+	URI_MAGMA,
 	URI_HIVE
 }	UriProtocol;
 
@@ -44,7 +46,9 @@ typedef enum UriProtocol
 #define PROTOCOL_GPFDISTS	"gpfdists://"
 #define PROTOCOL_PXF		"pxf://"
 #define PROTOCOL_HDFS		"hdfs://"
-#define PROTOCOL_HIVE      	"hive://"
+#define PROTOCOL_HBASE		"hbase://"
+#define PROTOCOL_MAGMA			"magma://"
+#define PROTOCOL_HIVE      "hive://"
 
 /* 
  * sometimes we don't want to parse the whole URI but just take a peek at
@@ -57,6 +61,9 @@ typedef enum UriProtocol
 #define IS_FTP_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_FTP, strlen(PROTOCOL_FTP)) == 0)
 #define IS_PXF_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_PXF, strlen(PROTOCOL_PXF)) == 0)
 #define IS_HDFS_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_HDFS, strlen(PROTOCOL_HDFS)) == 0)
+#define IS_HBASE_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_HBASE, strlen(PROTOCOL_HBASE)) == 0)
+#define IS_MAGMA_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_MAGMA, strlen(PROTOCOL_MAGMA)) == 0)
+#define IS_HIVE_URI(uri_str) (pg_strncasecmp(uri_str, PROTOCOL_HIVE, strlen(PROTOCOL_HIVE)) == 0)
 
 typedef struct Uri
 {

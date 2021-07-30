@@ -19,319 +19,290 @@ package org.apache.hawq.pxf.plugins.jdbc;
  * under the License.
  */
 
-import org.apache.hawq.pxf.api.Fragment;
 import org.apache.hawq.pxf.api.Fragmenter;
 import org.apache.hawq.pxf.api.FragmentsStats;
 import org.apache.hawq.pxf.api.UserDataException;
-import org.apache.hawq.pxf.api.utilities.InputData;
-import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
 import org.apache.hawq.pxf.plugins.jdbc.utils.DbProduct;
+import org.apache.hawq.pxf.plugins.jdbc.utils.ByteUtil;
+import org.apache.hawq.pxf.api.Fragment;
+import org.apache.hawq.pxf.api.utilities.InputData;
 
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
- * JDBC fragmenter
+ * Fragmenter class for JDBC data resources.
  *
- * Splits the query to allow multiple simultaneous SELECTs
+ * Extends the {@link Fragmenter} abstract class, with the purpose of transforming
+ * an input data path  (an JDBC Database table name  and user request parameters)  into a list of regions
+ * that belong to this table.
+ * <br>
+ * The parameter Patterns<br>
+ * There are three  parameters,  the format is as follows:<br>
+ * <pre>
+ * <code>PARTITION_BY=column_name:column_type&amp;RANGE=start_value[:end_value]&amp;INTERVAL=interval_num[:interval_unit]</code>
+ * </pre>
+ * The <code>PARTITION_BY</code> parameter can be split by colon(':'),the <code>column_type</code> current supported : <code>date,int,enum</code> .
+ * The Date format is 'yyyy-MM-dd'. <br>
+ * The <code>RANGE</code> parameter can be split by colon(':') ,used to identify the starting range of each fragment.
+ * The range is left-closed, ie:<code> '&gt;= start_value AND &lt; end_value' </code>.If the <code>column_type</code> is <code>int</code>,
+ * the <code>end_value</code> can be empty. If the <code>column_type</code>is <code>enum</code>,the parameter <code>RANGE</code> can be empty. <br>
+ * The <code>INTERVAL</code> parameter can be split by colon(':'), indicate the interval value of one fragment.
+ * When <code>column_type</code> is <code>date</code>,this parameter must be split by colon, and <code>interval_unit</code> can be <code>year,month,day</code>.
+ * When <code>column_type</code> is <code>int</code>, the <code>interval_unit</code> can be empty.
+ * When <code>column_type</code> is <code>enum</code>,the <code>INTERVAL</code> parameter can be empty.
+ * <br>
+ * <p>
+ * The syntax examples is :<br>
+ * <code>PARTITION_BY=createdate:date&amp;RANGE=2008-01-01:2010-01-01&amp;INTERVAL=1:month'</code> <br>
+ * <code>PARTITION_BY=year:int&amp;RANGE=2008:2010&amp;INTERVAL=1</code> <br>
+ * <code>PARTITION_BY=grade:enum&amp;RANGE=excellent:good:general:bad</code>
+ * </p>
+ *
  */
 public class JdbcPartitionFragmenter extends Fragmenter {
-    /**
-     * Insert fragment constraints into the SQL query.
-     *
-     * @param inputData InputData of the fragment
-     * @param dbName Database name (affects the behaviour for DATE partitions)
-     * @param query SQL query to insert constraints to. The query may may contain other WHERE statements
-     */
-    public static void buildFragmenterSql(InputData inputData, String dbName, StringBuilder query) {
-        if (inputData.getUserProperty("PARTITION_BY") == null) {
-            return;
+    String[] partitionBy = null;
+    String[] range = null;
+    String[] interval = null;
+    PartitionType partitionType = null;
+    String partitionColumn = null;
+    IntervalType intervalType = null;
+    int intervalNum = 1;
+
+    //when partitionType is DATE,it is valid
+    Calendar rangeStart = null;
+    Calendar rangeEnd = null;
+
+
+    enum PartitionType {
+        DATE,
+        INT,
+        ENUM;
+
+        public static PartitionType getType(String str) {
+            return valueOf(str.toUpperCase());
         }
+    }
 
-        byte[] meta = inputData.getFragmentMetadata();
-        if (meta == null) {
-            return;
-        }
-        String[] partitionBy = inputData.getUserProperty("PARTITION_BY").split(":");
-        String partitionColumn = partitionBy[0];
-        PartitionType partitionType = PartitionType.typeOf(partitionBy[1]);
-        DbProduct dbProduct = DbProduct.getDbProduct(dbName);
+    enum IntervalType {
+        DAY,
+        MONTH,
+        YEAR;
 
-        if (!query.toString().contains("WHERE")) {
-            query.append(" WHERE ");
-        }
-        else {
-            query.append(" AND ");
-        }
-
-        switch (partitionType) {
-            case DATE: {
-                byte[][] newb = ByteUtil.splitBytes(meta);
-                Date fragStart = new Date(ByteUtil.toLong(newb[0]));
-                Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
-
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                query.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(fragStart)));
-                query.append(" AND ");
-                query.append(partitionColumn).append(" < ").append(dbProduct.wrapDate(df.format(fragEnd)));
-
-                break;
-            }
-            case INT: {
-                byte[][] newb = ByteUtil.splitBytes(meta);
-                long fragStart = ByteUtil.toLong(newb[0]);
-                long fragEnd = ByteUtil.toLong(newb[1]);
-
-                query.append(partitionColumn).append(" >= ").append(fragStart);
-                query.append(" AND ");
-                query.append(partitionColumn).append(" < ").append(fragEnd);
-                break;
-            }
-            case ENUM: {
-                query.append(partitionColumn).append(" = '").append(new String(meta)).append("'");
-                break;
-            }
+        public static IntervalType type(String str) {
+            return valueOf(str.toUpperCase());
         }
     }
 
     /**
-     * Class constructor.
+     * Constructor for JdbcPartitionFragmenter.
      *
-     * @param inputData PXF InputData
-     * @throws UserDataException if the request parameter is malformed
+     * @param inConf input data such as which Jdbc table to scan
+     * @throws UserDataException  if the request parameter is malformed
      */
-    public JdbcPartitionFragmenter(InputData inputData) throws UserDataException {
-        super(inputData);
-        if (inputData.getUserProperty("PARTITION_BY") == null) {
+    public JdbcPartitionFragmenter(InputData inConf) throws UserDataException {
+        super(inConf);
+        if (inConf.getUserProperty("PARTITION_BY") == null)
             return;
-        }
-
-        // PARTITION_BY
         try {
-            partitionType = PartitionType.typeOf(
-                inputData.getUserProperty("PARTITION_BY").split(":")[1]
-            );
-        }
-        catch (IllegalArgumentException | ArrayIndexOutOfBoundsException ex) {
-            throw new UserDataException("The parameter 'PARTITION_BY' is invalid. The pattern is '<column_name>:date|int|enum'");
+            partitionBy = inConf.getUserProperty("PARTITION_BY").split(":");
+            partitionColumn = partitionBy[0];
+            partitionType = PartitionType.getType(partitionBy[1]);
+        } catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'PARTITION_BY' invalid, the pattern is 'column_name:date|int|enum'");
         }
 
-        // RANGE
         try {
-            String rangeStr = inputData.getUserProperty("RANGE");
-            if (rangeStr != null) {
-                range = rangeStr.split(":");
-                if (range.length == 1 && partitionType != PartitionType.ENUM) {
-                    throw new UserDataException("The parameter 'RANGE' must specify ':<end_value>' for this PARTITION_TYPE");
-                }
+            range = inConf.getUserProperty("RANGE").split(":");
+        } catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'RANGE' invalid, the pattern is 'start_value[:end_value]'");
+        }
+        try {
+            //parse and validate parameter-INTERVAL
+            if (inConf.getUserProperty("INTERVAL") != null) {
+                interval = inConf.getUserProperty("INTERVAL").split(":");
+                intervalNum = Integer.parseInt(interval[0]);
+                if (interval.length > 1)
+                    intervalType = IntervalType.type(interval[1]);
             }
-            else {
-                throw new UserDataException("The parameter 'RANGE' must be specified along with 'PARTITION_BY'");
-            }
-
+            if (intervalNum < 1)
+                throw new UserDataException("The parameter 'INTERVAL' must > 1, but actual is '" + intervalNum + "'");
+        } catch (IllegalArgumentException e1) {
+            throw new UserDataException("The parameter 'INTERVAL' invalid, the pattern is 'interval_num[:interval_unit]'");
+        } catch (UserDataException e2) {
+            throw e2;
+        }
+        try {
             if (partitionType == PartitionType.DATE) {
-                // Parse DATE partition type values
-                try {
-                    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
-                    rangeDateStart = Calendar.getInstance();
-                    rangeDateStart.setTime(df.parse(range[0]));
-                    rangeDateEnd = Calendar.getInstance();
-                    rangeDateEnd.setTime(df.parse(range[1]));
-                }
-                catch (ParseException e) {
-                    throw new UserDataException("The parameter 'RANGE' has invalid date format. The correct format is 'yyyy-MM-dd'");
-                }
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+                rangeStart = Calendar.getInstance();
+                rangeStart.setTime(df.parse(range[0]));
+                rangeEnd = Calendar.getInstance();
+                rangeEnd.setTime(df.parse(range[1]));
             }
-            else if (partitionType == PartitionType.INT) {
-                // Parse INT partition type values
-                try {
-                    rangeIntStart = Long.parseLong(range[0]);
-                    rangeIntEnd = Long.parseLong(range[1]);
-                }
-                catch (NumberFormatException e) {
-                    throw new UserDataException("The parameter 'RANGE' is invalid. Both range boundaries must be integers");
-                }
-            }
-        }
-        catch (IllegalArgumentException ex) {
-            throw new UserDataException("The parameter 'RANGE' is invalid. The pattern is '<start_value>[:<end_value>]'");
-        }
-
-        // INTERVAL
-        try {
-            String intervalStr = inputData.getUserProperty("INTERVAL");
-            if (intervalStr != null) {
-                String[] interval = intervalStr.split(":");
-                try {
-                    intervalNum = Long.parseLong(interval[0]);
-                    if (intervalNum < 1) {
-                        throw new UserDataException("The '<interval_num>' in parameter 'INTERVAL' must be at least 1, but actual is " + intervalNum);
-                    }
-                }
-                catch (NumberFormatException ex) {
-                    throw new UserDataException("The '<interval_num>' in parameter 'INTERVAL' must be an integer");
-                }
-
-                // Intervals of type DATE
-                if (interval.length > 1) {
-                    intervalType = IntervalType.typeOf(interval[1]);
-                }
-                if (interval.length == 1 && partitionType == PartitionType.DATE) {
-                    throw new UserDataException("The parameter 'INTERVAL' must specify unit (':year|month|day') for the PARTITION_TYPE = 'DATE'");
-                }
-            }
-            else if (partitionType != PartitionType.ENUM) {
-                throw new UserDataException("The parameter 'INTERVAL' must be specified along with 'PARTITION_BY' for this PARTITION_TYPE");
-            }
-        }
-        catch (IllegalArgumentException ex) {
-            throw new UserDataException("The parameter 'INTERVAL' is invalid. The pattern is '<interval_num>[:<interval_unit>]'");
+        } catch (ParseException e) {
+            throw new UserDataException("The parameter 'RANGE' include invalid date format.");
         }
     }
 
     /**
+     * Returns statistics for Jdbc table. Currently it's not implemented.
      * @throws UnsupportedOperationException ANALYZE for Jdbc plugin is not supported
      */
     @Override
     public FragmentsStats getFragmentsStats() throws UnsupportedOperationException {
-        throw new UnsupportedOperationException("ANALYZE for JDBC plugin is not supported");
+        throw new UnsupportedOperationException("ANALYZE for Jdbc plugin is not supported");
     }
 
     /**
-     * getFragments() implementation
+     * Returns list of fragments containing all of the
+     * Jdbc table data.
      *
-     * @return a list of fragments to be passed to PXF segments
+     * @return a list of fragments
+     * @throws Exception if assign host error
      */
     @Override
-    public List<Fragment> getFragments() {
+    public List<Fragment> getFragments() throws Exception {
         if (partitionType == null) {
-            // No partition case
-            Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, null);
+            byte[] fragmentMetadata = null;
+            byte[] userData = null;
+            Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
             fragments.add(fragment);
-            return fragments;
+            return prepareHosts(fragments);
         }
-
         switch (partitionType) {
             case DATE: {
-                Calendar fragStart = rangeDateStart;
+                int currInterval = intervalNum;
 
-                while (fragStart.before(rangeDateEnd)) {
-                    // Calculate a new fragment
-                    Calendar fragEnd = (Calendar)fragStart.clone();
+                Calendar fragStart = rangeStart;
+                while (fragStart.before(rangeEnd)) {
+                    Calendar fragEnd = (Calendar) fragStart.clone();
                     switch (intervalType) {
                         case DAY:
-                            fragEnd.add(Calendar.DAY_OF_MONTH, (int)intervalNum);
+                            fragEnd.add(Calendar.DAY_OF_MONTH, currInterval);
                             break;
                         case MONTH:
-                            fragEnd.add(Calendar.MONTH, (int)intervalNum);
+                            fragEnd.add(Calendar.MONTH, currInterval);
                             break;
                         case YEAR:
-                            fragEnd.add(Calendar.YEAR, (int)intervalNum);
+                            fragEnd.add(Calendar.YEAR, currInterval);
                             break;
                     }
-                    if (fragEnd.after(rangeDateEnd))
-                        fragEnd = (Calendar)rangeDateEnd.clone();
+                    if (fragEnd.after(rangeEnd))
+                        fragEnd = (Calendar) rangeEnd.clone();
 
-                    // Convert to byte[]
+                    //make metadata of this fragment , converts the date to a millisecond,then get bytes.
                     byte[] msStart = ByteUtil.getBytes(fragStart.getTimeInMillis());
                     byte[] msEnd = ByteUtil.getBytes(fragEnd.getTimeInMillis());
                     byte[] fragmentMetadata = ByteUtil.mergeBytes(msStart, msEnd);
 
-                    // Write fragment
-                    Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
+                    byte[] userData = new byte[0];
+                    Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
                     fragments.add(fragment);
 
-                    // Prepare for the next fragment
+                    //continue next fragment.
                     fragStart = fragEnd;
                 }
                 break;
             }
             case INT: {
-                long fragStart = rangeIntStart;
+                int rangeStart = Integer.parseInt(range[0]);
+                int rangeEnd = Integer.parseInt(range[1]);
+                int currInterval = intervalNum;
 
-                while (fragStart < rangeIntEnd) {
-                    // Calculate a new fragment
-                    long fragEnd = fragStart + intervalNum;
-                    if (fragEnd > rangeIntEnd) {
-                        fragEnd = rangeIntEnd;
-                    }
+                //validate : curr_interval > 0
+                int fragStart = rangeStart;
+                while (fragStart < rangeEnd) {
+                    int fragEnd = fragStart + currInterval;
+                    if (fragEnd > rangeEnd) fragEnd = rangeEnd;
 
-                    // Convert to byte[]
                     byte[] bStart = ByteUtil.getBytes(fragStart);
                     byte[] bEnd = ByteUtil.getBytes(fragEnd);
                     byte[] fragmentMetadata = ByteUtil.mergeBytes(bStart, bEnd);
 
-                    // Write fragment
-                    Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
+                    byte[] userData = new byte[0];
+                    Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, userData);
                     fragments.add(fragment);
 
-                    // Prepare for the next fragment
-                    fragStart = fragEnd;
+                    //continue next fragment.
+                    fragStart = fragEnd;// + 1;
                 }
                 break;
             }
-            case ENUM: {
+            case ENUM:
                 for (String frag : range) {
                     byte[] fragmentMetadata = frag.getBytes();
-                    Fragment fragment = new Fragment(inputData.getDataSource(), pxfHosts, fragmentMetadata);
+                    Fragment fragment = new Fragment(inputData.getDataSource(), null, fragmentMetadata, new byte[0]);
                     fragments.add(fragment);
                 }
                 break;
-            }
+        }
+
+        return prepareHosts(fragments);
+    }
+
+    /**
+     * For each fragment , assigned a host address.
+     * In Jdbc Plugin, 'replicas' is the host address of the PXF engine that is running, not the database engine.
+     * Since the other PXF host addresses can not be probed, only the host name of the current PXF engine is returned.
+     * @param fragments a list of fragments
+     * @return a list of fragments that assigned hosts.
+     * @throws UnknownHostException if InetAddress.getLocalHost error.
+     */
+    public static List<Fragment> prepareHosts(List<Fragment> fragments) throws UnknownHostException {
+        for (Fragment fragment : fragments) {
+            String pxfHost = InetAddress.getLocalHost().getHostAddress();
+            String[] hosts = new String[]{pxfHost};
+            fragment.setReplicas(hosts);
         }
 
         return fragments;
     }
 
-    // Partition parameters (filled by class constructor)
-    private String[] range = null;
-    private PartitionType partitionType = null;
-    private long intervalNum;
+    public String buildFragmenterSql(String dbName, String originSql) {
+        byte[] meta = inputData.getFragmentMetadata();
+        if (meta == null)
+            return originSql;
 
-    // Partition parameters for INT partitions (filled by class constructor)
-    private long rangeIntStart;
-    private long rangeIntEnd;
+        DbProduct dbProduct = DbProduct.getDbProduct(dbName);
 
-    // Partition parameters for DATE partitions (filled by class constructor)
-    private IntervalType intervalType;
-    private Calendar rangeDateStart;
-    private Calendar rangeDateEnd;
+        StringBuilder sb = new StringBuilder(originSql);
+        if (!originSql.contains("WHERE"))
+            sb.append(" WHERE 1=1 ");
 
-    private static enum PartitionType {
-        DATE,
-        INT,
-        ENUM;
+        sb.append(" AND ");
+        switch (partitionType) {
+            case DATE: {
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd");
+                //parse metadata of this fragment
+                //validate：the length of metadata == 16 (long)
+                byte[][] newb = ByteUtil.splitBytes(meta, 8);
+                Date fragStart = new Date(ByteUtil.toLong(newb[0]));
+                Date fragEnd = new Date(ByteUtil.toLong(newb[1]));
 
-        public static PartitionType typeOf(String str) {
-            return valueOf(str.toUpperCase());
+                sb.append(partitionColumn).append(" >= ").append(dbProduct.wrapDate(df.format(fragStart)));
+                sb.append(" AND ");
+                sb.append(partitionColumn).append(" < ").append(dbProduct.wrapDate(df.format(fragEnd)));
+
+                break;
+            }
+            case INT: {
+                //validate：the length of metadata ==8 （int)
+                byte[][] newb = ByteUtil.splitBytes(meta, 4);
+                int fragStart = ByteUtil.toInt(newb[0]);
+                int fragEnd = ByteUtil.toInt(newb[1]);
+                sb.append(partitionColumn).append(" >= ").append(fragStart);
+                sb.append(" AND ");
+                sb.append(partitionColumn).append(" < ").append(fragEnd);
+                break;
+            }
+            case ENUM:
+                sb.append(partitionColumn).append("='").append(new String(meta)).append("'");
+                break;
         }
-    }
-
-    private static enum IntervalType {
-        DAY,
-        MONTH,
-        YEAR;
-
-        public static IntervalType typeOf(String str) {
-            return valueOf(str.toUpperCase());
-        }
-    }
-
-    // A PXF engine to use as a host for fragments
-    private static final String[] pxfHosts;
-    static {
-        String[] localhost = {"localhost"};
-        try {
-            localhost[0] = InetAddress.getLocalHost().getHostAddress();
-        }
-        catch (UnknownHostException ex) {
-            // It is always possible to get 'localhost' address
-        }
-        pxfHosts = localhost;
+        return sb.toString();
     }
 }

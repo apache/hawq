@@ -30,12 +30,16 @@
 
 #include "portability/instr_time.h"	/* Monitor the dispatcher performance */
 
+#include "pqexpbuffer.h"
+
 struct DispatchData;
 struct DispatchTask;
 struct DispatchSlice;
 struct QueryExecutor;
 struct Segment;
 struct SegmentDatabaseDescriptor;
+struct MainDispatchData;
+struct NewDispatchTask;
 
 /* Executor state. */
 extern struct QueryExecutor *executormgr_create_executor(void);
@@ -66,7 +70,7 @@ extern struct SegmentDatabaseDescriptor *executormgr_allocate_executor(
 extern struct SegmentDatabaseDescriptor *executormgr_takeover_segment_conns(struct QueryExecutor *executor);
 extern void executormgr_free_takeovered_segment_conn(struct SegmentDatabaseDescriptor *desc);
 extern void executormgr_get_executor_connection_info(struct QueryExecutor *executor,
-							char **address, int *port, int *pid);
+							char **address, int *port, int *myPort, int *pid);
 extern bool	executormgr_is_stop(struct QueryExecutor *executor);
 extern bool	executormgr_has_error(struct QueryExecutor *executor);
 extern int	executormgr_get_executor_slice_id(struct QueryExecutor *executor);
@@ -100,6 +104,14 @@ extern void executormgr_free_executor(struct SegmentDatabaseDescriptor *desc);
 
 extern bool executormgr_has_cached_executor();
 extern void executormgr_clean_cached_executor();
+
+extern bool executormgr_addDispGuc(PQExpBuffer str, bool isSuperUser);
+extern bool
+executormgr_add_guc(PQExpBuffer str, bool is_superuser);
+extern bool
+executormgr_add_address(struct SegmentDatabaseDescriptor *segdbDesc, bool skipHost, PQExpBuffer str);
+extern bool
+executormgr_add_static_state(PQExpBuffer str, bool is_writer);
 
 #endif	/* EXECUTORMGR_H */
 

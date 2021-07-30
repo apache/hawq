@@ -148,6 +148,8 @@ extern Plan *add_repeat_node(Plan *result_plan, int repeat_count, uint64 groupin
  */
 extern Plan *create_plan(PlannerInfo *root, Path *path);
 extern bool is_pxf_protocol(Uri *uri);
+extern bool is_hdfs_protocol(Uri *uri);
+extern bool is_magma_protocol(Uri *uri);
 extern int pxf_calc_participating_segments(int total_segments);
 
 extern SubqueryScan *make_subqueryscan(PlannerInfo *root, List *qptlist, List *qpqual,

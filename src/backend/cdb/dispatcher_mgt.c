@@ -33,6 +33,7 @@
 #include "cdb/cdbvars.h"
 #include "miscadmin.h"			/* TODO: GetAuthenticatedUserId */
 
+#include "magma/cwrapper/magma-client-c.h"
 /* for poll */
 #ifdef HAVE_POLL_H
 #include <poll.h>
@@ -290,6 +291,13 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 		if (err_handle_executor == NULL)
 			err_handle_executor = executor;
 
+		if (workermgr_should_query_terminate(state)) {
+			write_log("%s(): query is terminated before dispatching. "
+					  "Will exit and clean up.", __func__);
+			err_handle_executor = executor;
+			goto error_cleanup;
+		}
+
 		if (workermgr_should_query_stop(state)) {
 			write_log("%s(): query is canceled before dispatching. "
 					  "Will exit and clean up.", __func__);
@@ -311,6 +319,13 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 		int 	nfds = 0;
 		int 	n;
 		int 	cur_fds_idx = 0;
+
+		/* Check global state to terminate query, this let poll process easier. */
+		if (workermgr_should_query_terminate(state)){
+			write_log("%s(): query is terminated before polling executors."
+					  "Will exit and clean up.", __func__);
+			goto error_cleanup;
+		}
 
 		/* Check global state to abort query, this let poll process easier. */
 		if (workermgr_should_query_stop(state)){
@@ -401,38 +416,66 @@ dispmgt_thread_func_run(QueryExecutorGroup *group, struct WorkerMgrState *state)
 	}
 
 error_cleanup:
-	/*
-	 * Cleanup rules:
-	 * 1. query cancel, result error, and poll error: mark the executor stop.
-	 * 2. connection error: mark the gang error. Set by workermgr_mark_executor_error().
-	 */
-	workermgr_set_state_cancel(state);
-	dispmgt_init_query_executor_in_group_iterator(group, &iterator, false);
-	while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
+
+	if (workermgr_should_query_terminate(state))
 	{
-		if (!executormgr_is_stop(executor))
+		dispmgt_init_query_executor_in_group_iterator(group, &iterator, false);
+		while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
 		{
-			/*
-			 * Executor is running, cancel it. If connection error occurs let
-			 * following code cope with it.
-			 */
-			executormgr_cancel(executor);
+			if (!executormgr_is_stop(executor))
+			{
+				/*
+				 * Executor is running, cancel it. If connection error occurs let
+				 * following code cope with it.
+				 */
+				executormgr_cancel(executor);
+			}
+		}
+	}
+	else if (err_handle_executor != NULL || workermgr_should_query_stop(state))
+	{
+		/*
+		 * Cleanup rules:
+		 * 1. query cancel, result error, and poll error: mark the executor stop.
+		 * 2. connection error: mark the gang error. Set by workermgr_mark_executor_error().
+		 */
+		workermgr_set_state_cancel(state);
+		dispmgt_init_query_executor_in_group_iterator(group, &iterator, false);
+		while ((executor = dispmgt_get_query_executor_in_group_iterator(group, &iterator)) != NULL)
+		{
+			if (!executormgr_is_stop(executor))
+			{
+				/*
+				 * Executor is running, cancel it. If connection error occurs let
+				 * following code cope with it.
+				 */
+				executormgr_cancel(executor);
+			}
+
+			/* Executor stopped but no error. */
+			if (!executormgr_has_error(executor))
+				continue;
 		}
 
-		/* Executor stopped but no error. */
-		if (!executormgr_has_error(executor))
-			continue;
+		/*
+		 * Previously query failed, probably in this executor. We need to
+		 * set error code here if it has not been set although the executor
+		 * is probably fine. This let the main process for the query proceed
+		 * to cancel the query in its thread also, without waiting for a long
+		 * time. We expect the error code have been set previously before jumping
+		 * to error_cleanup. The code below could be the last defence.
+		 */
+		executormgr_seterrcode_if_needed(err_handle_executor);
 	}
 
 	/*
-	 * Previously query failed, probably in this executor. We need to
-	 * set error code here if it has not been set although the executor
-	 * is probably fine. This let the main process for the query proceed
-	 * to cancel the query in its thread also, without waiting for a long
-	 * time. We expect the error code have been set previously before jumping
-	 * to error_cleanup. The code below could be the last defence.
+	 * Make sure magma client is cancelled
 	 */
-	executormgr_seterrcode_if_needed(err_handle_executor);
+	MagmaClientC_CancelMagmaClient();
+	MagmaFormatC_CancelMagmaClient();
+
+	if (MyNewExecutor != NULL)
+		MyExecutorSetCancelQuery(MyNewExecutor);
 
 thread_return:
 	return;

@@ -580,7 +580,9 @@ compresstype_is_valid(char *comptype)
 	 */
 	if(!found)
 	{
-		if(strcmp(comptype, "snappy") == 0 || strcmp(comptype, "gzip") == 0)
+		if(strcmp(comptype, "snappy") == 0 ||
+		    strcmp(comptype, "gzip") == 0 ||
+		    strcmp(comptype, "lz4") == 0)
 			found = true;
 	}
 

@@ -97,8 +97,10 @@
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchresult.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/cdbgang.h"
 #include "cdb/cdbfilesystemcredential.h"
+#include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/ml_ipc.h"
 #include "utils/guc.h"
 #include "access/twophase.h"
@@ -129,6 +131,14 @@
 #include "resourcemanager/resourcemanager.h"
 #include "resourcemanager/resourceenforcer/resourceenforcer_hash.h"
 #include "resourcemanager/resourceenforcer/resourceenforcer.h"
+
+#include "storage/cwrapper/hdfs-file-system-c.h"
+#include "scheduler/cwrapper/scheduler-c.h"
+#include "magma/cwrapper/magma-client-c.h"
+
+#include "pg_stat_activity_history_process.h"
+#include "utils/portal.h"
+#include "utils/timestamp.h"
 
 extern int	optind;
 extern char *optarg;
@@ -471,6 +481,7 @@ SocketBackend(StringInfo inBuf)
 			break;
 
 		case 'M':				/* Greenplum Database dispatched statement from QD */
+		case 'L':
 
 			doing_extended_query_message = false;
 
@@ -547,7 +558,8 @@ SocketBackend(StringInfo inBuf)
 			break;
 
 		case 'W':   /* Greenplum Database command for transmitting listener port. */
-
+		case 'V':   /* for Proxy dispatcher startup*/
+		case 'J':
 			break;
 
 		default:
@@ -1175,6 +1187,7 @@ exec_mpp_query(const char *query_string,
 		RebuildQueryContext(plan->contextdisp, &currentFilesystemCredentials,
                 &currentFilesystemCredentialsMemoryContext);
 		FinalizeQueryContextInfo(plan->contextdisp);
+		set_magma_range_vseg_map(plan->scantable_splits, GetQEGangNum());
     }
 
 	/*
@@ -1460,6 +1473,9 @@ exec_mpp_query(const char *query_string,
 		set_filesystem_credentials(portal, currentFilesystemCredentials,
                 currentFilesystemCredentialsMemoryContext);
 
+		// disable read cache mechanism
+		resetReadCache(false);
+
 		/*
 		 * Start the portal.  No parameters here.
 		 */
@@ -1558,6 +1574,18 @@ exec_mpp_query(const char *query_string,
 }
 
 /*
+ * IsDML
+ *
+ * Judge if current query is a DML query.
+ */
+
+bool IsDML(List *parsetree_list){
+ Node *headnode = (Node *) lfirst(list_head(parsetree_list));
+ return (nodeTag(headnode) == T_InsertStmt || nodeTag(headnode) == T_DeleteStmt ||
+   nodeTag(headnode) == T_UpdateStmt || nodeTag(headnode) == T_SelectStmt) ? true : false;
+}
+
+/*
  * exec_simple_query
  *
  * Execute a "simple Query" protocol message.
@@ -1573,6 +1601,9 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 	bool		was_logged = false;
 	bool		isTopLevel = false;
 	char		msec_str[32];
+	char		tmp_time[100];
+	bool		current_enable_pg_stat_activity_history = enable_pg_stat_activity_history;
+	const char	*start_time;
 
 	if (Gp_role != GP_ROLE_EXECUTE)
 	{
@@ -1584,6 +1615,19 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 			elog(NOTICE, "running query (sessionId, commandId): (%d, %d)",
 				 MyProc->mppSessionId, gp_command_count);
 		}
+	}
+
+	/*
+	 * set current query text and it's creation time
+	 */
+	if (Gp_role == GP_ROLE_DISPATCH && current_enable_pg_stat_activity_history)
+	{
+		is_qtype_sql = true;
+		sql_text = query_string;
+		start_time = timestamptz_to_str(GetCurrentTimestamp());
+		memset(tmp_time, '\0', 100);
+		strncpy(tmp_time, start_time, strlen(start_time));
+		sql_creation_time = tmp_time;
 	}
 
 	/*
@@ -1750,6 +1794,29 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 
 		plantree_list = pg_plan_queries(querytree_list, NULL, true, QRL_ONCE);
 
+		// set memory and cpu
+		if (Gp_role == GP_ROLE_DISPATCH && current_enable_pg_stat_activity_history)
+		{
+			// init
+			sql_memory = 0;
+			sql_cpu = 0;
+			if (IsDML(parsetree_list))
+			{
+				ListCell   *plantree_list_item = NULL;
+				foreach(plantree_list_item,plantree_list)
+				{
+					Node *plantree_node = (Node *) lfirst(plantree_list_item);
+					if ((*(PlannedStmt *)plantree_node).resource != NULL)
+					{
+						sql_memory += (*(PlannedStmt *)plantree_node).resource->segment_memory_mb *
+						(*(PlannedStmt *)plantree_node).planner_segments;
+						sql_cpu += (*(PlannedStmt *)plantree_node).resource->segment_vcore *
+						(*(PlannedStmt *)plantree_node).planner_segments;
+					}
+				}
+			}
+		}
+
 		/* Done with the snapshot used for parsing/planning */
 		ActiveSnapshot = NULL;
 		if (mySnapshot)
@@ -1780,6 +1847,9 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 						  MessageContext);
 
 		create_filesystem_credentials(portal);
+
+		// enable read cache mechanism
+		resetReadCache(true);
 
 		/*
 		 * Start the portal.  No parameters here.
@@ -1838,8 +1908,19 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 		 */
 		InMemHeap_DropAll(INMEM_HEAP_MAPPING);
 		CleanupOidInMemHeapMapping(INMEM_HEAP_MAPPING);
-
+		if (Gp_role == GP_ROLE_DISPATCH && current_enable_pg_stat_activity_history)
+		{
+			char *errorInfo = "";
+			pgStatActivityHistory_send(MyProc->databaseId, MyProc->roleId, MyProc->pid,
+																 MyProc->mppSessionId, sql_creation_time,
+																 timestamptz_to_str(GetCurrentTimestamp()), MyProcPort, application_name,
+																 sql_cpu, sql_memory, 1, errorInfo, sql_text);
+		}
 		PortalDrop(portal, false);
+		if (enable_secure_filesystem)
+			ActivePortal = NULL;
+
+		commitReadCache();
 
 		if (IsA(parsetree, TransactionStmt))
 		{
@@ -1871,7 +1952,6 @@ exec_simple_query(const char *query_string, const char *seqServerHost, int seqSe
 			 */
 			CommandCounterIncrement();
 		}
-
 		/*
 		 * Tell client that we're done with this query.  Note we emit exactly
 		 * one EndCommand report for each raw parsetree, thus one for each SQL
@@ -2545,6 +2625,9 @@ exec_bind_message(StringInfo input_message)
 					  qContext);
 
 	create_filesystem_credentials(portal);
+
+	// disable read cache mechanism
+	resetReadCache(false);
 
 	PortalStart(portal, params, InvalidSnapshot,
 				savedSeqServerHost, savedSeqServerPort);
@@ -3379,6 +3462,18 @@ die(SIGNAL_ARGS)
 		QueryCancelPending = true;
 
 		/*
+		 * Make sure magma client is cancelled
+		 */
+		MagmaClientC_CancelMagmaClient();
+		MagmaFormatC_CancelMagmaClient();
+
+		if (MyScheduler != NULL)
+		  SchedulerCancelQuery(MyScheduler);
+
+		if (MyNewExecutor != NULL)
+			MyExecutorSetCancelQuery(MyNewExecutor);
+
+		/*
 		 * If it's safe to interrupt, and we're waiting for input or a lock,
 		 * service the interrupt immediately
 		 */
@@ -3446,6 +3541,18 @@ StatementCancelHandler(SIGNAL_ARGS)
 		QueryCancelCleanup = true;
 
 		/*
+		 * Make sure magma client is cancelled
+		 */
+		MagmaClientC_CancelMagmaClient();
+		MagmaFormatC_CancelMagmaClient();
+
+		if (MyScheduler != NULL)
+		  SchedulerCancelQuery(MyScheduler);
+
+		if (MyNewExecutor != NULL)
+			MyExecutorSetCancelQuery(MyNewExecutor);
+
+		/*
 		 * If it's safe to interrupt, and we're waiting for a lock, service
 		 * the interrupt immediately.  No point in interrupting if we're
 		 * waiting for input, however.
@@ -3456,7 +3563,7 @@ StatementCancelHandler(SIGNAL_ARGS)
 			/* bump holdoff count to make ProcessInterrupts() a no-op */
 			/* until we are done getting ready for it */
 			InterruptHoldoffCount++;
-			if (LockWaitCancel()||InterruptWhenCallingPLUDF)
+			if (LockWaitCancel())
 			{
 				DisableNotifyInterrupt();
 				DisableCatchupInterrupt();
@@ -3464,7 +3571,9 @@ StatementCancelHandler(SIGNAL_ARGS)
 				ProcessInterrupts();
 			}
 			else
+			{
 				InterruptHoldoffCount--;
+			}
 		}
 	}
 
@@ -3613,10 +3722,11 @@ ProcessInterrupts(void)
 			ImmediateInterruptOK = false;	/* not idle anymore */
 			DisableNotifyInterrupt();
 			DisableCatchupInterrupt();
+			pid_t pid = getpid();
 			if (Gp_role == GP_ROLE_EXECUTE)
 				ereport(ERROR,
 						(errcode(ERRCODE_GP_OPERATION_CANCELED),
-						 errmsg("canceling MPP operation")));
+						 errmsg("canceling MPP operation, pid:%d", pid)));
 			else if (cancel_from_timeout)
 				ereport(ERROR,
 						(errcode(ERRCODE_QUERY_CANCELED),
@@ -3859,6 +3969,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 	sigjmp_buf	local_sigjmp_buf;
 	volatile bool send_ready_for_query = true;
 	int			topErrCode;
+	struct ProxyDispatchData *dispatchData = NULL;
 
 	MemoryAccount *postgresMainMemoryAccount = NULL;
 
@@ -4490,6 +4601,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 		InitResQueues();
 #endif
 
+
 	/*
 	 * Now that we know if client is a superuser, we can try to apply SUSET
 	 * GUC options that came from the client.
@@ -4764,6 +4876,8 @@ PostgresMain(int argc, char *argv[], const char *username)
 		 */
 		QueryCancelPending = false;		/* forget any earlier CANCEL signal */
 		DoingCommandRead = true;
+    if (Gp_role == GP_ROLE_DISPATCH || Gp_role == GP_ROLE_EXECUTE)
+      resetMyNewExecutorCancelFlag();
 
 #ifdef USE_TEST_UTILS
 		/* reset time slice */
@@ -4804,17 +4918,18 @@ PostgresMain(int argc, char *argv[], const char *username)
 			 * This means giving the end user enough time to type in the next SQL statement
 			 *
 			 */
-			if (IdleSessionGangTimeout > 0 && executormgr_has_cached_executor())
-            {
-				if (!enable_sig_alarm( IdleSessionGangTimeout /* ms */, false))
-                {
-					elog(FATAL, "could not set timer for client wait timeout");
-                }
-            }
-            else if (IdleSessionGangTimeout == 0)
-            {
-                executormgr_clean_cached_executor();
-            }
+		  if (executormgr_has_cached_executor() || executormgr_hasCachedExecutor()) {
+        if (IdleSessionGangTimeout > 0)
+        {
+          if (!enable_sig_alarm( IdleSessionGangTimeout /* ms */, false))
+          {
+            elog(FATAL, "could not set timer for client wait timeout");
+          }
+        } else if (IdleSessionGangTimeout == 0) {
+          executormgr_clean_cached_executor();
+          executormgr_cleanCachedExecutor();
+        }
+		  }
 		}
 
 		IdleTracker_DeactivateProcess();
@@ -4925,6 +5040,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					const char *seqServerHost = NULL;
 					const char *serializedIdentity = NULL;
 					const char *serializedResource = NULL;
+					const char *serializedCommonPlan = NULL;
 					
 					int query_string_len = 0;
 					int serializedSnapshotlen = 0;
@@ -4936,6 +5052,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					int seqServerPort = -1;
 					int	serializedIdentityLen = 0;
 					int serializedResourceLen = 0;
+					int serializedCommonPlanLen = 0;
 					int		localSlice;
 					int		rootIdx;
 					int		primary_gang_id;
@@ -4993,6 +5110,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					serializedSnapshotlen = pq_getmsgint(&input_message, 4);
 					serializedIdentityLen = pq_getmsgint(&input_message, 4);
 					serializedResourceLen = pq_getmsgint(&input_message, 4);
+					serializedCommonPlanLen = pq_getmsgint(&input_message, 4);
 						
 					/* read in the snapshot info */
 					if (serializedSnapshotlen == 0)
@@ -5029,6 +5147,9 @@ PostgresMain(int argc, char *argv[], const char *username)
 					if (serializedResourceLen > 0)
 						serializedResource = pq_getmsgbytes(&input_message, serializedResourceLen);
 
+					if (serializedCommonPlanLen > 0)
+						serializedCommonPlan = pq_getmsgbytes(&input_message, serializedCommonPlanLen);
+
 					if (seqServerHostlen > 0)
 						seqServerHost = pq_getmsgbytes(&input_message, seqServerHostlen);
 
@@ -5054,7 +5175,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 						char *completeSerializedIdentity = (char *) palloc((serializedIdentityLen + 1) * sizeof(char) );
 						memcpy(completeSerializedIdentity, serializedIdentity, serializedIdentityLen);
 						completeSerializedIdentity[serializedIdentityLen] = '\0';
-						SetupProcessIdentity((const char*)completeSerializedIdentity);
+						SetupProcessIdentity((const char*)completeSerializedIdentity, false);
 						pfree(completeSerializedIdentity);
 					}
 
@@ -5085,20 +5206,255 @@ PostgresMain(int argc, char *argv[], const char *username)
 							exec_simple_query(query_string, seqServerHost, seqServerPort);
 						}
 					}
-					else
-						exec_mpp_query(query_string,
-									   serializedQuerytree, serializedQuerytreelen,
-									   serializedPlantree, serializedPlantreelen,
-									   serializedParams, serializedParamslen,
-									   serializedSliceInfo, serializedSliceInfolen,
-									   serializedResource, serializedResourceLen,
-									   seqServerHost, seqServerPort, localSlice);
+					else {
+						if (serializedCommonPlanLen > 0) {
+							exec_mpp_query_new(
+									serializedCommonPlan,
+									serializedCommonPlanLen,
+									localSlice, true, NULL, NULL);
+							if (enable_secure_filesystem &&
+									Gp_role == GP_ROLE_EXECUTE) {
+								cleanup_FSManager();
+							}
+							StringInfoData buf;
+							pq_beginmessage(&buf, 'C');
+							pq_sendstring(&buf, getMyNewExecutorCompletionTag());
+							pq_endmessage(&buf);
+						} else
+							exec_mpp_query(
+									query_string,
+									serializedQuerytree,
+									serializedQuerytreelen,
+									serializedPlantree,
+									serializedPlantreelen,
+									serializedParams,
+									serializedParamslen,
+									serializedSliceInfo,
+									serializedSliceInfolen,
+									serializedResource,
+									serializedResourceLen,
+									seqServerHost, seqServerPort,
+									localSlice);
+					}
 
 					SetUserIdAndContext(GetOuterUserId(), false);
 
 					send_ready_for_query = true;
 				}
 				break;
+
+      case 'L':
+      {
+        const char *query_string = pstrdup("");
+
+                  const char *serializedSnapshot = NULL;
+                  const char *serializedQuerytree = NULL;
+                  const char *serializedPlantree = NULL;
+                  const char *serializedParams = NULL;
+                  const char *serializedSliceInfo = NULL;
+                  const char *seqServerHost = NULL;
+                  const char *serializedIdentity = NULL;
+                  const char *serializedResource = NULL;
+                  const char *serializedCommonPlan = NULL;
+
+                  int query_string_len = 0;
+                  int serializedSnapshotlen = 0;
+                  int serializedQuerytreelen = 0;
+                  int serializedPlantreelen = 0;
+                  int serializedParamslen = 0;
+                  int serializedSliceInfolen = 0;
+                  int seqServerHostlen = 0;
+                  int seqServerPort = -1;
+                  int serializedIdentityLen = 0;
+                  int serializedResourceLen = 0;
+                  int serializedCommonPlanLen = 0;
+                  int   rootIdx;
+                  int   primary_gang_id;
+                  TimestampTz statementStart;
+                  Oid   suid;
+                  Oid   ouid;
+                  Oid   cuid;
+                  bool  suid_is_super = false;
+                  bool  ouid_is_super = false;
+
+                  int unusedFlags;
+
+                  /* Set statement_timestamp() */
+                  SetCurrentStatementStartTimestamp();
+
+                  int qeIndex = pq_getmsgint(&input_message, 4);
+
+                  /* get the client command serial# */
+                  gp_command_count = pq_getmsgint(&input_message, 4);
+
+                  elog(DEBUG1, "Message type %c received by from libpq, len = %d", firstchar, input_message.len); /* TODO: Remove this */
+
+                  /* Get the userid info  (session, outer, current) */
+                  suid = pq_getmsgint(&input_message, 4);
+                  if(pq_getmsgbyte(&input_message) == 1)
+                    suid_is_super = true;
+
+                  ouid = pq_getmsgint(&input_message, 4);
+                  if(pq_getmsgbyte(&input_message) == 1)
+                    ouid_is_super = true;
+                  cuid = pq_getmsgint(&input_message, 4);
+
+                  rootIdx = pq_getmsgint(&input_message, 4);
+
+                  primary_gang_id = pq_getmsgint(&input_message, 4);
+
+                  statementStart = pq_getmsgint64(&input_message);
+                  /*
+                   * Should we set the CurrentStatementStartTimestamp to the
+                   * original start of the statement (as seen by the masterDB?
+                   *
+                   * Or have it be the time this particular QE received it's work?
+                   *
+                   * Or both?
+                   */
+                  SetCurrentStatementStartTimestampToMaster(statementStart);
+
+                  /* read ser string lengths */
+                  query_string_len = pq_getmsgint(&input_message, 4);
+                  serializedQuerytreelen = pq_getmsgint(&input_message, 4);
+                  serializedPlantreelen = pq_getmsgint(&input_message, 4);
+                  serializedParamslen = pq_getmsgint(&input_message, 4);
+                  serializedSliceInfolen = pq_getmsgint(&input_message, 4);
+                  serializedSnapshotlen = pq_getmsgint(&input_message, 4);
+                  serializedIdentityLen = pq_getmsgint(&input_message, 4);
+                  serializedResourceLen = pq_getmsgint(&input_message, 4);
+                  serializedCommonPlanLen = pq_getmsgint(&input_message, 4);
+
+                  /* read in the snapshot info */
+                  if (serializedSnapshotlen == 0)
+                    serializedSnapshot = NULL;
+                  else
+                    serializedSnapshot = pq_getmsgbytes(&input_message,serializedSnapshotlen);
+
+                  /* get the transaction options */
+                  unusedFlags = pq_getmsgint(&input_message, 4);
+                  Assert(0 == unusedFlags);
+
+                  seqServerHostlen = pq_getmsgint(&input_message, 4);
+                  seqServerPort = pq_getmsgint(&input_message, 4);
+
+                  /* get the query string and kick off processing. */
+                  if (query_string_len > 0)
+                    query_string = pq_getmsgbytes(&input_message,query_string_len);
+
+                  if (serializedQuerytreelen > 0)
+                    serializedQuerytree = pq_getmsgbytes(&input_message,serializedQuerytreelen);
+
+                  if (serializedPlantreelen > 0)
+                    serializedPlantree = pq_getmsgbytes(&input_message,serializedPlantreelen);
+
+                  if (serializedParamslen > 0)
+                    serializedParams = pq_getmsgbytes(&input_message,serializedParamslen);
+
+                  if (serializedSliceInfolen > 0)
+                    serializedSliceInfo = pq_getmsgbytes(&input_message,serializedSliceInfolen);
+
+                  if (serializedIdentityLen > 0)
+                    serializedIdentity = pq_getmsgbytes(&input_message, serializedIdentityLen);
+
+                  if (serializedResourceLen > 0)
+                    serializedResource = pq_getmsgbytes(&input_message, serializedResourceLen);
+
+                  if (serializedCommonPlanLen > 0)
+                    serializedCommonPlan = pq_getmsgbytes(&input_message, serializedCommonPlanLen);
+
+                  if (seqServerHostlen > 0)
+                    seqServerHost = pq_getmsgbytes(&input_message, seqServerHostlen);
+
+                  pq_getmsgend(&input_message);
+
+                  elog((Debug_print_full_dtm ? LOG : DEBUG5), "MPP dispatched stmt from QD: %s.",query_string);
+
+                  if (suid > 0)
+                    SetSessionUserId(suid, suid_is_super);  /* Set the session UserId */
+
+                  if (ouid > 0 && ouid != GetSessionUserId())
+                    SetCurrentRoleId(ouid, ouid_is_super);    /* Set the outer UserId */
+
+                  if (cuid > 0)
+                    SetUserIdAndContext(cuid, false); /* Set current userid */
+
+                  if (serializedIdentityLen > 0)
+                  {
+                    /*
+                     * serializedIdentity doesn't include '\0', which will cause core dump in SetupProcessIdentity() with using elog(DEBUG1).
+                     * So palloc a new string with '\0'.
+                     */
+                    char *completeSerializedIdentity = (char *) palloc((serializedIdentityLen + 1) * sizeof(char) );
+                    memcpy(completeSerializedIdentity, serializedIdentity, serializedIdentityLen);
+                    completeSerializedIdentity[serializedIdentityLen] = '\0';
+                    SetupProcessIdentity((const char*)(completeSerializedIdentity+qeIndex*SEGMENT_IDENTITY_SER_LENGTH), true);
+                    pfree(completeSerializedIdentity);
+                  }
+
+                  if (serializedQuerytreelen==0 && serializedPlantreelen==0)
+                  {
+                    if (strncmp(query_string, "BEGIN", 5) == 0)
+                    {
+                      CommandDest dest = whereToSendOutput;
+
+                      /*
+                       * Special explicit BEGIN for COPY, etc.
+                       * We've already begun it as part of setting up the context.
+                       */
+                      elog((Debug_print_full_dtm ? LOG : DEBUG5), "PostgresMain explicit %s", query_string);
+
+                      // UNDONE: HACK
+                      pgstat_report_activity("BEGIN");
+
+                      set_ps_display("BEGIN", false);
+
+                      BeginCommand("BEGIN", dest);
+
+                      EndCommand("BEGIN", dest);
+
+                    }
+                    else
+                    {
+                      exec_simple_query(query_string, seqServerHost, seqServerPort);
+                    }
+                  }
+                  else {
+                    if (serializedCommonPlanLen > 0) {
+                      exec_mpp_query_new(
+                          serializedCommonPlan,
+                          serializedCommonPlanLen,
+                          currentSliceId, true, NULL, NULL);
+                      if (enable_secure_filesystem &&
+                          Gp_role == GP_ROLE_EXECUTE) {
+                        cleanup_FSManager();
+                      }
+                      StringInfoData buf;
+                      pq_beginmessage(&buf, 'C');
+                      pq_sendstring(&buf, getMyNewExecutorCompletionTag());
+                      pq_endmessage(&buf);
+                    } else
+                      exec_mpp_query(
+                          query_string,
+                          serializedQuerytree,
+                          serializedQuerytreelen,
+                          serializedPlantree,
+                          serializedPlantreelen,
+                          serializedParams,
+                          serializedParamslen,
+                          serializedSliceInfo,
+                          serializedSliceInfolen,
+                          serializedResource,
+                          serializedResourceLen,
+                          seqServerHost, seqServerPort,
+                          currentSliceId);
+                  }
+
+                  SetUserIdAndContext(GetOuterUserId(), false);
+
+                  send_ready_for_query = true;
+      }
+      break;
 
 			case 'P':			/* parse */
 				{
@@ -5140,6 +5496,37 @@ PostgresMain(int argc, char *argv[], const char *username)
 					pq_flush();
 				}
 				break;
+
+			case 'V':  /* HAWQ proxy dispatcher startup info*/
+			{
+			  Gp_role = GP_ROLE_DISPATCH;  // I am proxy dispatcher
+			  PG_TRY();
+			  {
+			    set_ps_display("proxy dispatcher", false);
+			    int qeNum = pq_getmsgint(&input_message, 4);
+			    const char *msg = pq_getmsgstring(&input_message);
+			    proxyDispatchInit(qeNum, msg, &dispatchData);
+			    proxyDispatchPrepare(dispatchData);
+			    sendSegQEDetails(dispatchData);
+			    pq_flush();
+			  }
+			  PG_CATCH();
+			  {
+			    proxyDispatchCleanUp(&dispatchData);
+			    PG_RE_THROW();
+			  }
+			  PG_END_TRY();
+			}
+			break;
+
+			case 'J':
+			{
+			  proxyDispatchRun(dispatchData, pq_getmsgstring(&input_message));
+			  proxyDispatchWait(dispatchData);
+			  proxyDispatchCleanUp(&dispatchData);
+			  send_ready_for_query = true;
+			}
+			break;
 
 			case 'B':			/* bind */
 				/* Set statement_timestamp() */
@@ -5240,6 +5627,19 @@ PostgresMain(int argc, char *argv[], const char *username)
 					close_type = pq_getmsgbyte(&input_message);
 					close_target = pq_getmsgstring(&input_message);
 					pq_getmsgend(&input_message);
+
+					// stop scheduler
+					if (MyScheduler) {
+					  SchedulerEnd(MyScheduler);
+					  SchedulerCatchedError *err = SchedulerGetLastError(MyScheduler);
+					  if (err->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
+					    int errCode = err->errCode;
+					    SchedulerCleanUp(MyScheduler);
+					    ereport(WARNING, (errcode(errCode),
+					        errmsg("failed to stop scheduler. %s (%d)",
+					               err->errMessage, errCode)));
+					  }
+					}
 
 					switch (close_type)
 					{

@@ -152,7 +152,11 @@ typedef struct AggHashEntryData
 	AggStatePerGroupData pergroup[1];	/* VARIABLE LENGTH ARRAY */
 } AggHashEntryData;				/* VARIABLE LENGTH STRUCT */
 
-
+static void advance_transition_function(AggState *aggstate,
+										AggStatePerAgg peraggstate,
+										AggStatePerGroup pergroupstate,
+										FunctionCallInfoData *fcinfo,
+										MemoryManagerContainer *mem_manager);
 static void process_ordered_aggregate_single(AggState *aggstate,
 											 AggStatePerAgg peraggstate,
 											 AggStatePerGroup pergroupstate);
@@ -164,9 +168,12 @@ static void finalize_aggregate(AggState *aggstate,
 				   AggStatePerGroup pergroupstate,
 				   Datum *resultVal, bool *resultIsNull);
 
+static void finalize_aggregates(AggState *aggstate, AggStatePerGroup pergroup);
+
 static Bitmapset *find_unaggregated_cols(AggState *aggstate);
 static bool find_unaggregated_cols_walker(Node *node, Bitmapset **colnos);
 static TupleTableSlot *agg_retrieve_direct(AggState *aggstate);
+static TupleTableSlot *agg_retrieve_hash_table(AggState *aggstate);
 static void ExecAggExplainEnd(PlanState *planstate, struct StringInfoData *buf);
 static int count_extra_agg_slots(Node *node);
 static bool count_extra_agg_slots_walker(Node *node, int *count);
@@ -374,7 +381,7 @@ initialize_aggregates(AggState *aggstate,
  *
  * It doesn't matter which memory context this is called in.
  */
-void
+static void
 advance_transition_function(AggState *aggstate,
 							AggStatePerAgg peraggstate,
 							AggStatePerGroup pergroupstate,
@@ -812,7 +819,7 @@ process_ordered_aggregate_multi(AggState *aggstate,
  * finalize_aggregates
  *   Compute the final value for all aggregate functions.
  */
-void
+static void
 finalize_aggregates(AggState *aggstate, AggStatePerGroup pergroup)
 {
         AggStatePerAgg peragg = aggstate->peragg;
@@ -1701,7 +1708,7 @@ agg_retrieve_direct(AggState *aggstate)
 /*
  * ExecAgg for hashed case: retrieve groups from hash table
  */
-TupleTableSlot *
+static TupleTableSlot *
 agg_retrieve_hash_table(AggState *aggstate)
 {
 	ExprContext *econtext;
@@ -1943,7 +1950,7 @@ ExecInitAgg(Agg *node, EState *estate, int eflags)
 	 * initialize child nodes
 	 */
 	outerPlan = outerPlan(node);
-	if (IsA(outerPlan, ExternalScan)) {
+	if (IsA(outerPlan, ExternalScan) || IsA(outerPlan, MagmaIndexScan)) {
 		/*
 		 * Hack to indicate to PXF when there is an external scan
 		 */
@@ -3077,4 +3084,34 @@ ExecEagerFreeAgg(AggState *node)
 		pfree(node->grp_firstTuple);
 		node->grp_firstTuple = NULL;
 	}
+}
+
+/*
+ * AggCheckCallContext - test if a SQL function is being called as an aggregate
+ *
+ * The transition and/or final functions of an aggregate may want to verify
+ * that they are being called as aggregates, rather than as plain SQL
+ * functions.  They should use this function to do so.  The return value
+ * is nonzero if being called as an aggregate, or zero if not.  (Specific
+ * nonzero values are AGG_CONTEXT_AGGREGATE or AGG_CONTEXT_WINDOW, but more
+ * values could conceivably appear in future.)
+ *
+ * If aggcontext isn't NULL, the function also stores at *aggcontext the
+ * identity of the memory context that aggregate transition values are
+ * being stored in.
+ */
+int
+AggCheckCallContext(FunctionCallInfo fcinfo, MemoryContext *aggcontext)
+{
+  if (fcinfo->context && IsA(fcinfo->context, AggState))
+  {
+    if (aggcontext)
+      *aggcontext = ((AggState *) fcinfo->context)->aggcontext;
+    return AGG_CONTEXT_AGGREGATE;
+  }
+
+  /* this is just to prevent "uninitialized variable" warnings */
+  if (aggcontext)
+    *aggcontext = NULL;
+  return 0;
 }

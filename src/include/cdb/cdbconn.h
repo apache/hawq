@@ -67,6 +67,7 @@ typedef struct SegmentDatabaseDescriptor
      * NB: Use malloc/free, not palloc/pfree, for the items below.
      */
     int4		            motionListener; /* interconnect listener port */
+    int4								my_listener;
     int4					backendPid;
     char                   *whoami;         /* QE identifier for msgs */
 } SegmentDatabaseDescriptor;
@@ -92,5 +93,13 @@ cdbconn_doConnect(SegmentDatabaseDescriptor    *segdbDesc,
 bool
 cdbconn_setSliceIndex(SegmentDatabaseDescriptor    *segdbDesc,
                       int                           sliceIndex);
+
+bool /* returns true if connected */
+cdbconn_main_doconnect(SegmentDatabaseDescriptor *segdbDesc,
+                       const char *options, PQExpBuffer connMsg);
+
+bool                            /* returns true if connected */
+cdbconn_proxy_doconnect(SegmentDatabaseDescriptor    *segdbDesc,
+                        const char                   *connMsg);
 
 #endif   /* CDBCONN_H */

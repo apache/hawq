@@ -101,8 +101,6 @@ DATA(insert OID = 1 (  template1 PGUID ENCODING t t -1 0 0 1663 1663 _null_ _nul
 SHDESCR("Default template database");
 #define TemplateDbOid			1
 
-DATA(insert OID = 6120 (  hcatalog PGUID ENCODING f f -1 0 3 1663 1663 _null_ _null_ ));
-SHDESCR("HCatalog database");
 #define HcatalogDbOid                   6120
 
 #define HcatalogDbName "hcatalog"

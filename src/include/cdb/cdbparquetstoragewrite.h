@@ -32,6 +32,7 @@
 #include "storage/fd.h"
 #include "access/tupdesc.h"
 #include "cdb/cdbmirroredappendonly.h"
+#include "utils/hawq_type_mapping.h"
 #include "utils/relcache.h"
 #include "cdb/cdbparquetrleencoder.h"
 #include "cdb/cdbparquetbytepacker.h"
@@ -51,45 +52,6 @@ typedef struct FileField_4C* ParquetFileField;
 #define MIN_PARQUET_ROWGROUP_SIZE		 1024
 #define MAX_PARQUET_PAGE_SIZE			 1024*1024*1024
 #define MAX_PARQUET_ROWGROUP_SIZE		 1024*1024*1024
-
-/*
- * mapping to Parquet primitive type
- */
-#define HAWQ_TYPE_BOOL			16
-#define HAWQ_TYPE_CHAR			18
-#define HAWQ_TYPE_NAME			19
-#define HAWQ_TYPE_INT8			20
-#define HAWQ_TYPE_INT2			21
-#define HAWQ_TYPE_INT4			23
-#define HAWQ_TYPE_FLOAT4		700
-#define HAWQ_TYPE_FLOAT8		701
-#define HAWQ_TYPE_MONEY 		790
-#define HAWQ_TYPE_NUMERIC		1700
-#define HAWQ_TYPE_BYTE			17
-#define HAWQ_TYPE_TEXT			25
-#define HAWQ_TYPE_XML			142
-#define HAWQ_TYPE_MACADDR		829
-#define HAWQ_TYPE_INET			869
-#define HAWQ_TYPE_CIDR			650
-#define HAWQ_TYPE_BPCHAR		1042
-#define HAWQ_TYPE_VARCHAR		1043
-#define HAWQ_TYPE_DATE			1082
-#define HAWQ_TYPE_TIME			1083
-#define HAWQ_TYPE_TIMESTAMP		1114
-#define HAWQ_TYPE_TIMETZ		1266
-#define HAWQ_TYPE_TIMESTAMPTZ	1184
-#define HAWQ_TYPE_INTERVAL		1186
-#define HAWQ_TYPE_BIT			1560
-#define HAWQ_TYPE_VARBIT		1562
-/*
- * mapping to Parquet group type
- */
-#define HAWQ_TYPE_POINT			600
-#define HAWQ_TYPE_LSEG			601
-#define HAWQ_TYPE_PATH			602
-#define HAWQ_TYPE_BOX			603
-#define HAWQ_TYPE_POLYGON		604
-#define HAWQ_TYPE_CIRCLE		718
 
 #define DEFAULT_ROWGROUP_COUNT	20
 #define DEFAULT_DATAPAGE_COUNT	1

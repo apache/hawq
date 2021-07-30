@@ -995,7 +995,62 @@ DATA(insert OID = 2875 (  "@"	   PGNSP PGUID b f 601 628 16	  0  0 0 0 0 0 on_sl
 DATA(insert OID = 2876 (  "@"	   PGNSP PGUID b f 601 603 16	  0  0 0 0 0 0 on_sb - - ));
 DATA(insert OID = 2877 (  "~"	   PGNSP PGUID b f 1034 1033	 16 0 0 0 0 0 0 aclcontains - - ));
 
+DATA(insert OID = 3962 (  "->"     PGNSP PGUID b f 193 25 193 0 0 0 0 0 0 json_object_field - - ));
+DESCR("get json object field");
+DATA(insert OID = 3963 (  "->>"    PGNSP PGUID b f 193 25 25 0 0 0 0 0 0 json_object_field_text - - ));
+DESCR("get json object field as text");
+DATA(insert OID = 3964 (  "->"     PGNSP PGUID b f 193 23 193 0 0 0 0 0 0 json_array_element - - ));
+DESCR("get json array element");
+DATA(insert OID = 3965 (  "->>"    PGNSP PGUID b f 193 23 25 0 0 0 0 0 0 json_array_element_text - - ));
+DESCR("get json array element as text");
+DATA(insert OID = 3966 (  "#>"     PGNSP PGUID b f 193 1009 193 0 0 0 0 0 0 json_extract_path_op - - ));
+DESCR("get value from json with path elements");
+DATA(insert OID = 3967 (  "#>>"    PGNSP PGUID b f 193 1009 25 0 0 0 0 0 0 json_extract_path_text_op - - ));
+DESCR("get value from json as text with path elements");
 
+DATA(insert OID = 5506 (  "->"     PGNSP PGUID b f 3802 25 3802 0 0 0 0 0 0 jsonb_object_field - - ));
+DESCR("get jsonb object field");
+DATA(insert OID = 3477 (  "->>"    PGNSP PGUID b f 3802 25 25 0 0 0 0 0 0 jsonb_object_field_text - - ));
+DESCR("get jsonb object field as text");
+DATA(insert OID = 5507 (  "->"     PGNSP PGUID b f 3802 23 3802 0 0 0 0 0 0 jsonb_array_element - - ));
+DESCR("get jsonb array element");
+DATA(insert OID = 3481 (  "->>"    PGNSP PGUID b f 3802 23 25 0 0 0 0 0 0 jsonb_array_element_text - - ));
+DESCR("get jsonb array element as text");
+DATA(insert OID = 5508 (  "#>"     PGNSP PGUID b f 3802 1009 3802 0 0 0 0 0 0 jsonb_extract_path_op - - ));
+DESCR("get value from jsonb with path elements");
+DATA(insert OID = 5501 (  "#>>"    PGNSP PGUID b f 3802 1009 25 0 0 0 0 0 0 jsonb_extract_path_text_op - - ));
+DESCR("get value from jsonb as text with path elements");
+DATA(insert OID = 5515 (  "="  PGNSP PGUID b t 3802 3802  16 5515 3241 0 0 0 0 jsonb_eq eqsel eqjoinsel ));
+DESCR("equal");
+DATA(insert OID = 3241 (  "<>"   PGNSP PGUID b f 3802 3802  16 3241 5515 0 0 0 0 jsonb_ne neqsel neqjoinsel ));
+DESCR("not equal");
+DATA(insert OID = 3242 (  "<"   PGNSP PGUID b f 3802 3802 16 3243 3245 0 0 0 0 jsonb_lt scalarltsel scalarltjoinsel ));
+DESCR("less than");
+DATA(insert OID = 3243 (  ">"   PGNSP PGUID b f 3802 3802 16 3242 3244 0 0 0 0 jsonb_gt scalargtsel scalargtjoinsel ));
+DESCR("greater than");
+DATA(insert OID = 3244 (  "<="  PGNSP PGUID b f 3802 3802 16 3245 3243 0 0 0 0 jsonb_le scalarltsel scalarltjoinsel ));
+DESCR("less than or equal to");
+DATA(insert OID = 3245 (  ">="  PGNSP PGUID b f 3802 3802 16 3244 3242 0 0 0 0 jsonb_ge scalargtsel scalargtjoinsel ));
+DESCR("greater than or equal to");
+/* No commutator? */
+DATA(insert OID = 3246 (  "@>"     PGNSP PGUID b f 3802 3802 16 0 3250 0 0 0 0 jsonb_contains contsel contjoinsel ));
+DESCR("contains");
+DATA(insert OID = 3247 (  "?"    PGNSP PGUID b f 3802 25 16 0 0 0 0 0 0 jsonb_exists contsel contjoinsel ));
+DESCR("exists");
+DATA(insert OID = 3248 (  "?|"     PGNSP PGUID b f 3802 1009 16 0 0 0 0 0 0 jsonb_exists_any contsel contjoinsel ));
+DESCR("exists any");
+DATA(insert OID = 3249 (  "?&"     PGNSP PGUID b f 3802 1009 16 0 0 0 0 0 0 jsonb_exists_all contsel contjoinsel ));
+DESCR("exists all");
+DATA(insert OID = 3250 (  "<@"     PGNSP PGUID b f 3802 3802 16 0 3246 0 0 0 0 jsonb_contained contsel contjoinsel ));
+DESCR("contained");
+DATA(insert OID = 3284 (  "||"     PGNSP PGUID b f 3802 3802 3802 0 0 0 0 0 0 jsonb_concat - - ));
+DESCR("concatenate");
+DATA(insert OID = 3285 (  "-"    PGNSP PGUID b f 3802 25 3802 0 0 0 0 0 0 5537 - - ));
+DESCR("delete object field");
+DATA(insert OID = 3286 (  "-"    PGNSP PGUID b f 3802 23 3802 0 0 0 0 0 0 5538 - - ));
+DESCR("delete array element");
+DATA(insert OID = 3287 (  "#-"     PGNSP PGUID b f 3802 1009 3802 0 0 0 0 0 0 jsonb_delete_path - - ));
+DESCR("delete path");
 /*
  * function prototypes
  */

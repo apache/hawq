@@ -58,6 +58,7 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/cdbicudpfaultinjection.h"
 
 #include "portability/instr_time.h"
@@ -257,8 +258,8 @@ struct CursorICHistoryTable
  */
 #define MAIN_THREAD_COND_TIMEOUT (250000)
 
-/* Turn on/off UDP signal (on by default for Mac OS) */
-/* #define IC_USE_PTHREAD_SYNCHRONIZATION */
+// Now Turn off udp signal for Mac OS
+#define IC_USE_PTHREAD_SYNCHRONIZATION
 
 /*
  *  Used for synchronization between main thread (receiver) and background thread.
@@ -3221,19 +3222,22 @@ setupOutgoingUDPConnection(ChunkTransportState *transportStates, ChunkTransportS
  *
  * Should be called only inside the dispatcher
  */
-static void
-checkForCancelFromQD(ChunkTransportState *pTransportStates)
-{
-	Assert(Gp_role == GP_ROLE_DISPATCH);
-	Assert(pTransportStates);
-	Assert(pTransportStates->estate);
+static void checkForCancelFromQD(ChunkTransportState *pTransportStates) {
+  Assert(Gp_role == GP_ROLE_DISPATCH);
+  Assert(pTransportStates);
+  Assert(pTransportStates->estate);
 
-	if (dispatcher_has_error(pTransportStates->estate->dispatch_data))
-	{
-		ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
-						errmsg(CDB_MOTION_LOST_CONTACT_STRING)));
-		/* not reached */
-	}
+  if (pTransportStates->estate->dispatch_data &&
+      dispatcher_has_error(pTransportStates->estate->dispatch_data)) {
+    ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+                    errmsg(CDB_MOTION_LOST_CONTACT_STRING)));
+  }
+
+  if (pTransportStates->estate->mainDispatchData &&
+      mainDispatchHasError(pTransportStates->estate->mainDispatchData)) {
+    ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+                    errmsg(CDB_MOTION_LOST_CONTACT_STRING)));
+  }
 }
 
 /*
@@ -3544,6 +3548,12 @@ SetupUDPInterconnect(EState *estate)
 
 	PG_TRY();
 	{
+		/*
+		 * The rx-thread might have set an error since last teardown,
+		 * technically it is not part of current query, discard it directly.
+		 */
+		resetRxThreadError();
+
 		SetupUDPInterconnect_Internal(estate);
 
         /* Internal error if we locked the mutex but forgot to unlock it. */
@@ -4759,6 +4769,16 @@ xmit_retry:
 
 		if (errno == EAGAIN) /* no space ? not an error. */
 			return;
+
+		if (errno == EPERM)
+		{
+			ereport(LOG,
+					(errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+					 errmsg("Interconnect error writing an outgoing packet: %m"),
+					 errdetail("error during sendto() for Remote Connection: contentId=%d at %s",
+							   conn->remoteContentId, conn->remoteHostAndPort)));
+			return;
+		}
 
 		ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
 						errmsg("Interconnect error writing an outgoing packet: %m"),

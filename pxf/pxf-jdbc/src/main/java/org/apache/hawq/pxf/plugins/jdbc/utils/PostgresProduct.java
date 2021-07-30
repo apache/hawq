@@ -20,16 +20,11 @@ package org.apache.hawq.pxf.plugins.jdbc.utils;
  */
 
 /**
- * Implements methods for the PostgreSQL.
+ * Implements methods for Postgres Database.
  */
 public class PostgresProduct extends DbProduct {
     @Override
-    public String wrapDate(Object val) {
-        return "date'" + val + "'";
-    }
-
-    @Override
-    public String wrapTimestamp(Object val) {
-        return "'" + val + "'";
+    public String wrapDate(Object dateVal) {
+        return "date'" + dateVal + "'";
     }
 }

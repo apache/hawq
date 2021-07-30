@@ -253,7 +253,7 @@ extern char *
 ChooseConstraintNameForPartitionEarly(Relation rel, ConstrType contype, Node *expr);
 
 extern void
-fixCreateStmtForPartitionedTable(CreateStmt *stmt);
+fixCreateStmtForPartitionedTable(CreateStmtBase *stmt);
 
 extern void
 checkUniqueConstraintVsPartitioning(Relation rel, AttrNumber *indattr, int nidxatts, bool primary);

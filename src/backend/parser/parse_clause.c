@@ -33,9 +33,12 @@
  */
 
 #include "postgres.h"
+#include "port.h"
 
 #include "catalog/catquery.h"
 #include "access/heapam.h"
+#include "access/plugstorage.h"
+#include "catalog/catquery.h"
 #include "catalog/heap.h"
 #include "catalog/pg_am.h"
 #include "catalog/pg_amop.h"
@@ -64,6 +67,7 @@
 #include "parser/parse_type.h"
 #include "rewrite/rewriteManip.h"
 #include "utils/guc.h"
+#include "utils/rel.h"
 #include "utils/syscache.h"
 #include "utils/lsyscache.h"
 
@@ -908,12 +912,28 @@ setTargetTable(ParseState *pstate, RangeVar *relation,
 	{
 		if (requiredPerms != ACL_INSERT)
 		{
+			Oid reloid = RelationGetRelid(pstate->p_target_relation);
+			ExtTableEntry *extentry = GetExtTableEntry(reloid);
+			char *formatter = getExtTblFormatterTypeInFmtOptsStr(extentry->fmtopts);
+			if (!formatter || (pg_strncasecmp(formatter, "magma", strlen("magma"))))
+			{
+				ereport(ERROR,
+				        (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				         errmsg("cannot update or delete from external relation \"%s\" with %s format",
+				                RelationGetRelationName(pstate->p_target_relation),
+				                formatter ? formatter : "(NULL"),
+				         errOmitLocation(true)));
+			}
+
 			/* UPDATE/DELETE */
-			ereport(ERROR,
-					(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-					 errmsg("cannot update or delete from external relation \"%s\"",
-							RelationGetRelationName(pstate->p_target_relation)),
-					 errOmitLocation(true)));
+			if (!extentry->iswritable)
+			{
+				ereport(ERROR,
+				        (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				         errmsg("cannot update or delete from readable external relation \"%s\" with magma format",
+				                RelationGetRelationName(pstate->p_target_relation)),
+						errOmitLocation(true)));
+			}
 		}
 		else
 		{
@@ -924,11 +944,13 @@ setTargetTable(ParseState *pstate, RangeVar *relation,
 			extentry = GetExtTableEntry(reloid);
 			
 			if(!extentry->iswritable)
+			{
 				ereport(ERROR,
-						(errcode(ERRCODE_WRONG_OBJECT_TYPE),
-						 errmsg("cannot change a readable external table \"%s\"",
-								 RelationGetRelationName(pstate->p_target_relation)),
-						 errOmitLocation(true)));
+				        (errcode(ERRCODE_WRONG_OBJECT_TYPE),
+				         errmsg("cannot change a readable external table \"%s\"",
+				                RelationGetRelationName(pstate->p_target_relation)),
+				         errOmitLocation(true)));
+			}
 
 			pfree(extentry);
 		}

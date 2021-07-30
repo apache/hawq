@@ -35,6 +35,8 @@
 #include "storage/itemptr.h"
 #include "storage/dbdirnode.h"
 #include "catalog/pg_appendonly.h"
+#include "catalog/pg_exttable.h"
+#include "catalog/pg_namespace.h"
 
 /* ------------------------------------------------------------------------
  * Structure definitions
@@ -126,11 +128,14 @@ typedef struct DbInfoRel
 	/* A couple key fields from pg_class */
 	Oid									 relationOid; 
 	char								*relname;     
+	Oid									 relnamespace;
 	Oid									 reltablespace;
 	char								 relkind;
 	char								 relstorage;
 	Oid									 relam;
 	int									 relnatts;
+	char									*relnamespacename;
+	ExtTableEntry						*exttable;
 
 	/* segment files - as described in gp_relation_node */
 	DbInfoGpRelationNode				*gpRelationNodes;
@@ -175,6 +180,32 @@ typedef struct PgAppendOnlyHashEntry
 	AppendOnlyEntry		*aoEntry;
 } PgAppendOnlyHashEntry;
 
+/*
+ * struct PgExtTableHashEntry -
+ *    used to build a cache of pg_exttable entries
+ */
+typedef struct PgExtTableHashEntry
+{
+	/* Key */
+	Oid					 relationId;
+
+	/* Pointer */
+	ExtTableEntry		*extEntry;
+} PgExtTableHashEntry;
+
+/*
+ * struct PgNameSpaceHashEntry -
+ *    used to build a cache of pg_namespace entries
+ */
+typedef struct PgNameSpaceHashEntry
+{
+	/* Key */
+	Oid					 namespaceId;
+
+	/* Pointer */
+	NameSpaceEntry		*nspEntry;
+} PgNameSpaceHashEntry;
+
 
 /*
  * struct DatabaseInfo -
@@ -217,6 +248,7 @@ typedef struct DatabaseInfo
 	 */
 	bool                         collectGpRelationNodeInfo;
 	bool						 collectAppendOnlyCatalogSegmentInfo;
+	bool							collectExtTableInfo;
 } DatabaseInfo;
 
 
@@ -234,6 +266,7 @@ extern DatabaseInfo *DatabaseInfo_Collect(
 	Oid 		defaultTablespace,
 	bool        collectGpRelationNodeInfo,
 	bool		collectAppendOnlyCatalogSegmentInfo,
+	bool		collectExtTableInfo,
 	bool		scanFileSystem);
 
 /*

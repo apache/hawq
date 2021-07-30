@@ -432,25 +432,6 @@ void InputStreamImpl::openInternal(shared_ptr<FileSystemInter> fs, const char * 
         peerCache = &fs->getPeerCache();
         updateBlockInfos();
         closed = false;
-        /* If file is encrypted , then initialize CryptoCodec. */
-        fileStatus = fs->getFileStatus(this->path.c_str());
-        FileEncryptionInfo *fileEnInfo = fileStatus.getFileEncryption();
-        if (fileStatus.isFileEncrypted()) {
-            if (cryptoCodec == NULL) {
-                enAuth = shared_ptr<RpcAuth> (
-                        new RpcAuth(fs->getUserInfo(), RpcAuth::ParseMethod(conf->getKmsMethod())));
-                kcp = shared_ptr<KmsClientProvider> (
-                        new KmsClientProvider(enAuth, conf));
-                cryptoCodec = shared_ptr<CryptoCodec> (
-                        new CryptoCodec(fileEnInfo, kcp, conf->getCryptoBufferSize()));
-
-                int64_t file_length = 0;
-                int ret = cryptoCodec->init(CryptoMethod::DECRYPT, file_length);
-                if (ret < 0) {
-                    THROW(HdfsIOException, "init CryptoCodec failed, file:%s", this->path.c_str());
-                }
-            }
-         }
     } catch (const HdfsCanceled & e) {
         throw;
     } catch (const FileNotFoundException & e) {
@@ -645,12 +626,6 @@ int32_t InputStreamImpl::readInternal(char * buf, int32_t size) {
 
                 continue;
             }
-            std::string bufDecode;
-            if (fileStatus.isFileEncrypted()) {
-                /* Decrypt buffer if the file is encrypted. */
-                bufDecode = cryptoCodec->cipher_wrap(buf, retval);
-                memcpy(buf, bufDecode.c_str(), retval);
-            }
 
             return retval;
         } while (true);
@@ -759,17 +734,9 @@ void InputStreamImpl::seekInternal(int64_t pos) {
     }
 
     try {
-        if (blockReader && pos > cursor && pos < endOfCurBlock && (pos - cursor) < blockReader->available()) {
+        if (blockReader && pos > cursor && pos < endOfCurBlock) {
             blockReader->skip(pos - cursor);
             cursor = pos;
-            if (cryptoCodec) {
-                int ret = cryptoCodec->resetStreamOffset(CryptoMethod::DECRYPT,
-                        cursor);
-                if (ret < 0) {
-                    THROW(HdfsIOException, "Reset offset failed, file:%s",
-                            this->path.c_str());
-                }
-            }
             return;
         }
     } catch (const HdfsIOException & e) {
@@ -791,12 +758,6 @@ void InputStreamImpl::seekInternal(int64_t pos) {
     endOfCurBlock = 0;
     blockReader.reset();
     cursor = pos;
-    if (cryptoCodec) {
-        int ret = cryptoCodec->resetStreamOffset(CryptoMethod::DECRYPT, cursor);
-        if (ret < 0) {
-            THROW(HdfsIOException, "init CryptoCodec failed, file:%s", this->path.c_str());
-        }
-    }
 }
 
 /**

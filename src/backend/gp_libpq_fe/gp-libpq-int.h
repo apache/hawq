@@ -389,6 +389,7 @@ struct pg_conn
 	int			be_key;			/* key of backend --- needed for cancels */
 	
 	int			motion_listener; /* CDB tcp port for the interconnect listener. */
+	int			my_listener;
     int64      mop_high_watermark;   /* highwater mark for mop */
 	char		*qe_version;
 	
@@ -428,6 +429,9 @@ struct pg_conn
 
 	/* Buffer for receiving various parts of messages */
 	PQExpBufferData workBuffer; /* expansible string */
+
+    // dispatch buffer
+    PQExpBufferData dispBuffer;
 };
 
 /* PGcancel stores all data necessary to cancel a connection. A copy of this

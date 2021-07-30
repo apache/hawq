@@ -282,7 +282,7 @@ RelationGetRelationCompressionFuncs(Relation rel)
 	char *comptype = NULL;
 	PGFunction *compFuncs;
 
-	if(RelationIsAoRows(rel) || RelationIsParquet(rel)){
+	if(RelationIsAo(rel)){
 		aoentry = GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
 		comptype = aoentry->compresstype;
 	}

@@ -381,6 +381,7 @@ lookup_agg_function(List *fnName,
 {
 	Oid			fnOid;
 	bool		retset;
+	int     nvargs;
 	bool        retstrict;
 	bool        retordered;
 	Oid		   *true_oid_array;
@@ -396,9 +397,9 @@ lookup_agg_function(List *fnName,
 	 * function's return value.  it also returns the true argument types to
 	 * the function.
 	 */
-	fdresult = func_get_detail(fnName, NIL, nargs, input_types,
+	fdresult = func_get_detail(fnName, NIL, nargs, input_types,false,
 							   &fnOid, rettype, &retset, &retstrict,
-							   &retordered, &true_oid_array);
+							   &retordered, &nvargs, &true_oid_array);
 
 	/* only valid case is a normal function not returning a set */
 	if (fdresult != FUNCDETAIL_NORMAL || !OidIsValid(fnOid))

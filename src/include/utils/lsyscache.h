@@ -195,4 +195,9 @@ extern List *get_index_opclasses(Oid oidIndex);
 
 #define TypeIsToastable(typid)	(get_typstorage(typid) != 'p')
 
+/*
+ * fast function for base type info
+ */
+extern int32_t get_typlen_fast(Oid id, bool passbyval, int32_t typlen, Datum* pDatum);
+
 #endif   /* LSYSCACHE_H */

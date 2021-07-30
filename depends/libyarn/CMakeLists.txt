@@ -4,7 +4,6 @@ PROJECT(libyarn)
 
 SET(CMAKE_VERBOSE_MAKEFILE ON CACHE STRING "Verbose build." FORCE)
 SET(CMAKE_FIND_ROOT_PATH "/Users/weikui/Documents/project/osx106_x86")
-SET(CMAKE_MACOSX_RPATH 1)
 
 IF(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
     MESSAGE(FATAL_ERROR "cannot build the project in the source directory! Out-of-source build is enforced!")
@@ -16,6 +15,8 @@ SET(DOXYFILE_PATH ${CMAKE_SOURCE_DIR}/docs)
 INCLUDE(Platform)
 INCLUDE(Functions)
 INCLUDE(Options)
+
+SET(CMAKE_PREFIX_PATH "/opt/dependency/package" "/opt/dependency/tools")
 
 FIND_PACKAGE(LibXml2 REQUIRED)
 FIND_PACKAGE(Protobuf REQUIRED)

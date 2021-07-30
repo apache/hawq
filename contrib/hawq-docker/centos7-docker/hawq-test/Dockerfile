@@ -21,9 +21,6 @@ MAINTAINER Richard Guo <riguo@pivotal.io>
 
 USER root
 
-ARG PXF_CLASSPATH_TEMPLATE
-ARG PXF_LOG4J_PROPERTIES
-
 ## install HDP 2.5.0
 RUN curl -L "http://public-repo-1.hortonworks.com/HDP/centos7/2.x/updates/2.5.0.0/hdp.repo" -o /etc/yum.repos.d/hdp.repo && \
  yum install -y hadoop hadoop-hdfs hadoop-libhdfs hadoop-yarn hadoop-mapreduce hadoop-client hdp-select && \
@@ -31,16 +28,9 @@ RUN curl -L "http://public-repo-1.hortonworks.com/HDP/centos7/2.x/updates/2.5.0.
 
 RUN ln -s /usr/hdp/current/hadoop-hdfs-namenode/../hadoop/sbin/hadoop-daemon.sh /usr/bin/hadoop-daemon.sh
 
-RUN touch /tmp/pxf-private.classpath && \
- touch /tmp/log4j.properties && \
- echo "$PXF_CLASSPATH_TEMPLATE" > /tmp/pxf-private.classpath && \
- echo "$PXF_LOG4J_PROPERTIES" > /tmp/pxf-log4j.properties
-
 COPY conf/* /etc/hadoop/conf/
 
 COPY entrypoint.sh /usr/bin/entrypoint.sh
-COPY service-hawq.sh /usr/bin/service-hawq.sh
-COPY service-pxf.sh /usr/bin/service-pxf.sh
 COPY start-hdfs.sh /usr/bin/start-hdfs.sh
 
 USER gpadmin

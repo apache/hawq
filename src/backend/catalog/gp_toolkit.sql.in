@@ -325,6 +325,39 @@ REVOKE ALL ON TABLE %%JETPACK_PREFIX_AUX%%log_master_ext FROM public;
 
 
 --------------------------------------------------------------------------------
+-- @table:
+--		%%JETPACK_PREFIX%%pg_stat_activity_history
+--
+-- @doc:
+--		query execute information history; requires superuser privilege
+--
+--------------------------------------------------------------------------------
+CREATE READABLE EXTERNAL WEB TABLE %%JETPACK_PREFIX_AUX%%pg_stat_activity_history
+(
+	datid                int,
+	datname              text,
+	usesysid             int,
+	username             text,
+	procpid              int,
+	sess_id              int,
+	query_start          text,
+	query_end            text,
+	client_addr          text,
+	client_port          int,
+	application_name     text,
+	cpu                  text,
+	memory               text,
+	status               text,
+	errinfo              text,
+	query                text
+)
+EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.history' ON MASTER
+FORMAT 'CSV' (DELIMITER ',' NULL '' QUOTE '"');
+
+REVOKE ALL ON TABLE %%JETPACK_PREFIX_AUX%%pg_stat_activity_history FROM public;
+
+
+--------------------------------------------------------------------------------
 -- @view: 
 --		%%JETPACK_PREFIX%%log_system
 --
@@ -1465,7 +1498,8 @@ AS
 		FROM 
 			(SELECT * 
 			 FROM %%JETPACK_PREFIX_AUX%%user_data_tables_readable 
-			 WHERE autrelstorage != 'x'
+			  WHERE autrelstorage != 'x' OR
+			  autoid IN (SELECT reloid FROM pg_exttable WHERE pg_exttable.fmtopts ~~ '%category ''internal''%'::text)
 			) AS udtr
 			
 		LEFT JOIN pg_catalog.pg_appendonly ao
@@ -1775,7 +1809,6 @@ AS
 	WHERE
 		datname <> 'template0' 
 	AND datname <> 'template1'
-	AND datname <> 'postgres'
 	AND datname <> 'hcatalog';
 		
 GRANT SELECT ON TABLE %%JETPACK_PREFIX%%size_of_database TO public;

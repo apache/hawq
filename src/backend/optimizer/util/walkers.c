@@ -937,6 +937,14 @@ plan_tree_walker(Node *node,
 				return true;
 			break;
 
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+			if (walk_scan_node_fields((Scan *) node, walker, context))
+				return true;
+			if (walker((Node *) ((MagmaIndexScan *) node)->indexqualorig, context))
+				return true;
+			break;
+
 		case T_IndexScan:
 		case T_DynamicIndexScan:
 			if (walk_scan_node_fields((Scan *) node, walker, context))

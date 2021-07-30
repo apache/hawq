@@ -22,6 +22,7 @@
 #define DISPATCHER_H
 
 #include "lib/stringinfo.h"		/* TODO: Use function to return this? */
+#include "optimizer/newPlanner.h"
 #include "postmaster/identity.h"
 #include "nodes/pg_list.h"
 
@@ -56,9 +57,12 @@ typedef struct DispatchDataResult
  */
 extern struct DispatchData *initialize_dispatch_data(struct QueryResource *resource,
 				bool dispatch_to_all_cached_executors);
-extern void	prepare_dispatch_query_desc(struct DispatchData *data, struct QueryDesc *queryDesc);
-extern void	dispatch_run(struct DispatchData *data);
-extern void	dispatch_wait(struct DispatchData *data);
+extern void prepare_dispatch_query_desc(struct DispatchData *data,
+                                        struct QueryDesc *queryDesc,
+                                        bool newPlanner);
+extern void dispatch_run(struct DispatchData *data, CommonPlanContext *ctx,
+                         bool newPlanner);
+extern void	dispatch_wait(struct DispatchData *data, bool forcedStop);
 extern void	dispatch_catch_error(struct DispatchData *data);
 extern void	dispatch_cleanup(struct DispatchData *data);
 extern struct CdbDispatchResults	*dispatch_get_results(struct DispatchData *data);

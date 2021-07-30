@@ -42,24 +42,11 @@
 #include "utils/hsearch.h"
 #include "utils/memutils.h"
 #include "utils/portal.h"
+#include "storage/cwrapper/hdfs-file-system-c.h"
 
 int server_ticket_renew_interval = 43200000; /* millisecond */
 char *krb5_ccname = "/tmp/postgres.ccname";
 static volatile int64 *server_ticket_last_renew = NULL;
-
-struct FileSystemCredentialKey
-{
-	char protocol[64];
-	char host[1024];
-	int port;
-};
-
-struct FileSystemCredential
-{
-	struct FileSystemCredentialKey key;
-	char *credential;
-	void *fs;
-};
 
 void
 FSCredShmemInit(void)
@@ -183,13 +170,17 @@ create_filesystem_credentials_internal(HTAB **credentials, MemoryContext *mcxt)
 	*credentials = create_filesystem_credentials_cache(*mcxt);
 }
 
-static void
+void
 get_current_credential_cache_and_memcxt(HTAB ** currentFilesystemCredentials,
         MemoryContext *currentFilesystemCredentialsMemoryContext)
 {
-    if (!ActivePortal)
-        elog(ERROR, "cannot find ActivePortal");
-
+    if (!ActivePortal) {
+//        elog(ERROR, "cannot find ActivePortal");
+      Portal portal;
+      portal = CreatePortal("", true, true);
+      ActivePortal = portal;
+      create_filesystem_credentials(ActivePortal);
+    }
     Insist(NULL != currentFilesystemCredentials);
     Insist(NULL != currentFilesystemCredentialsMemoryContext);
 
@@ -383,6 +374,7 @@ cleanup_filesystem_credentials(Portal portal)
 {
 	if (enable_secure_filesystem)
 	{
+		cleanup_FSManager();
 		if (Gp_role == GP_ROLE_EXECUTE)
 		{
 			/*
@@ -448,6 +440,9 @@ serialize_filesystem_credentials(int *size)
 
     get_current_credential_cache_and_memcxt(&currentFilesystemCredentials,
             &currentFilesystemCredentialsMemoryContext);
+//        for(){
+//          elog(LOG,"the HTAB perpared to be dispatched %",*currentFilesystemCredentials);
+//        }
 
     Insist(NULL != currentFilesystemCredentials);
     Insist(NULL != currentFilesystemCredentialsMemoryContext);

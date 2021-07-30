@@ -245,14 +245,6 @@ public:
         this->rpcTimeout = rpcTimeout;
     }
 
-    int32_t getRpcMaxDataLength() const {
-        return rpcMaxDataLength;
-    }
-
-    void setRpcMaxDataLength(int32_t rpcMaxLength) {
-        this->rpcMaxDataLength = rpcMaxLength;
-    }
-
     bool doesNotRetryAnotherNode() const {
         return notRetryAnotherNode;
     }
@@ -309,26 +301,6 @@ public:
       return socketCacheCapacity;
     }
 
-    const std::string& getKmsUrl() const {
-        return kmsUrl;
-    }
-
-    const std::string& getKmsMethod() const {
-        return kmsAuthMethod;
-    }
-
-    int32_t getCryptoBufferSize() const {
-        return cryptoBufferSize;
-    }
-
-    int32_t getHttpRequestRetryTimes() const {
-        return httpRequestRetryTimes;
-    }
-
-    int64_t getCurlTimeOut() const {
-        return curlTimeout;
-    }
-
 public:
     /*
      * rpc configure
@@ -342,7 +314,6 @@ public:
     int32_t rpcMaxHARetry;
     int32_t rpcSocketLingerTimeout;
     int32_t rpcTimeout;
-    int32_t rpcMaxDataLength; //ipc.maximum.data.length
     bool rpcTcpNoDelay;
     std::string rpcAuthMethod;
 
@@ -388,11 +359,6 @@ public:
     int32_t packetPoolSize;
     int32_t heartBeatInterval;
     int32_t closeFileTimeout;
-    std::string kmsUrl;
-    std::string kmsAuthMethod;
-    int32_t cryptoBufferSize;
-    int32_t httpRequestRetryTimes;
-    int64_t curlTimeout;
 
 };
 

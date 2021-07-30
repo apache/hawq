@@ -43,6 +43,8 @@
 #include "cdb/cdbpersistentdatabase.h"
 #include "cdb/cdbdirectopen.h"
 #include "catalog/pg_appendonly.h"
+#include "catalog/pg_exttable.h"
+#include "catalog/pg_namespace.h"
 #include "access/aosegfiles.h"
 #include "access/appendonlytid.h"
 #include "utils/guc.h"
@@ -312,6 +314,48 @@ DatabaseInfo_PgAppendOnlyHashTableInit()
 	return hash_create("PgAppendOnly", 100, &info, hash_flags);
 }
 
+/*
+ * DatabaseInfo_PgExtTableHashTableInit()
+ *    Construct a hash table of PgExtTableHashEntry
+ */
+static HTAB *
+DatabaseInfo_PgExtTableHashTableInit()
+{
+	HASHCTL			info;
+	int				hash_flags;
+
+	/* Set key and entry sizes. */
+	MemSet(&info, 0, sizeof(info));
+	info.keysize = sizeof(Oid);
+	info.entrysize = sizeof(PgExtTableHashEntry);
+	info.hash = tag_hash;
+
+	hash_flags = (HASH_ELEM | HASH_FUNCTION);
+
+	return hash_create("PgExtTable", 100, &info, hash_flags);
+}
+
+/*
+ * DatabaseInfo_PgNameSpaceHashTableInit()
+ *    Construct a hash table of PgNameSpaceHashEntry
+ */
+static HTAB *
+DatabaseInfo_PgNameSpaceHashTableInit()
+{
+	HASHCTL			info;
+	int				hash_flags;
+
+	/* Set key and entry sizes. */
+	MemSet(&info, 0, sizeof(info));
+	info.keysize = sizeof(Oid);
+	info.entrysize = sizeof(PgNameSpaceHashEntry);
+	info.hash = tag_hash;
+
+	hash_flags = (HASH_ELEM | HASH_FUNCTION);
+
+	return hash_create("PgNameSpace", 100, &info, hash_flags);
+}
+
 
 /*
  * DatabaseInfo_AddRelationId()
@@ -392,6 +436,88 @@ static void DatabaseInfo_AddPgAppendOnly(
 			 relationId);
 
 	pgAppendOnlyHashEntry->aoEntry = aoEntry;
+}
+
+/*
+ * DatabaseInfo_AddPgExtTable()
+ *   Add an entry to a pgExtTable hash table.
+ */
+static void DatabaseInfo_AddPgExtTable(
+	HTAB					*dbInfoRelHashTable,
+	HTAB 				*pgNameSpaceHashTable,
+	HTAB 				*pgExtTableHashTable,
+	Oid					 relationId,
+	ExtTableEntry 		*extEntry)
+{
+	PgExtTableHashEntry *pgExtTableHashEntry;
+
+	bool found;
+
+	pgExtTableHashEntry =
+			(PgExtTableHashEntry *)
+					hash_search(pgExtTableHashTable,
+								(void *) &relationId,
+								HASH_ENTER,
+								&found);
+	if (found)
+		elog(ERROR, "More than one pg_exttable entry (relation id %u)",
+			 relationId);
+
+	pgExtTableHashEntry->extEntry = extEntry;
+
+	DbInfoRel *dbInfoRel;
+
+	dbInfoRel =
+			(DbInfoRel*)
+					hash_search(dbInfoRelHashTable,
+								(void *) &relationId,
+								HASH_FIND,
+								&found);
+
+	if (found)
+		dbInfoRel->exttable = extEntry;
+	else
+		elog(ERROR, "External table %u from pg_exttable can not found in pg_class", relationId);
+
+	PgNameSpaceHashEntry *pgNameSpaceHashEntry;
+
+	pgNameSpaceHashEntry =
+			(PgNameSpaceHashEntry *)
+					hash_search(pgNameSpaceHashTable,
+								(void *) &dbInfoRel->relnamespace,
+								HASH_ENTER,
+								&found);
+	if (found)
+		dbInfoRel->relnamespacename = pgNameSpaceHashEntry->nspEntry->nspname;
+	else
+		elog(ERROR, "Namespace %u of external table %u from pg_exttable can not found in pg_namespace",
+				dbInfoRel->relnamespace, relationId);
+}
+
+/*
+ * DatabaseInfo_AddPgNameSpace()
+ *   Add an entry to a pgNameSpace hash table.
+ */
+static void DatabaseInfo_AddPgNameSpace(
+	HTAB 				*pgNameSpaceHashTable,
+	Oid					 namespaceId,
+	NameSpaceEntry		*nspEntry)
+{
+	PgNameSpaceHashEntry *pgNameSpaceHashEntry;
+
+	bool found;
+
+	pgNameSpaceHashEntry =
+			(PgNameSpaceHashEntry *)
+					hash_search(pgNameSpaceHashTable,
+								(void *) &namespaceId,
+								HASH_ENTER,
+								&found);
+	if (found)
+		elog(ERROR, "More than one pg_namespace entry (namespace id %u)",
+			 namespaceId);
+
+	pgNameSpaceHashEntry->nspEntry = nspEntry;
 }
 
 
@@ -529,6 +655,7 @@ static void DatabaseInfo_AddPgClassStoredRelation(
 	Oid 				relfilenode,
 	ItemPointer			pgClassTid,
 	Oid					relationOid,
+	Oid					relnamespace,
 	char				*relname,
 	Oid					reltablespace,
 	char				relkind,
@@ -557,6 +684,7 @@ static void DatabaseInfo_AddPgClassStoredRelation(
 	dbInfoRel->pgClassTid = *pgClassTid;
 	dbInfoRel->relationOid = relationOid;
 	dbInfoRel->relname = pstrdup(relname);
+	dbInfoRel->relnamespace = relnamespace;
 	dbInfoRel->reltablespace = reltablespace;
 	dbInfoRel->relkind = relkind;
 	dbInfoRel->relstorage = relstorage;
@@ -1078,7 +1206,7 @@ DatabaseInfo_HandleAppendOnly(
 		if (dbInfoRel == NULL)
 			break;
 	
-		if (dbInfoRel->relstorage == RELSTORAGE_AOROWS || dbInfoRel->relstorage == RELSTORAGE_PARQUET)
+		if (relstorage_is_ao(dbInfoRel->relstorage))
 		{
 			AppendOnlyEntry 	*aoEntry;
 			DbInfoRel 			*aosegDbInfoRel;
@@ -1220,7 +1348,8 @@ DatabaseInfo_CollectPgClass(
 	DatabaseInfo 		*info,
 	HTAB				*dbInfoRelHashTable,
 	HTAB				*relationIdHashTable,
-	int					*count)
+	int				*count,
+	bool				collectExtTableInfo)
 {
 	Relation	pg_class_rel;
 
@@ -1243,6 +1372,7 @@ DatabaseInfo_CollectPgClass(
 
 		Form_pg_class	form_pg_class;
 
+		Oid 			relnamespace;
 		Oid 			reltablespace;
 
 		char			relkind;
@@ -1275,7 +1405,7 @@ DatabaseInfo_CollectPgClass(
 
 		relstorage = form_pg_class->relstorage;
 
-		if (relstorage == RELSTORAGE_EXTERNAL)
+		if (!collectExtTableInfo && relstorage == RELSTORAGE_EXTERNAL)
 			continue;
 
 		relnatts = form_pg_class->relnatts;
@@ -1291,6 +1421,7 @@ DatabaseInfo_CollectPgClass(
 											form_pg_class->relfilenode,
 											&tuple->t_self,
 											relationOid,
+											form_pg_class->relnamespace,
 											form_pg_class->relname.data,
 											reltablespace,
 											relkind,
@@ -1303,6 +1434,111 @@ DatabaseInfo_CollectPgClass(
 	heap_endscan(scan);
 
 	DirectOpen_PgClassClose(pg_class_rel);
+
+}
+
+static void
+DatabaseInfo_CollectPgExtTable(
+	DatabaseInfo 		*info,
+	HTAB					*dbInfoRelHashTable,
+	HTAB 				*pgNameSpaceHashTable,
+	HTAB					*pgExtTableHashTable)
+{
+	Relation	pg_exttable_rel;
+
+	HeapScanDesc scan;
+	HeapTuple	tuple;
+
+	/*
+	 * Iterate through all the relations of the database and determine which
+	 * database directories are active.  I.e. Fill up the tablespaces array.
+	 */
+	pg_exttable_rel =
+			DirectOpen_PgExtTableOpen(
+							info->defaultTablespace,
+							info->database);
+	scan = heap_beginscan(pg_exttable_rel, SnapshotNow, 0, NULL);
+	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	{
+		bool			nulls[Natts_pg_exttable];
+		Datum		values[Natts_pg_exttable];
+
+		ExtTableEntry *extEntry;
+
+		Oid 			relationId;
+
+		heap_deform_tuple(tuple, RelationGetDescr(pg_exttable_rel), values, nulls);
+
+		extEntry = GetExtTableEntryFromTuple(
+									pg_exttable_rel,
+									RelationGetDescr(pg_exttable_rel),
+									tuple,
+									&relationId);
+
+		Assert(extEntry != NULL);
+
+		DatabaseInfo_AddPgExtTable(
+								dbInfoRelHashTable,
+								pgNameSpaceHashTable,
+								pgExtTableHashTable,
+								relationId,
+								extEntry);
+
+	}
+	heap_endscan(scan);
+
+	DirectOpen_PgExtTableClose(pg_exttable_rel);
+
+}
+
+static void
+DatabaseInfo_CollectPgNameSpace(
+	DatabaseInfo 		*info,
+	HTAB					*dbInfoRelHashTable,
+	HTAB					*pgNameSpaceHashTable)
+{
+	Relation	pg_namespace_rel;
+
+	HeapScanDesc scan;
+	HeapTuple	tuple;
+
+	/*
+	 * Iterate through all the relations of the database and determine which
+	 * database directories are active.  I.e. Fill up the tablespaces array.
+	 */
+	pg_namespace_rel =
+			DirectOpen_PgNameSpaceOpen(
+							info->defaultTablespace,
+							info->database);
+	scan = heap_beginscan(pg_namespace_rel, SnapshotNow, 0, NULL);
+	while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+	{
+		bool			nulls[Natts_pg_namespace];
+		Datum		values[Natts_pg_namespace];
+
+		NameSpaceEntry *nspEntry;
+
+		Oid 			namespaceId;
+
+		heap_deform_tuple(tuple, RelationGetDescr(pg_namespace_rel), values, nulls);
+
+		nspEntry = GetNameSpaceEntryFromTuple(
+									pg_namespace_rel,
+									RelationGetDescr(pg_namespace_rel),
+									tuple,
+									&namespaceId);
+
+		Assert(nspEntry != NULL);
+
+		DatabaseInfo_AddPgNameSpace(
+								pgNameSpaceHashTable,
+								namespaceId,
+								nspEntry);
+
+	}
+	heap_endscan(scan);
+
+	DirectOpen_PgNameSpaceClose(pg_namespace_rel);
 
 }
 
@@ -1402,12 +1638,15 @@ DatabaseInfo_Collect(
 	Oid 		defaultTablespace,
 	bool        collectGpRelationNodeInfo,
 	bool		collectAppendOnlyCatalogSegmentInfo,
+	bool		collectExtTableInfo,
 	bool		scanFileSystem)
 {
 	DatabaseInfo		 *info;	
 	HTAB				 *dbInfoRelHashTable;
 	HTAB				 *relationIdHashTable;
 	HTAB				 *pgAppendOnlyHashTable;
+	HTAB				 *pgExtTableHashTable;
+	HTAB				 *pgNameSpaceHashTable;
 	int					  count;
 	int					  t;
 
@@ -1415,6 +1654,8 @@ DatabaseInfo_Collect(
 	dbInfoRelHashTable	  = DatabaseInfo_DbInfoRelHashTableInit();
 	relationIdHashTable	  = DatabaseInfo_RelationIdHashTableInit();
 	pgAppendOnlyHashTable = DatabaseInfo_PgAppendOnlyHashTableInit();
+	pgExtTableHashTable   = DatabaseInfo_PgExtTableHashTableInit();
+	pgNameSpaceHashTable   = DatabaseInfo_PgNameSpaceHashTableInit();
 
 	/* Setup an initial empty DatabaseInfo */
 	info = (DatabaseInfo*)palloc0(sizeof(DatabaseInfo));
@@ -1422,6 +1663,7 @@ DatabaseInfo_Collect(
 	info->defaultTablespace					  = defaultTablespace;
 	info->collectGpRelationNodeInfo           = collectGpRelationNodeInfo;
 	info->collectAppendOnlyCatalogSegmentInfo = collectAppendOnlyCatalogSegmentInfo;
+	info->collectExtTableInfo				= collectExtTableInfo;
 
 	/* 
 	 * Allocate the extensible arrays:
@@ -1455,11 +1697,13 @@ DatabaseInfo_Collect(
 	/* 
 	 * Start Collecting information: 
 	 *   - from pg_class
+	 *   - from pg_exttable [if specified]
 	 *   - from pg_appendonly [if specified]
 	 *   - from gp_relation_node [if specified]
 	 *   - from file system
 	 */
-	DatabaseInfo_CollectPgClass(info, dbInfoRelHashTable, relationIdHashTable, &count);
+	DatabaseInfo_CollectPgClass(info, dbInfoRelHashTable, relationIdHashTable,
+			&count, info->collectExtTableInfo);
 	DatabaseInfo_CollectPgAppendOnly(info, pgAppendOnlyHashTable);
 
 	if (info->collectAppendOnlyCatalogSegmentInfo)
@@ -1472,6 +1716,15 @@ DatabaseInfo_Collect(
 									  dbInfoRelHashTable, 
 									  relationIdHashTable, 
 									  pgAppendOnlyHashTable);
+	}
+
+	/*
+	 * We need info from pg_exttable and pg_namespace to drop magma tables when drop database
+	 */
+	if (info->collectExtTableInfo)
+	{
+		DatabaseInfo_CollectPgNameSpace(info, dbInfoRelHashTable, pgNameSpaceHashTable);
+		DatabaseInfo_CollectPgExtTable(info, dbInfoRelHashTable, pgNameSpaceHashTable, pgExtTableHashTable);
 	}
 
 	/*
@@ -1509,6 +1762,8 @@ DatabaseInfo_Collect(
 	hash_destroy(dbInfoRelHashTable);
 	hash_destroy(relationIdHashTable);
 	hash_destroy(pgAppendOnlyHashTable);
+	hash_destroy(pgExtTableHashTable);
+	hash_destroy(pgNameSpaceHashTable);
 
 	/* Return the built DatabaseInfo */
 	return info;

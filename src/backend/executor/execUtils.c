@@ -80,11 +80,13 @@
 #include "cdb/cdbgang.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdisp.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/cdbdispatchresult.h"
 #include "cdb/ml_ipc.h"
 #include "cdb/cdbmotion.h"
 #include "cdb/cdbsreh.h"
 #include "cdb/memquota.h"
+#include "cdb/scheduler.h"
 #include "cdb/cdbsrlz.h"
 #include "catalog/catalog.h" // isMasterOnly()
 #include "executor/spi.h"
@@ -95,6 +97,8 @@
 #include "postmaster/identity.h"
 
 #include "storage/ipc.h"
+
+#include "executor/cwrapper/executor-c.h"
 
 /* ----------------------------------------------------------------
  *		global counters for number of tuples processed, retrieved,
@@ -323,8 +327,11 @@ InternalCreateExecutorState(MemoryContext qcontext, bool is_subquery)
 	estate->active_recv_id = -1;
 	estate->es_got_eos = false;
 	estate->cancelUnfinished = false;
+	estate->terminateOnGoing = false;
 
 	estate->dispatch_data = NULL;
+	estate->mainDispatchData = NULL;
+	estate->scheduler_data = NULL;
 
 	estate->currentSliceIdInPlan = 0;
 	estate->currentExecutingSliceId = 0;
@@ -755,10 +762,7 @@ ExecBuildProjectionInfo(List *targetList,
 			break;
 		}
 		attr = inputDesc->attrs[variable->varattno - 1];
-		bool cond = vmthd.GetNType == NULL ?
-					variable->vartype != attr->atttypid :
-					(variable->vartype != attr->atttypid && vmthd.GetNType(variable->vartype) != attr->atttypid);
-		if (attr->attisdropped || cond)
+		if (attr->attisdropped || variable->vartype != attr->atttypid)
 		{
 			isVarList = false;
 			break;
@@ -1379,37 +1383,6 @@ ExecInsertIndexTuples(TupleTableSlot *slot,
 		 * keep track of index inserts for debugging
 		 */
 		IncrIndexInserted();
-	}
-}
-
-/*
- * ExecUpdateAOtupCount
- *		Update the tuple count on the master for an append only relation segfile.
- */
-static void
-ExecUpdateAOtupCount(ResultRelInfo *result_rels,
-					 Snapshot shapshot,
-					 int num_result_rels,
-					 uint64 processed)
-{
-	int		i;
-
-	Assert(Gp_role == GP_ROLE_DISPATCH);
-
-	for (i = num_result_rels; i > 0; i--)
-	{
-		if(RelationIsAoRows(result_rels->ri_RelationDesc)
-				|| RelationIsParquet(result_rels->ri_RelationDesc))
-		{
-			Assert(result_rels->ri_aosegnos != NIL);
-			/* The total tuple count would be not necessary in HAWQ 2.0 */
-			/*
-			UpdateMasterAosegTotals(result_rels->ri_RelationDesc,
-									result_rels->ri_aosegno,
-									processed);
-			*/
-		}
-		result_rels++;
 	}
 }
 
@@ -2119,10 +2092,49 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 	 * If QD, wait for QEs to finish and check their results.
 	 */
 	if (estate->dispatch_data && dispatch_get_results(estate->dispatch_data))
-	{
-		CdbDispatchResults *pr = dispatch_get_results(estate->dispatch_data);
-		HTAB 			   *aopartcounts = NULL;
+  {
+    CdbDispatchResults *pr = dispatch_get_results(estate->dispatch_data);
+    /*
+     * If we are finishing a query before all the tuples of the query
+     * plan were fetched we must call ExecSquelchNode before checking
+     * the dispatch results in order to tell the nodes below we no longer
+     * need any more tuples.
+     */
+    if (!estate->es_got_eos)
+    {
+      ExecSquelchNode(queryDesc->planstate);
+    }
 
+    /*
+     * Wait for completion of all QEs.
+     */
+    dispatch_wait(estate->dispatch_data, false); /*estate->terminateOnGoing);*/
+
+    /* If top slice was delegated to QEs, get num of rows processed. */
+    if (sliceRunsOnQE(currentSlice))
+    {
+      estate->es_processed +=
+        cdbdisp_sumCmdTuples(pr, LocallyExecutingSliceIndex(estate));
+      estate->es_lastoid =
+        cdbdisp_maxLastOid(pr, LocallyExecutingSliceIndex(estate));
+    }
+
+    cdbdisp_handleModifiedCatalogOnSegments(pr, UpdateCatalogModifiedOnSegments);
+
+    /* sum up rejected rows if any (single row error handling only) */
+    cdbdisp_sumRejectedRows(pr);
+
+    /*
+     * Check and free the results of all gangs. If any QE had an
+     * error, report it and exit to our error handler via PG_THROW.
+     * NB: This call doesn't wait, because we already waited above.
+     */
+    dispatch_cleanup(estate->dispatch_data);
+    estate->dispatch_data = NULL;
+  }
+	else if (estate->mainDispatchData && mainDispatchGetResults(estate->mainDispatchData))
+	{
+		CdbDispatchResults *pr = mainDispatchGetResults(estate->mainDispatchData);
 		/*
 		 * If we are finishing a query before all the tuples of the query
 		 * plan were fetched we must call ExecSquelchNode before checking
@@ -2133,11 +2145,10 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 		{
 			ExecSquelchNode(queryDesc->planstate);
 		}
-
 		/*
 		 * Wait for completion of all QEs.
 		 */
-		dispatch_wait(estate->dispatch_data);
+		mainDispatchWait(estate->mainDispatchData, false);
 
 		/* If top slice was delegated to QEs, get num of rows processed. */
 		if (sliceRunsOnQE(currentSlice))
@@ -2146,67 +2157,31 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 				cdbdisp_sumCmdTuples(pr, LocallyExecutingSliceIndex(estate));
 			estate->es_lastoid =
 				cdbdisp_maxLastOid(pr, LocallyExecutingSliceIndex(estate));
-			aopartcounts = cdbdisp_sumAoPartTupCount(estate->es_result_partitions, pr);
 		}
 
-		cdbdisp_handleModifiedCatalogOnSegments(pr, UpdateCatalogModifiedOnSegments);
+    if (estate->es_plannedstmt->commandType == CMD_UPDATE ||
+        estate->es_plannedstmt->commandType == CMD_DELETE) {
+      cdbdisp_handleModifiedCatalogOnSegmentsForUD(
+          pr, &estate->es_plannedstmt->relFileNodeInfo,
+          UpdateCatalogModifiedOnSegmentsForUD,
+          UpdateCatalogIndexForUD);
+      if (!mainDispatchHasError(estate->mainDispatchData) &&
+          list_length(estate->es_plannedstmt->relFileNodeInfo) != 0)
+        elog(ERROR, "failed to update catalog due to code bug");
+    } else {
+      cdbdisp_handleModifiedCatalogOnSegments(
+          pr, UpdateCatalogModifiedOnSegments);
+    }
 
-		/* sum up rejected rows if any (single row error handling only) */
+                /* sum up rejected rows if any (single row error handling only) */
 		cdbdisp_sumRejectedRows(pr);
-
-		/* sum up inserted rows into any AO relation */
-		if (aopartcounts)
-		{
-			/* counts from a partitioned AO table */
-
-			ListCell *lc;
-
-			foreach(lc, estate->es_result_aosegnos)
-			{
-				SegfileMapNode *map = lfirst(lc);
-				struct {
-					Oid relid;
-			   		int64 tupcount;
-				} *entry;
-				bool found;
-
-				entry = hash_search(aopartcounts,
-									&(map->relid),
-									HASH_FIND,
-									&found);
-
-				if (found)
-				{
-					Relation r = heap_open(map->relid, AccessShareLock);
-					if(RelationIsAoRows(r) || RelationIsParquet(r))
-					{
-						/* The total tuple count would be not necessary in HAWQ 2.0 */
-						/*
-						UpdateMasterAosegTotals(r, map->segno, entry->tupcount);
-						*/
-					}
-					heap_close(r, NoLock);
-				}
-			}
-
-		}
-		else
-		{
-			/* counts from a (non partitioned) AO table */
-
-			ExecUpdateAOtupCount(estate->es_result_relations,
-								 estate->es_snapshot,
-								 estate->es_num_result_relations,
-								 estate->es_processed);
-		}
 
 		/*
 		 * Check and free the results of all gangs. If any QE had an
 		 * error, report it and exit to our error handler via PG_THROW.
 		 * NB: This call doesn't wait, because we already waited above.
 		 */
-		dispatch_cleanup(estate->dispatch_data);
-		estate->dispatch_data = NULL;
+		mainDispatchCleanUp(&estate->mainDispatchData);
 	}
 
 	/* Teardown the Interconnect */
@@ -2283,6 +2258,16 @@ void mppExecutorCleanup(QueryDesc *queryDesc)
 
 		dispatch_catch_error(estate->dispatch_data);
 		estate->dispatch_data = NULL;
+	}
+	else if (estate->scheduler_data)
+	{
+	  scheduler_catch_error(estate->scheduler_data);
+	  scheduler_cleanup(estate->scheduler_data);
+	  estate->scheduler_data = NULL;
+	} else if (estate->mainDispatchData) {
+	  if (estate->es_interconnect_is_setup && !estate->es_got_eos)
+	    ExecSquelchNode(queryDesc->planstate);
+	  mainDispatchCatchError(&estate->mainDispatchData);
 	}
 
 	/* Clean up the interconnect. */
@@ -2475,9 +2460,10 @@ sendInitGpmonPkts(Plan *node, EState *estate)
 		case T_TidScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
 		{
 			initGpmonPktFuncs[nodeTag(node) - T_Plan_Start](node, &gpmon_pkt, estate);
-
 			break;
 		}
 

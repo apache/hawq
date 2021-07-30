@@ -160,12 +160,13 @@ int main(int argc, char * argv[]) {
         return checkdirErrCode;
     }
 
-    strcat(filepath, filename);
-    int operateErrCode = testHdfsOperateFile(fs, filepath, dfscompleteurl);
+    // hawq init should not wait until datanode is ready
+    //strcat(filepath, filename);
+    //int operateErrCode = testHdfsOperateFile(fs, filepath, dfscompleteurl);
 
-    if (operateErrCode) {
-        return operateErrCode;
-    }
+    //if (operateErrCode) {
+    //    return operateErrCode;
+    //}
 
     free(host);
     free(port);
@@ -353,6 +354,7 @@ void getHostAndPort(const char * dfs_url, char * host, char * port) {
         int nServicelength = spritPos - dfs_url;
         strncpy(host, dfs_url, nServicelength);
         *(host + nServicelength) = '\0';
+        *port = '\0';
     }
 }
 

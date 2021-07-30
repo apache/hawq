@@ -20,37 +20,26 @@
 import org.apache.tools.ant.filters.ReplaceTokens
 
 buildscript {
+    repositories {
+        // mavenCentral without https:
+        maven {
+            url 'http://repo1.maven.org/maven2'
+        }
+        mavenLocal()
+        jcenter {
+            url 'http://jcenter.bintray.com/'
+        }
+        maven {
+            url 'http://repository.jboss.org/nexus/content/groups/public'
+        }
+    }
 
     dependencies {
         classpath "com.netflix.nebula:gradle-ospackage-plugin:2.2.6"
+        classpath "de.undercouch:gradle-download-task:2.1.0"
         classpath 'com.netflix.nebula:gradle-aggregate-javadocs-plugin:2.2.+'
-    }
+    }   
 }
-
-plugins {
-    id "de.undercouch.download" version "3.4.3"
-}
-
-repositories {
-    // mavenCentral without https:
-    maven {
-        url 'http://repo1.maven.org/maven2'
-    }
-    mavenLocal()
-    jcenter {
-        url 'http://jcenter.bintray.com/'
-    }
-    maven {
-        url 'http://repository.jboss.org/nexus/content/groups/public'
-    }
-}
-
-// Get database property, use HAWQ as a default database
-def database = System.getProperty("database", "hawq");
-def databaseFileName = "gradle/profiles/" + database + ".properties";
-assert file(databaseFileName).exists()
-def databaseProperties = new Properties()
-file(databaseFileName).withInputStream { databaseProperties.load(it) }
 
 // Hadoop distribution (can be hdp or null which would default to apache) - needed to set correct classpaths
 // can be set with -Dhd=<value>
@@ -87,18 +76,8 @@ subprojects { subProject ->
     compileTestJava.options*.compilerArgs = [
             "-Xlint:varargs", "-Xlint:cast", "-Xlint:classfile", "-Xlint:dep-ann", "-Xlint:divzero", "-Xlint:empty",
             "-Xlint:finally", "-Xlint:overrides", "-Xlint:path", "-Xlint:processing", "-Xlint:static", "-Xlint:try",
-            "-Xlint:fallthrough", "-Xlint:deprecation", "-Xlint:unchecked", "-Xlint:-options"
+            "-Xlint:-fallthrough", "-Xlint:-deprecation", "-Xlint:-unchecked", "-Xlint:-options"
     ]
-
-    // Add LICENSE, DISCLAIMER and NOTICE to generated jar files.
-    sourceSets {
-        main {
-            resources {
-                srcDir '../resources'
-                include '**/*'
-            }
-        }
-    }
 
     repositories {
         // mavenCentral without https:
@@ -157,17 +136,60 @@ subprojects { subProject ->
 
 project('pxf-service') {
 
+// Copy existing sources and replace any occurrences of @tokenName@ with desired values
+    task generateSources {
+        doFirst {
+            copy {
+                from('src/main/java') {
+                    include '**/*.java'
+                    filter(ReplaceTokens,
+                        tokens:['pxfProtocolVersion': project.pxfProtocolVersion ])}
+                into "tmp/generatedSources"
+            }
+        }
+    }
+
+// Call cleanup taskAfter Java code compilation
+    compileJava.doLast {
+        tasks.cleanGeneratedSources.execute()
+    }
+
+// Delete "tmp" directory under current project directory
+// rm -r pxf-service/tmp
+    task cleanGeneratedSources() {
+        doFirst {
+            delete "tmp"
+        }
+    }
+
+// Call generateSources task before Java compilation
+    gradle.projectsEvaluated {
+        compileJava.dependsOn(generateSources)
+    }
+
+// Use custom sources directory with generated sources
+    sourceSets {
+        main {
+            java {
+                srcDirs = ["tmp/generatedSources"]
+            }
+        }
+    }
+
     apply plugin: 'war'
     tasks.war {
         archiveName = 'pxf.war'
-        filter(ReplaceTokens, tokens: ['pxfProtocolVersion': project.pxfProtocolVersion])
         processResources {
-            filesMatching('**/pxf-*') {
+            filesMatching('**/pxf-private*.classpath') {
                 details ->
+                if (details.name == "pxf-private${hddist}.classpath") {
+                    details.name = "pxf-private.classpath"
+                } else { 
+                    // exclude classpath file for a different distribution
                     details.exclude()
+                }
             }
         }
-
     }
     dependencies {
         compile(project(':pxf-api'))
@@ -182,7 +204,6 @@ project('pxf-service') {
             exclude module: 'calcite-core'
             exclude module: 'calcite-avatica'
         }
-        runtime "org.apache.parquet:parquet-hadoop-bundle:$parquetVersion"
     }
 
     ospackage {
@@ -202,9 +223,10 @@ project('pxf-service') {
         obsoletes('pxf-core')
         obsoletes('pxf-api')
 
-        from('src/main/resources/pxf-profiles.xml') {
+        from('src/main/resources/pxf-profiles-default.xml') {
             fileType CONFIG | NOREPLACE
             into "/etc/pxf-${project.version}/conf"
+            rename { 'pxf-profiles.xml' }
         }
 
         from('src/configs/pxf-site.xml') {
@@ -220,7 +242,7 @@ project('pxf-service') {
 
         from("src/main/resources/pxf-private${hddist}.classpath") {
             into("/etc/pxf-${project.version}/conf")
-            rename("pxf-private${hddist}.classpath", "pxf-private.classpath")
+            rename("pxf-private${hddist}.classpath", "pxf-private.classpath") 
         }
 
         from('src/main/resources/pxf-public.classpath') {
@@ -231,15 +253,9 @@ project('pxf-service') {
         from('src/scripts/pxf-env.sh') {
             fileMode 0755
             fileType NOREPLACE
-            filter(ReplaceTokens,
-                    tokens: ['pxfLogDir'     :  databaseProperties.pxfLogDir,
-                             'pxfRunDir'     :  databaseProperties.pxfRunDir,
-                             'pxfPortNum'    :  databaseProperties.pxfPortNum,
-                             'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser),
-                             'pxfDefaultUserImpersonation': (databaseProperties.pxfDefaultUserImpersonation == null ? "" : databaseProperties.pxfDefaultUserImpersonation)])
             into "/etc/pxf-${project.version}/conf"
         }
-
+        
         from('src/main/resources/pxf-log4j.properties') {
             fileType CONFIG | NOREPLACE
             into "/etc/pxf-${project.version}/conf"
@@ -252,7 +268,7 @@ project('pxf-service') {
         from(jar.outputs.files) {
             into "/usr/lib/pxf-${project.version}"
         }
-
+        
         //tomcat configuration files
         from('src/configs/tomcat') {
             fileType CONFIG | NOREPLACE
@@ -263,10 +279,6 @@ project('pxf-service') {
             fileMode 0755
             addParentDirs false
             into "/opt/pxf-${project.version}"
-            filter(ReplaceTokens,
-                    tokens: [
-                            'pxfPortNum'    :  databaseProperties.pxfPortNum,
-                            'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
         }
 
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
@@ -274,7 +286,7 @@ project('pxf-service') {
     }
 
     project.distTar {
-        from('src/main/resources/pxf-profiles.xml') { into 'conf' }
+        from('src/main/resources/pxf-profiles-default.xml') { into 'conf' rename { 'pxf-profiles.xml' } }
         from("src/main/resources") { into 'conf' include '**/pxf-private*.classpath'}
         from("src/main/resources/pxf-private${hddist}.classpath") { into 'conf' rename {'pxf-private.classpath'} }
         from('src/main/resources/pxf-public.classpath') { into 'conf' }
@@ -297,8 +309,6 @@ project('pxf') {
         requires(versionedPackageName('pxf-hive'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-hbase'), project.version, GREATER | EQUAL)
         requires(versionedPackageName('pxf-json'), project.version, GREATER | EQUAL)
-        requires(versionedPackageName('pxf-jdbc'), project.version, GREATER | EQUAL)
-        requires(versionedPackageName('pxf-ignite'), project.version, GREATER | EQUAL)
 
         preInstall file('src/scripts/pre-install.sh')
         postInstall file('src/scripts/post-install.sh')
@@ -307,18 +317,6 @@ project('pxf') {
         link('/etc/pxf', "/etc/pxf-${project.version}")
         link('/opt/pxf', "/opt/pxf-${project.version}")
         link('/etc/init.d/pxf-service', "/opt/pxf/pxf-service")
-
-        from('../resources/META-INF/DISCLAIMER') {
-            into "/opt/pxf-${project.version}"
-        }
-
-        from('../resources/META-INF/LICENSE') {
-            into "/opt/pxf-${project.version}"
-        }
-
-        from('../resources/META-INF/NOTICE') {
-            into "/opt/pxf-${project.version}"
-        }
     }
 }
 
@@ -329,7 +327,6 @@ project('pxf-hdfs') {
         compile "org.apache.hadoop:hadoop-mapreduce-client-core:$hadoopVersion"
         compile "org.apache.hadoop:hadoop-common:$hadoopVersion"
         compile "org.apache.hadoop:hadoop-hdfs:$hadoopVersion"
-        compile "org.apache.parquet:parquet-hadoop-bundle:$parquetVersion"
     }
 
     ospackage {
@@ -390,6 +387,8 @@ project('pxf-json') {
     dependencies {
       compile(project(':pxf-hdfs'))
       compile(project(':pxf-service'))
+      compile "org.apache.commons:commons-lang3:3.0"
+
       testCompile 'pl.pragmatists:JUnitParams:1.0.2'
     }
 
@@ -413,7 +412,7 @@ project('pxf-json') {
     task create_tweets_tgz(type: Exec){
       commandLine 'tar', '-zcf', 'src/test/resources/tweets.tar.gz', '-C', 'src/test/resources', 'tweets-pp.json'
     }
-
+    
     tasks['test'].dependsOn('create_tweets_tgz')
 }
 
@@ -442,6 +441,7 @@ project('pxf-hbase') {
         link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
     }
 }
+
 
 project('pxf-jdbc') {
     dependencies {
@@ -474,44 +474,13 @@ project('pxf-jdbc') {
     }
 }
 
-project('pxf-ignite') {
-    dependencies {
-        compile(project(':pxf-api'))
-        compile(project(':pxf-service'))
-        compile 'com.google.code.gson:gson:2.8.2'
-        compile 'org.apache.commons:commons-compress:1.16.1'
-        testCompile 'com.google.code.gson:gson:2.8.2'
-        testCompile 'org.apache.commons:commons-compress:1.16.1'
-    }
-
-    ospackage {
-        packageName = versionedPackageName("${project.name}")
-        summary = 'HAWQ Extension Framework (PXF), Apache Ignite plugin'
-        description = 'Querying external data stored in the Apache Ignite database.'
-        packager = ' '
-        packageGroup = 'Development/Libraries'
-        release = buildNumber() + '.' + project.osFamily
-        buildHost = ' '
-
-        requires(versionedPackageName('pxf-service'), project.version, GREATER | EQUAL)
-
-        from(jar.outputs.files) {
-            into "/usr/lib/pxf-${project.version}"
-        }
-
-        link("/usr/lib/pxf-${project.version}/${project.name}.jar", "${project.name}-${project.version}.jar")
-    }
-}
-
-
 def buildNumber() {
     System.getenv('BUILD_NUMBER') ?: System.getProperty('user.name')
 }
 
-wrapper {
-    gradleVersion = '4.9'
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.11'
 }
-
 
 def distSubprojects = subprojects - project(':pxf-api')
 
@@ -546,15 +515,17 @@ task rpm(type: Copy, dependsOn: [subprojects.build, distSubprojects.buildRpm]) {
     }
 }
 
-// tomcat
+// tomcat 
 def tomcatName = "apache-tomcat-${tomcatVersion}"
 def tomcatTargetDir = "tomcat/build"
 
 task tomcatGet << {
 
+    apply plugin: 'de.undercouch.download'
+    
     def TarGzSuffix = ".tar.gz"
     def tomcatTar = "${tomcatName}${TarGzSuffix}"
-    def tomcatUrl = "https://www-us.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
+    def tomcatUrl = "http://archive.apache.org/dist/tomcat/tomcat-7/v${tomcatVersion}/bin/${tomcatTar}"
 
     if (file("${tomcatTargetDir}/${tomcatName}").exists()) {
         println "${tomcatName} already exists, nothing to do"
@@ -620,41 +591,22 @@ def pxfTargetDir = System.properties['deployPath'] ?: "build/"
 
 task install(type: Copy, dependsOn: [subprojects.build, tomcatGet]) {
     into "${pxfTargetDir}"
-    subprojects { project ->
+    subprojects { subProject ->
         from("${project.name}/build/libs") { into 'lib' }
     }
     from("pxf-service/src/scripts/pxf-service") {
         into 'bin'
         fileMode 0755
         rename('pxf-service', 'pxf')
-        filter(ReplaceTokens,
-                tokens: [
-                        'pxfPortNum'    : databaseProperties.pxfPortNum,
-                        'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser)])
     }
 
     from("${tomcatTargetDir}/${tomcatName}") { into 'apache-tomcat' }
     from("pxf-service/src/main/resources") { into 'conf' }
     from("pxf-service/src/configs/pxf-site.xml") { into 'conf' }
-    from("pxf-service/src/scripts/pxf-env.sh") {
-        filter(ReplaceTokens,
-                tokens: ['pxfLogDir'     : databaseProperties.pxfLogDir,
-                         'pxfRunDir'     : databaseProperties.pxfRunDir,
-                         'pxfPortNum'    : databaseProperties.pxfPortNum,
-                         'pxfDefaultUser': (databaseProperties.pxfDefaultUser == null ? "" : databaseProperties.pxfDefaultUser),
-                         'pxfDefaultUserImpersonation': (databaseProperties.pxfDefaultUserImpersonation == null ? "" : databaseProperties.pxfDefaultUserImpersonation)]) into 'conf'
-    }
+    from("pxf-service/src/scripts/pxf-env.sh") { into 'conf' }
     from("pxf-service/src/configs/tomcat") { into 'tomcat-templates' }
-    from("pxf-service/src/configs/templates") { into 'conf-templates' }
 }
 
-task bundle(type: Tar) {
-    baseName = "${project.name}"
-    compression = Compression.GZIP
-    extension = 'tar.gz'
-    from install.outputs.files
-    into "${project.name}"
-}
 
 buildDir = '.'
 apply plugin: 'nebula-aggregate-javadocs'

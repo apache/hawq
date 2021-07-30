@@ -18,8 +18,9 @@
 
 object_type=$1
 GPHOME=$2
+enable_hdfs=$3
 VERBOSE=0
-if [ "$3" == "1" ]; then
+if [ "$4" == "1" ]; then
     VERBOSE=1
 fi
 source ${GPHOME}/bin/lib/hawq_bash_functions.sh
@@ -192,8 +193,6 @@ LOAD_GP_TOOLKIT () {
 get_master_ipv6_addresses() {
     if [ "${distro_based_on}" = "Mac" ]; then
         MASTER_IPV6_LOCAL_ADDRESS_ALL=(`${IFCONFIG} | ${GREP} inet6 | ${AWK} '{print $2}' | cut -d'%' -f1`)
-    elif [ -f /etc/SuSE-release ]; then
-        MASTER_IPV6_LOCAL_ADDRESS_ALL=(`${IFCONFIG} | ${GREP} inet6 | ${AWK} '{print $3}' | cut -d'%' -f1 | awk -F '/' '{print $1}'`)
     else
         MASTER_IPV6_LOCAL_ADDRESS_ALL=(`ip -6 address show |${GREP} inet6|${AWK} '{print $2}' |cut -d'/' -f1`)
     fi
@@ -279,27 +278,33 @@ master_init() {
         ${ECHO} "Start hawq master failed"  | tee -a ${MASTER_LOG_FILE}
         exit 1
     fi
+    if [[ $1 == "true" || $1 == "on" ]] ; then
+        $PSQL -p ${hawq_port} -d template1 -c "create filespace dfs_system on hdfs ('${dfs_url}');" 1>>${MASTER_LOG_FILE} 2>&1
+        if [ $? -ne 0  ] ; then
+            ${ECHO} "Create filespace failed, please check your hdfs settings"  | tee -a ${MASTER_LOG_FILE}
+            exit 1
+        fi
 
-    $PSQL -p ${hawq_port} -d template1 -c "create filespace dfs_system on hdfs ('${dfs_url}');" 1>>${MASTER_LOG_FILE} 2>&1
-    if [ $? -ne 0  ] ; then
-        ${ECHO} "Create filespace failed, please check your hdfs settings"  | tee -a ${MASTER_LOG_FILE}
-        exit 1
+        $PSQL -p ${hawq_port} -d template1 -c "create tablespace dfs_default filespace dfs_system;" 1>>${MASTER_LOG_FILE} 2>&1
+        if [ $? -ne 0  ] ; then
+            ${ECHO} "Create tablespace failed"  | tee -a ${MASTER_LOG_FILE}
+            exit 1
+        fi
     fi
-
-    $PSQL -p ${hawq_port} -d template1 -c "create tablespace dfs_default filespace dfs_system;" 1>>${MASTER_LOG_FILE} 2>&1
-    if [ $? -ne 0  ] ; then
-        ${ECHO} "Create tablespace failed"  | tee -a ${MASTER_LOG_FILE}
-        exit 1
+    
+    tablespace="dfs_default"
+    if [[ $1 == "off" || $1 == "false" ]]; then
+        tablespace="pg_default"
     fi
-
+    
     env PGOPTIONS="-c gp_session_role=utility" $PSQL -p ${hawq_port} -d template1 -c \
-        "SET allow_system_table_mods='dml';UPDATE pg_database SET dat2tablespace = (SELECT oid FROM pg_tablespace WHERE spcname = 'dfs_default') WHERE datname = 'template1';" 1>>${MASTER_LOG_FILE} 2>&1
+	"SET allow_system_table_mods='dml';UPDATE pg_database SET dat2tablespace = (SELECT oid FROM pg_tablespace WHERE spcname = '$tablespace') WHERE datname = 'template1';" 1>>${MASTER_LOG_FILE} 2>&1
     if [ $? -ne 0  ] ; then
         ${ECHO} "Configure database template1 failed" | tee -a ${MASTER_LOG_FILE}
         exit 1
     fi
 
-    $PSQL -p ${hawq_port} -d template1 -c "create database template0 tablespace dfs_default template template1;" 1>>${MASTER_LOG_FILE} 2>&1
+    $PSQL -p ${hawq_port} -d template1 -c "create database template0 tablespace $tablespace template template1;" 1>>${MASTER_LOG_FILE} 2>&1
     if [ $? -ne 0  ] ; then
         ${ECHO} "Create database template0 failed" | tee -a ${MASTER_LOG_FILE}
         exit 1
@@ -311,7 +316,7 @@ master_init() {
         exit 1
     fi
 
-    $PSQL -p ${hawq_port} -d template1 -c "create database postgres tablespace dfs_default;" 1>>${MASTER_LOG_FILE} 2>&1
+    $PSQL -p ${hawq_port} -d template1 -c "create database postgres tablespace $tablespace;" 1>>${MASTER_LOG_FILE} 2>&1
     if [ $? -ne 0  ] ; then
         ${ECHO} "Create database postgres failed" | tee -a ${MASTER_LOG_FILE}
         exit 1
@@ -555,11 +560,10 @@ check_temp_directory() {
     done
 }
 
-
 if [ ${object_type} == "master" ]; then
     check_data_directorytory
     check_temp_directory
-    master_init
+    master_init $enable_hdfs
 elif [ ${object_type} == "standby" ]; then
     check_standby_data_directorytory
     standby_init

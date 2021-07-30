@@ -112,8 +112,13 @@ struct _DestReceiver
 	void		(*rShutdown) (DestReceiver *self);
 	/* Destroy the receiver object itself (if dynamically allocated) */
 	void		(*rDestroy) (DestReceiver *self);
+
 	/* CommandDest code for this receiver */
 	CommandDest mydest;
+
+	// output each tuple for new plan
+	void		(*receiveSlotNewPlan) (const char **value, uint64_t *len,
+																bool *isNull, int natts);
 	/* Private fields might appear beyond this point... */
 };
 

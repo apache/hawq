@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.orc.OrcInputFormat;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.TextInputFormat;
+import org.apache.hawq.pxf.api.Metadata;
 
 /**
  * Factory class which returns optimal profile for given input format
@@ -34,20 +35,16 @@ public class ProfileFactory {
     private static final String HIVE_RC_PROFILE = "HiveRC";
     private static final String HIVE_ORC_PROFILE = "HiveORC";
     private static final String HIVE_PROFILE = "Hive";
-    private static final String HIVE_ORC_VECTORIZED_PROFILE = "HiveVectorizedORC";
 
     /**
      * The method which returns optimal profile
      *
      * @param inputFormat input format of table/partition
      * @param hasComplexTypes whether record has complex types, see @EnumHiveToHawqType
-     * @param userProfileName profile name provided by user
      * @return name of optimal profile
      */
-    public static String get(InputFormat inputFormat, boolean hasComplexTypes, String userProfileName) {
+    public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
         String profileName = null;
-        if (HIVE_ORC_VECTORIZED_PROFILE.equals(userProfileName))
-            return userProfileName;
         if (inputFormat instanceof TextInputFormat && !hasComplexTypes) {
             profileName = HIVE_TEXT_PROFILE;
         } else if (inputFormat instanceof RCFileInputFormat) {
@@ -58,18 +55,6 @@ public class ProfileFactory {
             //Default case
             profileName = HIVE_PROFILE;
         }
-        return profileName;
-    }
-
-    /**
-     * @see ProfileFactory#get(InputFormat, boolean, String)
-     *
-     * @param inputFormat input format of table/partition
-     * @param hasComplexTypes whether record has complex types, see @EnumHiveToHawqType
-     * @return name of optimal profile
-     */
-    public static String get(InputFormat inputFormat, boolean hasComplexTypes) {
-        String profileName = get(inputFormat, hasComplexTypes, null);
         return profileName;
     }
 

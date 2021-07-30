@@ -288,7 +288,7 @@ typedef struct StdRdOptions
 	int			compresslevel;  /* compression level (AO rels only) */
 	char*		compresstype;   /* compression type (AO rels only) */
 	bool		checksum;		/* checksum (AO rels only) */
-	char 		columnstore;	/* columnstore (AO only, 'a' for ao, 'c' for co, 'p' for parquet) */
+	char 		columnstore;	/* columnstore (AO only, 'a' for ao, 'o' for orc, 'p' for parquet) */
 	bool		forceHeap;		/* specified appendonly=false */
 	bool		errorTable;		/* skip GOH tablespace checking. */
 	int 		bucket_num;		/* default init segment num for random/hash/external table */
@@ -370,6 +370,12 @@ typedef struct TidycatOptions
 #define RelationIsParquet(relation) \
 	((bool)(((relation)->rd_rel->relstorage == RELSTORAGE_PARQUET)))
 
+#define RelationIsOrc(relation) \
+  ((bool)(((relation)->rd_rel->relstorage == RELSTORAGE_ORC)))
+
+#define RelationIsAo(relation)                                  \
+  (RelationIsAoRows(relation) || RelationIsParquet(relation) || \
+   RelationIsOrc(relation))
 
 /*
  * RelationIsForeign

@@ -1,3 +1,4 @@
+
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
@@ -34,6 +35,7 @@
 #include "postgres.h"
 
 #include "access/filesplit.h"
+#include "access/orcam.h"
 #include "cdb/cdbvars.h"
 #include "executor/executor.h"
 #include "miscadmin.h"
@@ -71,7 +73,11 @@ getScanMethod(int tableType)
 		{
 			&ParquetScanNext, &BeginScanParquetRelation, &EndScanParquetRelation,
 			&ReScanParquetRelation, &MarkRestrNotAllowed, &MarkRestrNotAllowed
-		}
+		},
+		{
+      &orcScanNext, &orcBeginScan, &orcEndScan,
+      &orcReScan, &MarkRestrNotAllowed, &MarkRestrNotAllowed
+    }
 	};
 	
 	COMPILE_ASSERT(ARRAY_SIZE(scanMethods) == TableTypeInvalid);
@@ -314,7 +320,7 @@ InitScanStateRelationDetails(ScanState *scanState, Plan *plan, EState *estate)
 	Relation currentRelation = ExecOpenScanRelation(estate, ((Scan *)plan)->scanrelid);
 	scanState->ss_currentRelation = currentRelation;
 
-  if (RelationIsAoRows(currentRelation) || RelationIsParquet(currentRelation))
+  if (RelationIsAo(currentRelation))
   {
     scanState->splits = GetFileSplitsOfSegment(estate->es_plannedstmt->scantable_splits,
                     currentRelation->rd_id, GetQEIndex());
@@ -440,6 +446,11 @@ getTableType(Relation rel)
 		return TableTypeParquet;
 	}
 
+	if (RelationIsOrc(rel))
+	{
+	  return TableTypeOrc;
+	}
+
 	elog(ERROR, "undefined table type for storage format: %c", rel->rd_rel->relstorage);
 	return TableTypeInvalid;
 }
@@ -549,6 +560,7 @@ MarkRestrNotAllowed(ScanState *scanState)
 {
 	Assert(scanState->tableType == TableTypeAppendOnly ||
 		   scanState->tableType == TableTypeParquet ||
+		   scanState->tableType == TableTypeOrc ||
 		   IsA(scanState, DynamicTableScanState));
 	
 	const char *scan = NULL;
@@ -560,6 +572,11 @@ MarkRestrNotAllowed(ScanState *scanState)
 	else if (scanState->tableType == TableTypeParquet)
 	{
 		scan = "ParquetScan";
+	}
+
+	else if (scanState->tableType == TableTypeOrc)
+	{
+	  scan = "OrcScan";
 	}
 
 	else

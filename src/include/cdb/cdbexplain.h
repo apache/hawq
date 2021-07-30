@@ -29,7 +29,10 @@
 
 #include "executor/instrument.h"        /* instr_time */
 #include "cdb/cdbpublic.h"              /* CdbExplain_Agg */
+#include "cdb/scheduler.h"
 #include "postmaster/identity.h"
+
+#include "dbcommon/utils/instrument.h"
 
 struct CdbDispatchResults;              /* #include "cdb/cdbdispatchresult.h" */
 struct EState;                          /* #include "nodes/execnodes.h" */
@@ -126,6 +129,8 @@ void
 cdbexplain_localExecStats(struct PlanState                 *planstate,
                           struct CdbExplain_ShowStatCtx    *showstatctx);
 
+void newplan_sendExecStats(MyInstrumentation *instr);
+
 /*
  * cdbexplain_sendExecStats
  *    Called by qExec process to send EXPLAIN ANALYZE statistics to qDisp.
@@ -207,5 +212,8 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
                             struct StringInfoData          *str,
                             struct EState                  *estate);
 
+void cdbexplain_recvSchedulerExecStats(
+    struct PlanState *planstate, struct SchedulerData *scheduler_data,
+    int stageNo, struct CdbExplain_ShowStatCtx *showstatctx);
 
 #endif   /* CDBEXPLAIN_H */

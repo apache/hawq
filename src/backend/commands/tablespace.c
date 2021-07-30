@@ -88,6 +88,8 @@
 
 /* GUC variable */
 char	   *default_tablespace = NULL;
+char	   *default_table_format = NULL;
+bool       hawq_init_with_hdfs = false;
 
 
 static bool remove_tablespace_directories(Oid tablespaceoid, bool redo,
@@ -979,8 +981,9 @@ assign_default_tablespace(const char *newval, bool doit, GucSource source)
 	 */
 	if (IsTransactionState())
 	{
+		/* table space metadata is not dispatched and will be checked on QD */
 		if (newval[0] != '\0' &&
-			!OidIsValid(get_tablespace_oid(newval)))
+			!OidIsValid(get_tablespace_oid(newval)) && Gp_role != GP_ROLE_EXECUTE)
 		{
 			if (source >= PGC_S_INTERACTIVE)
 				ereport(ERROR,
@@ -991,6 +994,31 @@ assign_default_tablespace(const char *newval, bool doit, GucSource source)
 		}
 	}
 
+	return newval;
+}
+
+/*
+ * Routines for handling the GUC variable 'default_tableformat'.
+ */
+
+/* assign_hook: validate new default_tablespace, do extra actions as needed */
+const char *
+assign_default_tableformat(const char *newval, bool doit, GucSource source)
+{
+	/*
+	 * If we aren't inside a transaction, we cannot do database access so
+	 * cannot verify the name.	Must accept the value on faith.
+	 */
+  if (IsTransactionState()) {
+	  if (pg_strcasecmp(newval, "appendonly") != 0
+			  && pg_strcasecmp(newval, "magmatp") != 0
+			  &&  pg_strcasecmp(newval, "magmaap") != 0)
+	  {
+		  ereport(ERROR,
+				(errcode(ERRCODE_UNDEFINED_OBJECT), errmsg("default tableformat "
+						"\"%s\" does not support," "should be appendonly, magmatp or magmaap", newval)));
+	  }
+  }
 	return newval;
 }
 
@@ -1342,7 +1370,7 @@ RejectAccessTablespace(Oid reltablespace, char *msg)
 	if (IsBootstrapProcessingMode())
 		return;
 
-	/* The tablespace will be dispatched, so check this on QD only. */
+	/* The tablespace will not be dispatched, so check this on QD only. */
 	if (Gp_role != GP_ROLE_DISPATCH)
 		return;
 
@@ -1442,8 +1470,7 @@ GetSuitableTablespace(char relkind, char relstorage, Oid reltablespace, bool *ov
 
 	Insist(relkind == RELKIND_RELATION);
 	/* Appendonly relation has no restriction. */
-	if (relstorage == RELSTORAGE_AOROWS ||
-		relstorage == RELSTORAGE_PARQUET ||
+	if (relstorage_is_ao(relstorage) ||
 		relstorage == RELSTORAGE_EXTERNAL ||
 		relstorage == RELSTORAGE_FOREIGN)
 		return reltablespace;
@@ -1453,8 +1480,8 @@ GetSuitableTablespace(char relkind, char relstorage, Oid reltablespace, bool *ov
 	if (Gohdb_appendonly_override)
 	{
 		/* In production mode. */
-		if (is_tablespace_shared_master(get_database_dts(MyDatabaseId)) &&
-			override != NULL)
+		if ((is_tablespace_shared_master(get_database_dts(MyDatabaseId)) ||
+				pg_strcasecmp(default_table_format, "appendonly") == 0) && override != NULL)
 			*override = true;
 		else
 		{

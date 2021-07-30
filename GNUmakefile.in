@@ -10,18 +10,6 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 #	$(MAKE) -C doc $@
-	$(MAKE) -C depends/thirdparty/googletest $@
-	$(MAKE) -C depends/thirdparty/googletest install
-	$(MAKE) -C depends/libhdfs3 $@
-	$(MAKE) -C depends/libhdfs3 install
-	$(MAKE) -C depends/libyarn $@
-	$(MAKE) -C depends/libyarn install
-	$(MAKE) -C depends/dbcommon $@
-	$(MAKE) -C depends/dbcommon install
-	$(MAKE) -C depends/univplan $@
-	$(MAKE) -C depends/univplan install
-	$(MAKE) -C depends/storage $@
-	$(MAKE) -C depends/storage install
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
@@ -31,12 +19,6 @@ all:
 
 install:
 #	$(MAKE) -C doc $@
-	$(MAKE) -C depends/thirdparty/googletest install
-	$(MAKE) -C depends/libhdfs3 install
-	$(MAKE) -C depends/libyarn install
-	$(MAKE) -C depends/dbcommon install
-	$(MAKE) -C depends/univplan install
-	$(MAKE) -C depends/storage install
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
@@ -60,14 +42,9 @@ distprep:
 
 rpm:
 	$(MAKE) -C contrib/hawq-package $@
-	$(MAKE) -C pxf $@
+#	$(MAKE) -C pxf $@
 	$(MAKE) -C ranger-plugin $@
 	$(MAKE) -C contrib/hawq-package rpm-tarball
-
-unittest:
-	$(MAKE) -C depends/dbcommon $@
-	$(MAKE) -C depends/univplan $@
-	$(MAKE) -C depends/storage $@
 
 feature-test:
 	$(MAKE) -C src feature-test
@@ -80,18 +57,12 @@ feature-test-clean:
 clean:
 #	$(MAKE) -C doc $@
 	$(MAKE) -C contrib $@
-	-$(MAKE) -C depends/thirdparty/googletest $@ 
-	-$(MAKE) -C depends/libhdfs3 $@
-	-$(MAKE) -C depends/libyarn $@
-	-$(MAKE) -C depends/dbcommon $@
-	-$(MAKE) -C depends/univplan $@
-	-$(MAKE) -C depends/storage $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
 	$(MAKE) -C tools $@
 	$(MAKE) -C contrib/hawq-package $@
-	$(MAKE) -C pxf $@
+#	$(MAKE) -C pxf $@
 	$(MAKE) -C ranger-plugin $@
 	-$(MAKE) -C src feature-test-clean
 # Garbage from autoconf:
@@ -102,17 +73,11 @@ clean:
 distclean maintainer-clean:
 #	-$(MAKE) -C doc $@
 	-$(MAKE) -C contrib $@
-	-$(MAKE) -C depends/thirdparty/googletest $@ 
-	-$(MAKE) -C depends/libhdfs3 $@
-	-$(MAKE) -C depends/libyarn $@
-	-$(MAKE) -C depends/dbcommon $@
-	-$(MAKE) -C depends/univplan $@
-	-$(MAKE) -C depends/storage $@
 	-$(MAKE) -C config $@
 	-$(MAKE) -C tools $@
 	-$(MAKE) -C src feature-test-clean
 	-$(MAKE) -C src $@
-	-$(MAKE) -C pxf $@
+#	-$(MAKE) -C pxf $@
 	-$(MAKE) -C ranger-plugin $@
 	-rm -f config.cache config.log config.status GNUmakefile
 # Garbage from autoconf:
@@ -203,14 +168,44 @@ ifeq ($(origin filter), undefined)
 filter = .
 endif
 
-coverage-show:
+coverage:
+	@rm -rf CodeCoverageReport CodeCoverage.info CodeCoverage.info.cleaned
 	lcov --directory $(filter) --capture --output-file CodeCoverage.info
 	lcov --remove CodeCoverage.info 'test/*' 'mock/*' '/usr/*' '/opt/*' '*ext/rhel5_x86_64*' '*ext/osx*' --output-file CodeCoverage.info.cleaned
-	genhtml -o CodeCoverageReport CodeCoverage.info.cleaned
+	genhtml -o CodeCoverageReport CodeCoverage.info.cleaned --prefix `pwd`
 
-coverage-reset:
+resetcoverage:
 	lcov --directory . --zerocounters
 
+sanity:
+	./sanity-test.sh
+
+skip-orca-build:
+	touch ./depends/thirdparty/gpos.commit
+	touch ./depends/thirdparty/gpos_prepare_timestamp
+	touch ./depends/thirdparty/gpos_build_timestamp
+
+	touch ./depends/thirdparty/gp-xerces.commit
+	touch ./depends/thirdparty/gp-xerces_prepare_timestamp
+	touch ./depends/thirdparty/gp-xerces_build_timestamp
+
+	touch ./depends/thirdparty/gporca.commit
+	touch ./depends/thirdparty/gporca_prepare_timestamp
+	touch ./depends/thirdparty/gporca_build_timestamp
+
+	mkdir -p ./depends/thirdparty/gpos/build/
+	mkdir -p ./depends/thirdparty/gp-xerces/build/
+	mkdir -p ./depends/thirdparty/gporca/build/
+
+	echo install: > ./depends/thirdparty/gpos/build/makefile
+	echo install: > ./depends/thirdparty/gp-xerces/build/makefile
+	echo install: > ./depends/thirdparty/gporca/build/makefile
+
+install-orca:
+	$(MAKE) -C src/backend submake-libdxltranslators
+	$(MAKE) -C depends/thirdparty/gpos/build/ install
+	$(MAKE) -C depends/thirdparty/gp-xerces/build/ install
+	$(MAKE) -C depends/thirdparty/gporca/build/ install
 
 .PHONY: dist distdir distcheck
 #unexport split-dist

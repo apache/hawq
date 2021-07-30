@@ -19,16 +19,14 @@
 default: all
 
 ifneq "$(HD)" ""
-    BUILD_PARAMS+= -Dhd=$(HD)
+    BUILD_PARAMS= -Dhd=$(HD)
 else
     ifneq "$(PXF_HOME)" ""
-        BUILD_PARAMS+= -DdeployPath="$(PXF_HOME)"
+        BUILD_PARAMS= -DdeployPath=$(PXF_HOME)
     else ifneq "$(GPHOME)" ""
-        PXF_HOME= "$(GPHOME)/pxf"
-        BUILD_PARAMS+= -DdeployPath="$(PXF_HOME)"
+        BUILD_PARAMS= -DdeployPath="$(GPHOME)/pxf"
     else
 		@echo "Cannot invoke install without configuring either PXF_HOME or GPHOME"
-		exit
     endif
 endif
 
@@ -44,10 +42,6 @@ ifneq "$(PXF_VERSION)" ""
     BUILD_PARAMS+= -Pversion="$(PXF_VERSION)"
 endif
 
-ifneq "$(DATABASE)" ""
-    BUILD_PARAMS+= -Ddatabase="$(DATABASE)"
-endif
-
 help:
 	@echo 
 	@echo "help it is then"
@@ -57,11 +51,9 @@ help:
 	@echo	"  -  -  LICENSE=<license info> - add license info to created RPMs"
 	@echo	"  -  -  VENDOR=<vendor name> - add vendor name to created RPMs"
 	@echo	"  -  -  PLUGINS_EXCLUDE_RPM=plugin1, plugin2,... - do not build and RPM for given comma-separated list of plugins"
-	@echo	"  -  -  DATABASE=build pxf for specific database(HAWQ is default, other databases are defined under gradle/profiles)"
 	@echo	"  - tomcat - builds tomcat rpm from downloaded tarball"
 	@echo	"  -  -  LICENSE and VENDOR parameters can be used as well"
-	@echo	"  - install - setup PXF along with tomcat in the configured deployPath"
-	@echo	"  - bundle - bundle PXF along with tomcat into a single tarball"
+	@echo	"  - deploy - setup PXF along with tomcat in the configured deployPath"
 	@echo	"  - doc - creates aggregate javadoc under docs"
 
 all:
@@ -94,12 +86,3 @@ tomcat:
 
 install:
 	./gradlew install $(BUILD_PARAMS)
-	@if [ -d "$(PXF_HOME)/lib" ] ; then \
-		cd $(PXF_HOME)/lib && \
-		for X in pxf-*-[0-9]*.jar; do \
-			ln -sf $$X `echo $$X | sed -e 's/-[a-zA-Z0-9.]*.jar/.jar/'`; \
-		done; \
-	fi
-
-bundle:
-	./gradlew bundle $(BUILD_PARAMS)

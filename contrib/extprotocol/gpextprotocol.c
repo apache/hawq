@@ -324,5 +324,5 @@ void FreeDemoUri(DemoUri *uri)
 	if (uri->protocol)
 		pfree(uri->protocol);
 	
-	FreeExternalTableUri(uri);
+	pfree(uri);
 }

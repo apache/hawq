@@ -2968,6 +2968,8 @@
 
  CREATE FUNCTION pg_file_read(text, int8, int8) RETURNS text LANGUAGE internal VOLATILE STRICT AS 'pg_read_file' WITH (OID=6045, DESCRIPTION="Read text from a file");
 
+ CREATE FUNCTION hawq_magma_status() RETURNS SETOF record LANGUAGE internal VOLATILE STRICT AS 'hawq_magma_status' WITH (OID=5085, DESCRIPTION="Return magma node information");
+
  CREATE FUNCTION pg_logfile_rotate() RETURNS bool LANGUAGE internal VOLATILE STRICT AS 'pg_rotate_logfile' WITH (OID=6046, DESCRIPTION="Rotate log file");
 
  CREATE FUNCTION pg_file_write(text, text, bool) RETURNS int8 LANGUAGE internal VOLATILE STRICT AS 'pg_file_write' WITH (OID=6047, DESCRIPTION="Write text to a file");
@@ -5529,5 +5531,13 @@
  CREATE FUNCTION gp_metadata_cache_put_entry_for_test(tablespace_oid, database_oid, relation_oid, segno) RETURNS text LANGUAGE internal STABLE STRICT AS 'gp_metadata_cache_put_entry_for_test' WITH (OID=8085, DESCRIPTION="Put entries into metadata cache for test");
  
  CREATE FUNCTION dump_resource_manager_status(info_type) RETURNS text LANGUAGE internal STABLE STRICT AS 'dump_resource_manager_status' WITH (OID=6450, DESCRIPTION="Dump resource manager status for testing");
+
+ CREATE FUNCTION euclidean_metric_float4array(float4array, float4array) RETURNS float4 LANGUAGE internal IMMUTABLE AS 'euclidean_metric_float4array' WITH (OID=3135, DESCRIPTION="Euclidean distance between two float4 array");
+
+ CREATE FUNCTION euclidean_metric_float8array(float8array, float8array) RETURNS float8 LANGUAGE internal IMMUTABLE AS 'euclidean_metric_float8array' WITH (OID=3136, DESCRIPTION="Euclidean distance between two float8 array");
+
+ CREATE FUNCTION cosine_distance_float4array(float4array, float4array) RETURNS float8 LANGUAGE internal IMMUTABLE AS 'cosine_distance_float4array' WITH (OID=3137, DESCRIPTION="Cosine distance between two float4 array");
+
+ CREATE FUNCTION cosine_distance_float8array(float8array, float8array) RETURNS float8 LANGUAGE internal IMMUTABLE AS 'cosine_distance_float8array' WITH (OID=3138, DESCRIPTION="Cosine distance between two float8 array");
 
  CREATE FUNCTION gp_is_filespace_encrypted(filespace_name) RETURNS bool LANGUAGE internal STABLE STRICT AS 'gp_is_filespace_encrypted' WITH (OID=8086, DESCRIPTION="Check whether filespace is encrypted");

@@ -122,7 +122,6 @@ ARGV: \-meta\ \/Users\/jianl\/Git\/hawq\/mn\/cdb\-pg\/\.\.\/gpMgmt\/bin\/gppylib
 #include "catalog/pg_tidycat.h"
 
 #include "catalog/gp_configuration.h"
-#include "catalog/gp_configuration.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_san_config.h"
 

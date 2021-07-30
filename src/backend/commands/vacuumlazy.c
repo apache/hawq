@@ -52,6 +52,7 @@
 #include "access/heapam.h"
 #include "access/transam.h"
 #include "access/aosegfiles.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "access/aomd.h"
 #include "commands/vacuum.h"
@@ -187,6 +188,10 @@ lazy_vacuum_rel(Relation onerel, VacuumStmt *vacstmt, List *updated_stats)
 	else if (RelationIsParquet(onerel))
 	{
 		vacuum_parquet_rel(onerel, vacrelstats, /* FULL */ false);
+	}
+	else if (RelationIsOrc(onerel))
+	{
+	  vacuum_orc_rel(onerel, vacrelstats, /* FULL */ false);
 	}
 	else
 	{
@@ -953,8 +958,10 @@ lazy_truncate_heap(Relation onerel, LVRelStats *vacrelstats)
  *		There may be indexes on the table, but currently nothing is done
  *		to clean up the indexes.
  */
-void
-vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
+typedef FileSegTotals *(*GetFileSegTotalsCallback)(Relation rel,
+                                               Snapshot snapshot);
+static void vacuum_appendonly_internal(Relation aorel, void *vacrelstats, bool isVacFull,
+                                  GetFileSegTotalsCallback callback)
 {
 	FileSegTotals *fstotal;
 	BlockNumber nblocks;
@@ -973,7 +980,7 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 					relname)));
 
 	/* get statistics from the pg_aoseg table */
-	fstotal = GetSegFilesTotals(aorel, SnapshotNow);
+	fstotal = callback(aorel, SnapshotNow);
 
 	/* calculate the values we care about */
 	eof = (double)fstotal->totalbytes;
@@ -1029,6 +1036,18 @@ vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
 	pfree(fstotal);
 
 	return;
+}
+
+void
+vacuum_appendonly_rel(Relation aorel, void *vacrelstats, bool isVacFull)
+{
+  vacuum_appendonly_internal(aorel, vacrelstats, isVacFull, GetSegFilesTotals);
+}
+
+void
+vacuum_orc_rel(Relation aorel, void *vacrelstats, bool isVacFull)
+{
+  vacuum_appendonly_internal(aorel, vacrelstats, isVacFull, getOrcSegFileStats);
 }
 
 /*

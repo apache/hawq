@@ -159,6 +159,10 @@ GetVirtualSegmentList(void)
 #endif
 }
 
+const char *getSegmentKey(Segment *segment) {
+  return segment->master ? "master" : segment->hostname;
+}
+
 Segment *
 CopySegment(Segment *src, MemoryContext cxt)
 {
@@ -169,6 +173,9 @@ CopySegment(Segment *src, MemoryContext cxt)
 	/* memory leak risk! */
 	dest->hostname = MemoryContextStrdup(valid_cxt, src->hostname);
 	dest->hostip = MemoryContextStrdup(valid_cxt, src->hostip);
+	if (src->hdfsHostname)
+		dest->hdfsHostname =
+				MemoryContextStrdup(valid_cxt, src->hdfsHostname);
 
 	return dest;
 }
@@ -581,6 +588,9 @@ cdb_setup(void)
 	{
 		/* Initialize the Motion Layer IPC subsystem. */
 		InitMotionLayerIPC();
+
+		InitNewInterconnect();
+		ResetRpcClientInstance();
 	}
 
 	if (Gp_role == GP_ROLE_DISPATCH)
@@ -628,6 +638,9 @@ cdb_cleanup(int code __attribute__((unused)) , Datum arg __attribute__((unused))
 	{
 		/* shutdown our listener socket */
 		CleanUpMotionLayerIPC();
+
+		CleanUpNewInterconnect();
+		ResetRpcClientInstance();
 
 		/* Move self out from CGroup. */
 		if (GetQEIndex() != -1)

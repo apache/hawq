@@ -376,7 +376,7 @@ potential erroneous comparison.
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.apache.org
+Address bug reports and comments to: dev@hawq.incubator.apache.org
 
 =cut
 
@@ -906,7 +906,7 @@ sub format_explain
 
     {
         use IO::File;
-        use POSIX qw(tmpnam);
+        use File::Temp qw/ :POSIX /;
 
         my ($tmpnam, $tmpfh);
 

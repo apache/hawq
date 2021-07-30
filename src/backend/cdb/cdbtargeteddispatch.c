@@ -298,7 +298,11 @@ GetContentIdsFromPlanForSingleRelation(List *rtable, Plan *plan, int rangeTableI
 				if ( ! result.dd.isDirectDispatch)
 					break;
 
-				hashCode = cdbhashreduce(h);
+				// hashCode = cdbhashreduce(h);
+				int *map = NULL;
+				int nmap = 0;
+				get_magma_range_vseg_map(&map, &nmap, h->numsegs);
+				hashCode = magichashreduce(h, map, nmap);
 
 				/*
 				 * right now we only allow ONE contentid
@@ -476,13 +480,20 @@ AssignContentIdsToPlanData_Walker(Node *node, void *context)
 			case T_SeqScan:
 			case T_AppendOnlyScan:
 			case T_ParquetScan:
+			case T_ExternalScan:
 				/* we can determine the dispatch data to merge by looking at the relation begin scanned */
 				dispatchInfo = GetContentIdsFromPlanForSingleRelation(data->rtable, (Plan *)node, ((Scan*)node)->scanrelid,
 						(Node*) ((Plan*)node)->qual);
 				break;
 
-			case T_ExternalScan:
-				DisableTargetedDispatch(&dispatchInfo); /* not sure about external tables ... so disable */
+			case T_MagmaIndexScan:
+			case T_MagmaIndexOnlyScan:
+			  {
+			    MagmaIndexScan *indexScan = (MagmaIndexScan*)node;
+			    /* we can determine the dispatch data to merge by looking at the relation begin scanned */
+			    dispatchInfo = GetContentIdsFromPlanForSingleRelation(data->rtable, (Plan *)node, ((Scan*)node)->scanrelid,
+			        (Node*) indexScan->indexqualorig); // must use _orig_ qual!
+			  }
 				break;
 
 			case T_IndexScan:

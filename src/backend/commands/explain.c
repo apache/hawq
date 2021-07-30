@@ -62,6 +62,7 @@
 #include "cdb/memquota.h"
 #include "miscadmin.h"
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 
 #ifdef USE_ORCA
 extern char *SzDXLPlan(Query *parse);
@@ -455,6 +456,7 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
     EState     *estate = NULL;
 	int			eflags;
     int         nb;
+    bool newExecutorMode = false;
 
 	/*
 	 * Use a snapshot with an updated command ID to ensure this query sees
@@ -526,6 +528,7 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
         PG_TRY();
         {
 		    ExecutorRun(queryDesc, ForwardScanDirection, 0L);
+		    if (queryDesc->newPlan) newExecutorMode = true;
         }
         PG_CATCH();
         {
@@ -536,10 +539,8 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
         /* Wait for completion of all qExec processes. */
         PG_TRY();
         {
-            if (estate->dispatch_data)
-			{
-                dispatch_wait(estate->dispatch_data); 
-			}
+          if (estate->mainDispatchData)
+              mainDispatchWait(estate->mainDispatchData, false);
         }
         PG_CATCH();
         {
@@ -559,17 +560,27 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
 
 
         /* Get local stats if root slice was executed here in the qDisp. */
-        if (!es->currentSlice ||
-            sliceRunsOnQD(es->currentSlice))
+        if (!es->currentSlice || sliceRunsOnQD(es->currentSlice))
             cdbexplain_localExecStats(queryDesc->planstate, es->showstatctx);
 
         /* Fill in the plan's Instrumentation with stats from qExecs. */
-        if (estate->dispatch_data && !dispatcher_has_error(estate->dispatch_data))
+        if (estate->mainDispatchData && !mainDispatchHasError(estate->mainDispatchData))
             cdbexplain_recvExecStats(queryDesc->planstate,
-                                     dispatch_get_results(estate->dispatch_data),
+                                     mainDispatchGetResults(estate->mainDispatchData),
                                      LocallyExecutingSliceIndex(estate),
                                      es->showstatctx,
-                                     dispatch_get_segment_num(queryDesc->estate->dispatch_data));
+                                     mainDispatchGetSegNum(queryDesc->estate->mainDispatchData));
+        if (estate->scheduler_data) {
+          scheduler_receive_computenode_stats(queryDesc->estate->scheduler_data,
+                                              queryDesc->planstate);
+          cdbexplain_recvSchedulerExecStats(queryDesc->planstate,
+                                            queryDesc->estate->scheduler_data,
+                                            0, es->showstatctx);
+        }
+	} else {
+		CommonPlanContext ctx;
+		queryDesc->newPlanForceAuto = true;
+		newExecutorMode = can_convert_common_plan(queryDesc, &ctx);
 	}
 
 	es->rtable = queryDesc->plannedstmt->rtable;
@@ -749,7 +760,7 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
     /*
      * Display per-slice and whole-query statistics.
      */
-    if (stmt->analyze)
+    if (stmt->analyze && !newExecutorMode)
         cdbexplain_showExecStatsEnd(queryDesc->plannedstmt, es->showstatctx, buf, estate);
 
     /*
@@ -764,22 +775,14 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
     }
 
 #ifdef USE_ORCA
-    /* Display optimizer status: either 'legacy query optimizer' or Orca version number */
-    if (optimizer_explain_show_status)
-    {
-
-    	appendStringInfo(buf, "Optimizer status: ");
-    	if (queryDesc->plannedstmt->planGen == PLANGEN_PLANNER)
-    	{
-    		appendStringInfo(buf, "legacy query optimizer\n");
-    	}
-    	else /* PLANGEN_OPTIMIZER */
-    	{
-    		StringInfo str = OptVersion();
-    		appendStringInfo(buf, "PQO version %s\n", str->data);
-			pfree(str->data);
-			pfree(str);
-    	}
+    /* Display optimizer status */
+    if (optimizer_explain_show_status) {
+      if (queryDesc->plannedstmt->planGen != PLANGEN_PLANNER) {
+        StringInfo str = OptVersion();
+        appendStringInfo(buf, "Optimizer status: PQO version %s\n", str->data);
+        pfree(str->data);
+        pfree(str);
+      }
     }
 #endif
 
@@ -788,7 +791,10 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
      */
 	if (stmt->analyze || stmt->verbose)
 	{
-		dispatcher_print_statistics(buf, estate->dispatch_data);
+	  if (estate->mainDispatchData)
+	    mainDispatchPrintStats(buf, estate->mainDispatchData);
+	  else if (estate->scheduler_data)
+	    scheduler_print_stats(estate->scheduler_data, buf);
 		appendStringInfo(buf, "Data locality statistics:\n");
 		if(plannedstmt->datalocalityInfo ==NULL){
 		  appendStringInfo(buf, "  no data locality information in this query\n");
@@ -798,6 +804,12 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
 		appendStringInfo(buf, "Total runtime: %.3f ms\n",
 						 1000.0 * totaltime);
 
+	}
+
+	if (newExecutorMode) {
+		appendStringInfo(buf, "New executor mode: ON\n");
+		if (pg_strcasecmp(new_scheduler_mode, new_scheduler_mode_on) == 0)
+			appendStringInfo(buf, "New scheduler mode: ON\n");
 	}
 
   if (Debug_print_execution_detail) {
@@ -1120,17 +1132,29 @@ explain_outNode(StringInfo str,
 		case T_SeqScan:
 			pname = "Seq Scan";
 			break;
-		case T_AppendOnlyScan:
-			pname = "Append-only Scan";
-			break;
-		case T_TableScan:
+    case T_AppendOnlyScan: {
+      RangeTblEntry *rte =
+          rt_fetch(((Scan *)plan)->scanrelid, es->rtable);
+      if (RELSTORAGE_ORC == get_rel_relstorage(rte->relid))
+        pname = "Orc Table Scan";
+      else
+        pname = "Row Table Scan";
+      break;
+    }
+    case T_TableScan:
 			pname = "Table Scan";
 			break;
 		case T_DynamicTableScan:
 			pname = "Dynamic Table Scan";
 			break;
 		case T_ParquetScan:
-			pname = "Parquet table Scan";
+			pname = "Parquet Table Scan";
+			break;
+		case T_MagmaIndexScan:
+			pname = "Magma Index Scan";
+			break;
+		case T_MagmaIndexOnlyScan:
+			pname = "Magma Index Only Scan";
 			break;
 		case T_ExternalScan:
 			pname = "External Scan";
@@ -1312,9 +1336,6 @@ explain_outNode(StringInfo str,
 			break;
 	}
 
-	if(plan->vectorized)
-		appendStringInfoString(str, "vectorized ");
-
 	appendStringInfoString(str, pname);
 	switch (nodeTag(plan))
 	{
@@ -1324,6 +1345,11 @@ explain_outNode(StringInfo str,
 			appendStringInfo(str, " using %s",
 			  quote_identifier(get_rel_name(((IndexScan *) plan)->indexid)));
 			/* FALL THRU */
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+			if (nodeTag(plan) != T_IndexScan)
+				appendStringInfo(str, " using index : %s",
+				  quote_identifier(((ExternalScan *) plan)->indexname));
 		case T_SeqScan:
 		case T_ExternalScan:
 		case T_AppendOnlyScan:
@@ -1541,6 +1567,19 @@ explain_outNode(StringInfo str,
 		case T_DynamicTableScan:
 		case T_FunctionScan:
 		case T_ValuesScan:
+			show_scan_qual(plan->qual,
+						   "Filter",
+						   ((Scan *) plan)->scanrelid,
+						   plan, outer_plan,
+						   str, indent, es);
+			break;
+		case T_MagmaIndexScan:
+		case T_MagmaIndexOnlyScan:
+			show_scan_qual(((MagmaIndexScan *) plan)->indexqualorig,
+						   "Index Cond",
+						   ((Scan *) plan)->scanrelid,
+						   plan, outer_plan,
+						   str, indent, es);
 			show_scan_qual(plan->qual,
 						   "Filter",
 						   ((Scan *) plan)->scanrelid,

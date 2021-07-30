@@ -85,5 +85,6 @@ typedef NumericData *Numeric;
 #define PG_RETURN_NUMERIC(x)	  return NumericGetDatum(x)
 
 extern double numeric_to_double_no_overflow(Numeric num);
+extern char *numeric_normalize(Numeric num);
 
 #endif   /* _PG_NUMERIC_H_ */

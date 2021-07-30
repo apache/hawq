@@ -38,9 +38,12 @@
 
 #include "access/genam.h"
 #include "access/heapam.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "catalog/catquery.h"
+#include "catalog/heap.h"
 #include "catalog/gp_policy.h"
+#include "catalog/pg_attribute.h"
 #include "catalog/pg_inherits.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/indexing.h"
@@ -78,6 +81,9 @@
 static List *get_relation_constraints(PlannerInfo *root,
 									  Oid relationObjectId, RelOptInfo *rel,
 									  bool include_notnull);
+
+static List *build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
+				  Relation heapRelation);
 
 static void
 estimate_tuple_width(Relation   rel,
@@ -289,6 +295,9 @@ get_relation_info(PlannerInfo *root, Oid relationObjectId, bool inhparent,
 				ChangeVarNodes((Node *) info->indpred, 1, varno, 0);
 			info->predOK = false;		/* set later in indxpath.c */
 			info->unique = index->indisunique;
+
+			/* Build targetlist using the completed indexprs data */
+			info->indextlist = build_index_tlist(root, info, relation);
 
 			/*
 			 * Estimate the index size.  If it's not a partial index, we lock
@@ -553,6 +562,12 @@ estimate_rel_size(Relation rel, int32 *attr_widths,
 				curpages = RelationGuessNumberOfBlocks((double)fstotal->totalbytes);
 				pfree(fstotal);
 			}
+			else if (RelationIsOrc(rel)) {
+			  FileSegTotals *fstotal = getOrcSegFileStats(rel, SnapshotNow);
+			  Assert(fstotal);
+        curpages = RelationGuessNumberOfBlocks((double)fstotal->totalbytes);
+        pfree(fstotal);
+			}
 			else
 			{
 				/* it has storage, ok to call the smgr */
@@ -798,6 +813,69 @@ get_relation_constraints(PlannerInfo *root,
 	return result;
 }
 
+
+/*
+ * build_index_tlist
+ *
+ * Build a targetlist representing the columns of the specified index.
+ * Each column is represented by a Var for the corresponding base-relation
+ * column, or an expression in base-relation Vars, as appropriate.
+ *
+ * There are never any dropped columns in indexes, so unlike
+ * build_physical_tlist, we need no failure case.
+ */
+static List *
+build_index_tlist(PlannerInfo *root, IndexOptInfo *index,
+				  Relation heapRelation)
+{
+	List	   *tlist = NIL;
+	Index	   varno = index->rel->relid;
+	ListCell   *indexpr_item;
+	int	   i;
+
+	indexpr_item = list_head(index->indexprs);
+	for (i = 0; i < index->ncolumns; i++)
+	{
+		int	   indexkey = index->indexkeys[i];
+		Expr	   *indexvar;
+
+		if (indexkey != 0)
+		{
+			/* simple column */
+			Form_pg_attribute att_tup;
+
+			if (indexkey < 0)
+				att_tup = SystemAttributeDefinition(indexkey,
+				    heapRelation->rd_rel->relhasoids);
+			else
+				att_tup = heapRelation->rd_att->attrs[indexkey - 1];
+
+			indexvar = (Expr *) makeVar(varno,
+			                            indexkey,
+			                            att_tup->atttypid,
+			                            att_tup->atttypmod,
+			                            0);
+		}
+		else
+		{
+			/* expression column */
+			if (indexpr_item == NULL)
+				elog(ERROR, "wrong number of index expressions");
+			indexvar = (Expr *) lfirst(indexpr_item);
+			indexpr_item = lnext(indexpr_item);
+		}
+
+		tlist = lappend(tlist,
+						makeTargetEntry(indexvar,
+						                i + 1,
+						                NULL,
+						                false));
+	}
+	if (indexpr_item != NULL)
+		elog(ERROR, "wrong number of index expressions");
+
+	return tlist;
+}
 
 /*
  * relation_excluded_by_constraints

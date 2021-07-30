@@ -58,7 +58,8 @@
 
 static inline bool AllocSizeIsValid(Size sz)
 {
-        return (sz < MaxAllocSize);
+        // return (sz < MaxAllocSize);
+    return true;
 }
 
 /*

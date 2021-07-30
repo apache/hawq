@@ -58,7 +58,17 @@ typedef struct FormatterData
 {
 	NodeTag			type;                 /* see T_FormatterData */
 
+	/*
+	 * action mask
+	 *
+	 * The first time the formatter is called, this field is set as FMT_NOACTION,
+	 * the formatter input method should fill this mask to tell external frame
+	 * work if this formatter needs external protocol functions to handle buffer,
+	 * and if this formatter supports both reading and writing.
+	 *
+	 */
 	FmtActionMask	fmt_mask;
+
 	/* metadata */
 	Relation    	fmt_relation;
 	TupleDesc   	fmt_tupDesc;
@@ -110,6 +120,7 @@ typedef struct FormatterData
 #define FORMATTER_GET_NTH_ARG_KEY(fcinfo, n)  (((DefElem *)(list_nth(FORMATTER_GET_ARG_LIST(fcinfo),(n - 1))))->defname)
 #define FORMATTER_GET_NTH_ARG_VAL(fcinfo, n)  (((Value *)((DefElem *)(list_nth(FORMATTER_GET_ARG_LIST(fcinfo),(n - 1))))->arg)->val.str)
 #define FORMATTER_GET_EXTENCODING(fcinfo)     (((FormatterData*) fcinfo->context)->fmt_external_encoding)
+#define FORMATTER_GET_MASK(fcinfo)            (((FormatterData*) fcinfo->context)->fmt_mask)
 
 #define FORMATTER_SET_USER_CTX(fcinfo, p) \
 	(((FormatterData*) fcinfo->context)->fmt_user_ctx = p)

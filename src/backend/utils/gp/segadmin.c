@@ -21,8 +21,10 @@
  *
  */
 #include "postgres.h"
+#include "funcapi.h"
 #include "miscadmin.h"
 
+#include "access/plugstorage.h"
 #include "catalog/catquery.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/pg_database.h"
@@ -46,6 +48,8 @@
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/segadmin.h"
+
+#include "magma/cwrapper/magma-client-c.h"
 
 #define MASTER_ONLY 0x1
 #define UTILITY_MODE 0x2
@@ -192,6 +196,128 @@ gp_remove_segment(PG_FUNCTION_ARGS)
 	remove_segment(order);
 
 	PG_RETURN_BOOL(true);
+}
+
+/*
+ * get magma node status
+ */
+#define HAWQ_MAGMA_STATUS_COLUMNS  7
+#define HAWQ_MAGMA_STATUS_BUFSIZE  4096
+Datum hawq_magma_status(PG_FUNCTION_ARGS)
+{
+	FuncCallContext *funcctx;
+	Datum result;
+	MemoryContext oldcontext = NULL;
+	HeapTuple tuple = NULL;
+	if (SRF_IS_FIRSTCALL())
+	{
+	  Oid procOid = LookupMagmaFunc("magma", "getstatus");
+	  FmgrInfo mgInfo;
+	  if (OidIsValid(procOid))
+	  {
+	    fmgr_info(procOid, &mgInfo);
+	  }
+	  else
+	  {
+	    elog(ERROR, "magma_getstatus function was not found for pluggable storage");
+	  }
+	  PlugStorageData psdata;
+	  FunctionCallInfoData fcinfoData;
+	  psdata.type = T_PlugStorageData;
+	  InitFunctionCallInfoData(fcinfoData,  // FunctionCallInfoData
+	                           &mgInfo,     // FmgrInfo
+	                           0,           // nArgs
+	                           (Node *)(&psdata), // Call Context
+	                           NULL);             // ResultSetInfo
+	  // Invoke function
+	  FunctionCallInvoke(&fcinfoData);
+	  ExtProtocolMagmaStatusData *data = (ExtProtocolMagmaStatusData*)(fcinfoData.resultinfo);
+	  if (data != NULL)
+	  {
+	    Assert((data)->type == T_ExtProtocolMagmaStatusData);
+	  }
+	  TupleDesc	tupdesc;
+	  MemoryContext oldcontext;
+	  /* create a function context for cross-call persistence */
+	  funcctx = SRF_FIRSTCALL_INIT();
+	  /*
+	   * switch to memory context appropriate for multiple function
+	   * calls
+	   */
+	  oldcontext = MemoryContextSwitchTo(funcctx->multi_call_memory_ctx);
+
+	  /* build tupdesc for result tuples */
+	  /* this had better match hawq_magma_status view in system_views.sql */
+	  tupdesc = CreateTemplateTupleDesc(HAWQ_MAGMA_STATUS_COLUMNS, false);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 1, "node",
+	                     TEXTOID, -1, 0);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 2, "compactJobRunning",
+	                     TEXTOID, -1, 0);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 3, "compactJob",
+	                     TEXTOID, -1, 0);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 4, "compactActionJobRunning",
+	                     TEXTOID, -1, 0);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 5, "compactActionJob",
+	                     TEXTOID, -1, 0);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 6, "dirs",
+	                     TEXTOID, -1, 0);
+	  TupleDescInitEntry(tupdesc, (AttrNumber) 7, "description",
+	                     TEXTOID, -1, 0);
+	  funcctx->tuple_desc = BlessTupleDesc(tupdesc);
+	  MemoryContextSwitchTo(oldcontext);
+
+	  funcctx->max_calls = data->size;
+	  funcctx->user_fctx = (void *)data;
+	  elog(LOG, "hawq_magma_status size:%d", data->size);
+	}
+	funcctx = SRF_PERCALL_SETUP();
+	ExtProtocolMagmaStatusData *data = funcctx->user_fctx;
+	if (funcctx->call_cntr < funcctx->max_calls)
+	{
+	  Datum values[HAWQ_MAGMA_STATUS_COLUMNS];
+	  bool nulls[HAWQ_MAGMA_STATUS_COLUMNS];
+	  char buf[HAWQ_MAGMA_STATUS_BUFSIZE];
+	  for (int i = 0; i < HAWQ_MAGMA_STATUS_COLUMNS; i++)
+	  {
+	    // description is null
+	    if (i < HAWQ_MAGMA_STATUS_COLUMNS - 1) nulls[i] = false;
+	    else nulls[i] = true;
+	  }
+	  if ((data->magmaNodes[funcctx->call_cntr].node))
+	  {
+	    values[0] = PointerGetDatum(cstring_to_text(data->magmaNodes[funcctx->call_cntr].node));
+	  }
+	  else
+	  {
+	    nulls[0] = true;
+	  }
+	  snprintf(buf, sizeof(buf), "%d", data->magmaNodes[funcctx->call_cntr].compactJobRunning);
+	  values[1] = PointerGetDatum(cstring_to_text(buf));
+	  snprintf(buf, sizeof(buf), "%d", data->magmaNodes[funcctx->call_cntr].compactJob);
+	  values[2] = PointerGetDatum(cstring_to_text(buf));
+	  snprintf(buf, sizeof(buf), "%d", data->magmaNodes[funcctx->call_cntr].compactActionJobRunning);
+	  values[3] = PointerGetDatum(cstring_to_text(buf));
+	  snprintf(buf, sizeof(buf), "%d", data->magmaNodes[funcctx->call_cntr].compactActionJob);
+	  values[4] = PointerGetDatum(cstring_to_text(buf));
+	  if (data->magmaNodes[funcctx->call_cntr].dirs)
+	  {
+	    values[5] = PointerGetDatum(cstring_to_text(data->magmaNodes[funcctx->call_cntr].dirs));
+	  }
+	  else
+	  {
+	    nulls[5] = true;
+	  }
+	  tuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);
+	  // free memory
+	  free(data->magmaNodes[funcctx->call_cntr].node);
+	  free(data->magmaNodes[funcctx->call_cntr].dirs);
+	  result = HeapTupleGetDatum(tuple);
+	  SRF_RETURN_NEXT(funcctx, result);
+	} else {
+	  // free memory
+	  free(data->magmaNodes);
+	  SRF_RETURN_DONE(funcctx);
+	}
 }
 
 /*

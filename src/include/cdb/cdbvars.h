@@ -133,7 +133,6 @@ typedef enum
 	GP_ROLE_UNDEFINED			/* Should never see this role in use */
 } GpRoleValue;
 
-
 extern GpRoleValue Gp_session_role;	/* GUC var - server startup mode.  */
 extern char *gp_session_role_string;	/* Use by guc.c as staging area for
 										 * value. */
@@ -381,6 +380,9 @@ extern int	gp_connections_per_thread; /* GUC var - server operating mode.  */
 
 extern bool assign_gp_connections_per_thread(int newval, bool doit, GucSource source);
 extern const char *show_gp_connections_per_thread(void);
+
+extern int  main_disp_connections_per_thread;
+extern int  proxy_disp_connections_per_thread;
 
 /*
  * If number of subtransactions within a transaction exceed this limit,
@@ -1084,6 +1086,7 @@ extern GpId GpIdentity;
  * Interconnect connections from other Motion nodes.
  */
 extern int	Gp_listener_port;
+extern int	my_listener_port;
 
 
 
@@ -1155,12 +1158,16 @@ extern bool get_tmpdir_from_rm;
 extern bool debug_fake_segmentnum;
 extern bool debug_datalocality_time;
 
+/* HAWQ magma GUCs */
+extern int   scheduler_rpc_base_port;
+
 /* New HAWQ 2.0 basic GUCs */
 extern char   *master_addr_host;
 extern int     master_addr_port;
 extern char   *standby_addr_host;
 extern int     seg_addr_port;
 extern char   *dfs_url;
+extern char   *magma_nodes_url;
 extern char   *master_directory;
 extern char   *seg_directory;
 extern int    segment_history_keep_period;

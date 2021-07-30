@@ -2,17 +2,13 @@
 -- test hcatalog lookup
 -- --------------------------------------
 SELECT * FROM pxf_get_item_fields('Hive', '*');
- path | itemname | fieldname | fieldtype | sourcefieldtype 
-------+----------+-----------+-----------+-----------------
-(0 rows)
-
+ERROR:  the pxf protocol for external tables is deprecated
 \d hcatalog.*.*
+ERROR:  the pxf protocol for external tables is deprecated
 SELECT * FROM pxf_get_item_fields('Hive', '*abc*abc*');
- path | itemname | fieldname | fieldtype | sourcefieldtype 
-------+----------+-----------+-----------+-----------------
-(0 rows)
-
+ERROR:  the pxf protocol for external tables is deprecated
 \d hcatalog.*abc*.*abc*
+ERROR:  the pxf protocol for external tables is deprecated
 \d hcatalog
 Invalid pattern provided.
 \d hcatalog.

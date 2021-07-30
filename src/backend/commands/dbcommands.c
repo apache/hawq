@@ -46,8 +46,10 @@
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "catalog/heap.h"
+#include "access/read_cache.h"
 #include "access/xact.h"
 #include "access/transam.h"				/* InvalidTransactionId */
+#include "access/plugstorage.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
 #include "catalog/dependency.h"
@@ -57,6 +59,7 @@
 #include "catalog/pg_class.h"
 #include "catalog/pg_namespace.h"
 #include "catalog/pg_database.h"
+#include "catalog/pg_exttable.h"
 #include "catalog/pg_tablespace.h"
 #include "commands/comment.h"
 #include "commands/dbcommands.h"
@@ -78,6 +81,7 @@
 #include "utils/lsyscache.h"
 #include "utils/pg_locale.h"
 #include "utils/syscache.h"
+#include "utils/uri.h"
 
 #include "cdb/cdbdisp.h"
 #include "cdb/cdbdispatchresult.h"
@@ -797,11 +801,13 @@ createdb(CreatedbStmt *stmt)
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 				  errmsg("pg_global cannot be used as default tablespace")));
 
-		/* don't allow user create database on pg_default*/
+		/* don't allow user create database on pg_default
+		 * user can create database on pg_default when it is used as default magma tablespace
 		if (dst_deftablespace == DEFAULTTABLESPACE_OID)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					errmsg("Creating database on tablespace 'pg_default' is not allowed")));
+		 */
 
 		/*
 		 * If we are trying to change the default tablespace of the template,
@@ -981,6 +987,7 @@ createdb(CreatedbStmt *stmt)
 							DEFAULTTABLESPACE_OID,
 							/* collectGpRelationNodeInfo */ true,
 							/* collectAppendOnlyCatalogSegmentInfo */ true,
+							/* collectExtTableInfo */ false,
 							/* scanFileSystem */ true);
 		
 		if (Debug_database_command_print)
@@ -1064,11 +1071,9 @@ createdb(CreatedbStmt *stmt)
 							dboid,
 							&dstRelFileNode);
 			
-			relStorageMgr = (
-					 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-					  dbInfoRel->relstorage == RELSTORAGE_PARQUET ) ?
+			relStorageMgr = relstorage_is_ao(dbInfoRel->relstorage) ?
 									PersistentFileSysRelStorageMgr_AppendOnly :
-									PersistentFileSysRelStorageMgr_BufferPool);
+									PersistentFileSysRelStorageMgr_BufferPool;
 
 			if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool)
 			{
@@ -1248,7 +1253,7 @@ dropdb(const char *dbname, bool missing_ok)
 	{
 		/*
 		 * Don't allow master tp call this in a transaction block.  Segments are ok as
-		 * distributed transaction participants. 
+		 * distributed transaction participants.
 		 */
 		PreventTransactionChain((void *) dbname, "DROP DATABASE");
 	}
@@ -1282,11 +1287,11 @@ dropdb(const char *dbname, bool missing_ok)
 			{
 				/* This branch exists just to facilitate cleanup of a failed
 				 * CREATE DATABASE.  Other callers will supply missing_ok as
-				 * FALSE.  The role check is just insurance. 
+				 * FALSE.  The role check is just insurance.
 				 */
 				elog(DEBUG1, "ignored request to drop non-existent "
 					 "database \"%s\"", dbname);
-				
+
 				heap_close(pgdbrel, RowExclusiveLock);
 				return;
 			}
@@ -1397,7 +1402,8 @@ dropdb(const char *dbname, bool missing_ok)
 								defaultTablespace,
 								/* collectGpRelationNodeInfo */ true,
 								/* collectAppendOnlyCatalogSegmentInfo */ false,
-//								/* scanFileSystem */ true);
+								/* collectExtTableInfo */ true,
+ //								/* scanFileSystem */ true);
 								/*
 								 * wangz11: info->miscEntry and dbInfoRel->physicalSegmentFiles
 								 * collected in DatabaseInfo_Collect are not used.
@@ -1445,11 +1451,12 @@ dropdb(const char *dbname, bool missing_ok)
 			/*
 			 * Schedule the relation drop.
 			 */
-			relStorageMgr = (
-					 (dbInfoRel->relstorage == RELSTORAGE_AOROWS ||
-					  dbInfoRel->relstorage == RELSTORAGE_PARQUET  ) ?
-									PersistentFileSysRelStorageMgr_AppendOnly :
-									PersistentFileSysRelStorageMgr_BufferPool);
+			if (relstorage_is_ao(dbInfoRel->relstorage))
+				relStorageMgr = PersistentFileSysRelStorageMgr_AppendOnly;
+			else if (dbInfoRel->relstorage == RELSTORAGE_EXTERNAL)
+				relStorageMgr = PersistentFileSysRelStorageMgr_External;
+			else
+				relStorageMgr = PersistentFileSysRelStorageMgr_BufferPool;
 
 			if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool)
 			{
@@ -1464,7 +1471,7 @@ dropdb(const char *dbname, bool missing_ok)
 												&dbInfoGpRelationNode->persistentTid,
 												dbInfoGpRelationNode->persistentSerialNum);
 			}
-			else
+			else if (relStorageMgr == PersistentFileSysRelStorageMgr_AppendOnly)
 			{
 				for (g = 0; g < dbInfoRel->gpRelationNodesCount; g++)
 				{
@@ -1482,6 +1489,64 @@ dropdb(const char *dbname, bool missing_ok)
 
 				/* Schedule for dropping relation directory */
 				MirroredFileSysObj_ScheduleDropRelationDir(&relFileNode, is_tablespace_shared(relFileNode.spcNode));
+			}
+			else
+			{
+				ExtTableEntry *exttbl = dbInfoRel->exttable;
+
+				/* Get category for the external table */
+				List *entry_locations = exttbl->locations;
+				Assert(entry_locations);
+				ListCell *entry_location = list_head(entry_locations);
+				char *url = ((Value*) lfirst(entry_location))->val.str;
+				char *category = getExtTblCategoryInFmtOptsStr(exttbl->fmtopts);
+
+				/* Remove data for magma internal table */
+				if (category != NULL
+						&& pg_strncasecmp(category, "internal",
+								strlen("internal")) == 0) {
+					if (IS_MAGMA_URI(url)) /* magma */
+					{
+						// ensure there have one location at least
+						Assert(list_length(entry_locations) >= 1);
+						/* get database name for the relation */
+						char *database_name = get_database_name(info->database);
+
+						/* get schema name for the relation */
+						char *schema_name = dbInfoRel->relnamespacename;
+
+						/* get table name for the relation */
+						char *table_name = dbInfoRel->relname;
+
+						Oid procOid = LookupMagmaFunc("magma", "droptable");
+						FmgrInfo procInfo;
+						if (OidIsValid(procOid)) {
+							fmgr_info(procOid, &procInfo);
+						} else {
+							elog(
+									ERROR, "magma_droptable function was not found for pluggable storage");
+						}
+
+						// start transaction in magma for DROP TABLE
+						if (PlugStorageGetTransactionStatus()
+								== PS_TXN_STS_DEFAULT) {
+							PlugStorageBeginTransaction(NULL);
+						}
+						Assert(
+								PlugStorageGetTransactionStatus()
+										== PS_TXN_STS_STARTED);
+
+						// drop table in magma now
+						InvokeMagmaDropTable(&procInfo, dbInfoRel->exttable, database_name,
+								schema_name, table_name,
+								PlugStorageGetTransactionSnapshot());
+						ReadCacheHashEntryReviseOnCommit(dbInfoRel->relationOid, true);
+					}
+				}
+
+				if (category) {
+					pfree(category);
+				}
 			}
 		}
 
@@ -1515,6 +1580,10 @@ dropdb(const char *dbname, bool missing_ok)
 											persistentSerialNum,
 											sharedStorage);
 		}
+		/*
+		 * Schedule the database folder removal for possibly exist external table
+		 */
+		scheduleDropDbExtDir(dbname);
 	}
 
 	/*
@@ -1573,13 +1642,6 @@ RenameDatabase(const char *oldname, const char *newname)
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("current database may not be renamed")));
-	/*
-	 * "hcatalog" database cannot be renamed
-	 */
-	if (db_id == HcatalogDbOid)
-		ereport(ERROR,
-				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-				errmsg("permission denied to ALTER DATABASE \"%s\" is reserved for system use", HcatalogDbName)));
 
 	/*
 	 * Make sure the database does not have active sessions.  This is the same

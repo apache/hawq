@@ -74,10 +74,14 @@
 #include "utils/uri.h"
 #include "utils/guc.h"
 #include "utils/builtins.h"
+#include "utils/palloc.h"
 
 #include "cdb/cdbsreh.h"
 #include "cdb/cdbutil.h"
 #include "cdb/cdbvars.h"
+#include "access/filesplit.h"
+
+#include "storage/cwrapper/hive-file-system-c.h"
 
 static HeapTuple externalgettup(FileScanDesc scan, ScanDirection dir, ExternalSelectDesc desc, ScanState *ss);
 static void InitParseState(CopyState pstate, Relation relation,
@@ -86,17 +90,16 @@ static void InitParseState(CopyState pstate, Relation relation,
 						   char *uri, int rejectlimit,
 						   bool islimitinrows, Oid fmterrtbl, ResultRelSegFileInfo *segfileinfo, int encoding);
 
-static void
-FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
-							 int					nArgs,
-							 CopyState 				pstate,
-							 FormatterData		   *formatter,
-							 Relation 				rel,
-							 TupleDesc 				tupDesc,
-							 FmgrInfo			   *convFuncs,
-							 Oid                   *typioparams,
-							 char				   *url,
-							 ScanState			   *ss);
+static void FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
+										 int					nArgs,
+										 CopyState 				pstate,
+										 FormatterData*			formatter,
+										 Relation 				rel,
+										 TupleDesc 				tupDesc,
+										 FmgrInfo			   *convFuncs,
+										 Oid                   *typioparams,
+										 char				   *url,
+										 ScanState			   *ss);
 
 static void open_external_readable_source(FileScanDesc scan);
 static void open_external_writable_source(ExternalInsertDesc extInsertDesc);
@@ -204,8 +207,18 @@ external_beginscan(ExternalScan *extScan,
 	if (Gp_role == GP_ROLE_EXECUTE)
 	{
 		/* this is the normal path for most ext tables */
-		Value *v;
-		int idx = segindex;
+		Value *v = NULL;
+		int idx;
+		if (!fmttype_is_custom(fmtType))
+		{
+			idx = segindex;
+		}
+		else
+		{
+			idx = 0;
+		}
+
+		elog(LOG, "executor index as segment index %d", idx);
 
 		/*
 		 * Segindex may be -1, for the following case.
@@ -245,9 +258,11 @@ external_beginscan(ExternalScan *extScan,
 	 */
 	if (uri)
 	{
-		/* set external source (uri) */
+		/* set external source (uri) */;
+		if (IS_HIVE_URI(uri)) {
+		  uri = pstrdup(extScan->hiveUrl);
+		}
 		scan->fs_uri = uri;
-
 		elog(LOG, "fs_uri (%d) is set as %s", segindex, uri);
 		/* NOTE: we delay actually opening the data source until external_getnext() */
 	}
@@ -292,15 +307,21 @@ external_beginscan(ExternalScan *extScan,
 
 	/* Initialize all the parsing and state variables */
 	InitParseState(scan->fs_pstate, relation, NULL, NULL, false, fmtOpts, fmtType,
-	               scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, segFileInfo, encoding);
+				   scan->fs_uri, rejLimit, rejLimitInRows, fmterrtbl, segFileInfo, encoding);
 
 	/*
 	 * We always have custom formatter
-	 */
+	 *
+	if(fmttype_is_custom(fmtType))
+	{
+	*/
 	scan->fs_formatter = (FormatterData *) palloc0 (sizeof(FormatterData));
 	initStringInfo(&scan->fs_formatter->fmt_databuf);
 	scan->fs_formatter->fmt_perrow_ctx = scan->fs_pstate->rowcontext;
 	scan->fs_formatter->fmt_user_ctx = NULL;
+	/*
+	}
+	*/
 
 	/* Set up callback to identify error line number */
 	scan->errcontext.callback = external_scan_error_callback;
@@ -308,16 +329,18 @@ external_beginscan(ExternalScan *extScan,
 	scan->errcontext.previous = error_context_stack;
 
 	//pgstat_initstats(relation);
+
+	/* First call formatter in function to get action mask */
 	external_populate_formatter_actionmask(scan->fs_pstate, scan->fs_formatter);
+
 	return scan;
 }
-
 
 /* ----------------
  * external_populate_formatter_actionmask
  * ----------------
  */
-void external_populate_formatter_actionmask(CopyState pstate,
+void external_populate_formatter_actionmask(struct CopyStateData *pstate,
 											FormatterData *formatter)
 {
 	/* We just call the formatter in function to populate the mask */
@@ -354,6 +377,7 @@ void external_populate_formatter_actionmask(CopyState pstate,
 		elog(LOG, "external scan needs only formatter to manipulate data");
 	}
 }
+
 
 /* ----------------
 *		external_rescan  - (re)start a scan of an external file
@@ -614,7 +638,6 @@ external_getnext(FileScanDesc scan,
 	return true;
 }
 
-
 /*
  * external_insert_init
  *
@@ -667,7 +690,6 @@ external_insert_init(Relation rel, int errAosegno,
 		/* LOCATION - gpfdist or custom */
 
 		Value*		v;
-		char*		uri_str;
 		int			segindex = GetQEIndex();
 		int			num_segs = GetQEGangNum();
 		int			num_urls = list_length(extentry->locations);
@@ -681,12 +703,11 @@ external_insert_init(Relation rel, int errAosegno,
 
 		/* get a url to use. we use seg number modulo total num of urls */
 		v = list_nth(extentry->locations, my_url);
-		uri_str = pstrdup(v->val.str);
-		Uri* uri = ParseExternalTableUri(uri_str);
-
-		extInsertDesc->ext_uri = uri_str;
-
-		FreeExternalTableUri(uri);
+    if (IS_HIVE_URI(v->val.str)) {
+      extInsertDesc->ext_uri = pstrdup(plannedstmt->hiveUrl);
+    } else {
+      extInsertDesc->ext_uri = pstrdup(v->val.str);
+    }
 
 		/*elog(NOTICE, "seg %d got url number %d: %s", segindex, my_url, uri_str);*/
 	}
@@ -758,7 +779,7 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 	if(!extInsertDesc->ext_file &&
 	   !extInsertDesc->ext_noop &&
 	   (extInsertDesc->ext_formatter_data == NULL ||
-	   (extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF)))
+		(extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF)))
 	{
 		open_external_writable_source(extInsertDesc);
 	}
@@ -841,7 +862,8 @@ external_insert(ExternalInsertDesc extInsertDesc, TupleTableSlot *tupTableSlot)
 		}
 	}
 
-	if (extInsertDesc->ext_formatter_data == NULL || (extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF))
+	if (extInsertDesc->ext_formatter_data == NULL ||
+		(extInsertDesc->ext_formatter_data->fmt_mask & FMT_NEEDEXTBUFF))
 	{
 		/* Write the data into the external source */
 		external_senddata((URL_FILE*)extInsertDesc->ext_file, pstate);
@@ -907,7 +929,6 @@ external_insert_finish(ExternalInsertDesc extInsertDesc)
 
 	pfree(extInsertDesc);
 }
-
 
 /* ==========================================================================
  * The follwing macros aid in major refactoring of data processing code (in
@@ -1146,102 +1167,106 @@ static DataLineStatus parse_next_line(FileScanDesc scan)
 static HeapTuple
 externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 {
-	HeapTuple	tuple = NULL;
-	CopyState	pstate = scan->fs_pstate;
-	bool        needData = false;
+		HeapTuple	tuple = NULL;
+		CopyState	pstate = scan->fs_pstate;
+		bool        needData = false;
 
-	/* If we either got things to read or stuff to process */
-	while (!pstate->fe_eof || !pstate->raw_buf_done)
-	{
-		/* need to fill our buffer with data? */
-		if (pstate->raw_buf_done)
+		/* If we either got things to read or stuff to process */
+		while (!pstate->fe_eof || !pstate->raw_buf_done)
 		{
-		    pstate->bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
-			pstate->begloc = pstate->raw_buf;
-			pstate->raw_buf_done = (pstate->bytesread==0);
-			pstate->raw_buf_index = 0;
-
-			/* on first time around just throw the header line away */
-			if (pstate->header_line && pstate->bytesread > 0)
+			/* need to fill our buffer with data? */
+			if (pstate->raw_buf_done)
 			{
-				PG_TRY();
-				{
-					readHeaderLine(pstate);
-				}
-				PG_CATCH();
-				{
-					/*
-					 * got here? encoding conversion error occurred on the
-					 * header line (first row).
-					 */
-					if (pstate->errMode == ALL_OR_NOTHING)
-					{
-						PG_RE_THROW();
-					}
-					else
-					{
-						/* SREH - release error state */
-						if (!elog_dismiss(DEBUG5))
-							PG_RE_THROW(); /* hope to never get here! */
+			    pstate->bytesread = external_getdata((URL_FILE*)scan->fs_file,
+			    									 pstate,
+													 RAW_BUF_SIZE,
+													 desc,
+													 ss);
+				pstate->begloc = pstate->raw_buf;
+				pstate->raw_buf_done = (pstate->bytesread==0);
+				pstate->raw_buf_index = 0;
 
+				/* on first time around just throw the header line away */
+				if (pstate->header_line && pstate->bytesread > 0)
+				{
+					PG_TRY();
+					{
+						readHeaderLine(pstate);
+					}
+					PG_CATCH();
+					{
 						/*
-						 * note: we don't bother doing anything special here.
-						 * we are never interested in logging a header line
-						 * error. just continue the workflow.
+						 * got here? encoding conversion error occurred on the
+						 * header line (first row).
 						 */
+						if (pstate->errMode == ALL_OR_NOTHING)
+						{
+							PG_RE_THROW();
+						}
+						else
+						{
+							/* SREH - release error state */
+							if (!elog_dismiss(DEBUG5))
+								PG_RE_THROW(); /* hope to never get here! */
+
+							/*
+							 * note: we don't bother doing anything special here.
+							 * we are never interested in logging a header line
+							 * error. just continue the workflow.
+							 */
+						}
 					}
+					PG_END_TRY();
+
+					EXT_RESET_LINEBUF;
+					pstate->header_line = false;
 				}
-				PG_END_TRY();
+			}
 
-				EXT_RESET_LINEBUF;
-				pstate->header_line = false;
+			/* while there is still data in our buffer */
+			while (!pstate->raw_buf_done || needData)
+			{
+				DataLineStatus ret_mode = parse_next_line(scan);
+
+				if(ret_mode == LINE_OK)
+				{
+					/* convert to heap tuple */
+					/* XXX This is bad code.  Planner should be able to
+					 * decide whether we need heaptuple or memtuple upstream,
+					 * so make the right decision here.
+					 */
+					tuple = heap_form_tuple(scan->fs_tupDesc, scan->values, scan->nulls);
+					pstate->processed++;
+					MemoryContextReset(pstate->rowcontext);
+					return tuple;
+				}
+				else if(ret_mode == LINE_ERROR && !pstate->raw_buf_done)
+				{
+					/* error was handled in parse_next_line. move to the next */
+					continue;
+				}
+				else if(ret_mode == END_MARKER)
+				{
+					scan->fs_inited = false;
+					return NULL;
+				}
+				else
+				{
+					/* try to get more data if possible */
+					Assert((ret_mode == NEED_MORE_DATA) ||
+						   (ret_mode == LINE_ERROR && pstate->raw_buf_done));
+					needData = true;
+					break;
+				}
 			}
 		}
 
-		/* while there is still data in our buffer */
-		while (!pstate->raw_buf_done || needData)
-		{
-			DataLineStatus ret_mode = parse_next_line(scan);
+		/*
+		 * if we got here we finished reading all the data.
+		 */
+		scan->fs_inited = false;
 
-			if(ret_mode == LINE_OK)
-			{
-				/* convert to heap tuple */
-				/* XXX This is bad code.  Planner should be able to
-				 * decide whether we need heaptuple or memtuple upstream,
-				 * so make the right decision here.
-				 */
-				tuple = heap_form_tuple(scan->fs_tupDesc, scan->values, scan->nulls);
-				pstate->processed++;
-				MemoryContextReset(pstate->rowcontext);
-				return tuple;
-			}
-			else if(ret_mode == LINE_ERROR && !pstate->raw_buf_done)
-			{
-				/* error was handled in parse_next_line. move to the next */
-				continue;
-			}
-			else if(ret_mode == END_MARKER)
-			{
-				scan->fs_inited = false;
-				return NULL;
-			}
-			else
-			{
-				/* try to get more data if possible */
-				Assert((ret_mode == NEED_MORE_DATA) ||
-					   (ret_mode == LINE_ERROR && pstate->raw_buf_done));
-				needData = true;
-				break;
-			}
-		}
-	}
-
-	/*
-	 * if we got here we finished reading all the data.
-	 */
-	scan->fs_inited = false;
-
-	return NULL;
+		return NULL;
 
 
 }
@@ -1249,150 +1274,152 @@ externalgettup_defined(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss
 static HeapTuple
 externalgettup_custom(FileScanDesc scan, ExternalSelectDesc desc, ScanState *ss)
 {
-	HeapTuple   	tuple;
-	CopyState		pstate = scan->fs_pstate;
-	FormatterData*	formatter = scan->fs_formatter;
-	bool			no_more_data = false;
-	MemoryContext 	oldctxt = CurrentMemoryContext;
+		HeapTuple   	tuple;
+		CopyState		pstate = scan->fs_pstate;
+		FormatterData*	formatter = scan->fs_formatter;
+		bool			no_more_data = false;
+		MemoryContext 	oldctxt = CurrentMemoryContext;
 
-	Assert(formatter);
+		Assert(formatter);
 
-	/* while didn't finish processing the entire file */
-	while (!no_more_data)
-	{
-		/* need to fill our buffer with data? */
-		if (pstate->raw_buf_done)
+		/* while didn't finish processing the entire file */
+		while (!no_more_data)
 		{
-			int	 bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
-			if ( bytesread > 0 )
-				appendBinaryStringInfo(&formatter->fmt_databuf, pstate->raw_buf, bytesread);
-			pstate->raw_buf_done = false;
-
-			/* HEADER not yet supported ... */
-			if(pstate->header_line)
-				elog(ERROR, "header line in custom format is not yet supported");
-		}
-
-		if (formatter->fmt_databuf.len > 0 || !pstate->fe_eof)
-		{
-			/* while there is still data in our buffer */
-			while (!pstate->raw_buf_done)
+			/* need to fill our buffer with data? */
+			if (pstate->raw_buf_done)
 			{
-				bool	error_caught = false;
+				int	 bytesread = external_getdata((URL_FILE*)scan->fs_file, pstate, RAW_BUF_SIZE, desc, ss);
+				if ( bytesread > 0 )
+					appendBinaryStringInfo(&formatter->fmt_databuf, pstate->raw_buf, bytesread);
+				pstate->raw_buf_done = false;
 
-				/*
-				 * Invoke the custom formatter function.
-				 */
-				PG_TRY();
+				/* HEADER not yet supported ... */
+				if(pstate->header_line)
+					elog(ERROR, "header line in custom format is not yet supported");
+			}
+
+			if (formatter->fmt_databuf.len > 0 || !pstate->fe_eof)
+			{
+				/* while there is still data in our buffer */
+				while (!pstate->raw_buf_done)
 				{
-					Datum					d;
-					FunctionCallInfoData	fcinfo;
-
-					/* per call formatter prep */
-					FunctionCallPrepareFormatter(&fcinfo,
-												 0,
-												 pstate,
-												 formatter,
-												 scan->fs_rd,
-												 scan->fs_tupDesc,
-												 scan->in_functions,
-												 scan->typioparams,
-												 ((URL_FILE *)(scan->fs_file))->url,
-												 ss);
-					d = FunctionCallInvoke(&fcinfo);
-
-				}
-				PG_CATCH();
-				{
-					error_caught = true;
-
-					MemoryContextSwitchTo(formatter->fmt_perrow_ctx);
+					bool	error_caught = false;
 
 					/*
-					 * Save any bad row information that was set
-					 * by the user in the formatter UDF (if any).
-					 * Then handle the error in FILEAM_HANDLE_ERROR.
+					 * Invoke the custom formatter function.
 					 */
-					pstate->cur_lineno = formatter->fmt_badrow_num;
-					pstate->cur_byteno = formatter->fmt_bytesread;
-					resetStringInfo(&pstate->line_buf);
-
-					if (formatter->fmt_badrow_len > 0)
+					PG_TRY();
 					{
-						if (formatter->fmt_badrow_data)
-							appendBinaryStringInfo(&pstate->line_buf,
-												   formatter->fmt_badrow_data,
-												   formatter->fmt_badrow_len);
+						Datum					d;
+						FunctionCallInfoData	fcinfo;
 
-						formatter->fmt_databuf.cursor += formatter->fmt_badrow_len;
-						if (formatter->fmt_databuf.cursor > formatter->fmt_databuf.len ||
-							formatter->fmt_databuf.cursor < 0 )
+						elog(LOG, "file url is %s", ((URL_FILE*)scan->fs_file)->url);
+
+						/* per call formatter prep */
+						FunctionCallPrepareFormatter(&fcinfo,
+													 0,
+													 pstate,
+													 formatter,
+													 scan->fs_rd,
+													 scan->fs_tupDesc,
+													 scan->in_functions,
+													 scan->typioparams,
+													 ((URL_FILE *)(scan->fs_file))->url,
+													 ss);
+						d = FunctionCallInvoke(&fcinfo);
+
+					}
+					PG_CATCH();
+					{
+						error_caught = true;
+
+						MemoryContextSwitchTo(formatter->fmt_perrow_ctx);
+
+						/*
+						 * Save any bad row information that was set
+						 * by the user in the formatter UDF (if any).
+						 * Then handle the error in FILEAM_HANDLE_ERROR.
+						 */
+						pstate->cur_lineno = formatter->fmt_badrow_num;
+						pstate->cur_byteno = formatter->fmt_bytesread;
+						resetStringInfo(&pstate->line_buf);
+
+						if (formatter->fmt_badrow_len > 0)
 						{
-							formatter->fmt_databuf.cursor = formatter->fmt_databuf.len;
+							if (formatter->fmt_badrow_data)
+								appendBinaryStringInfo(&pstate->line_buf,
+													   formatter->fmt_badrow_data,
+													   formatter->fmt_badrow_len);
+
+							formatter->fmt_databuf.cursor += formatter->fmt_badrow_len;
+							if (formatter->fmt_databuf.cursor > formatter->fmt_databuf.len ||
+								formatter->fmt_databuf.cursor < 0 )
+							{
+								formatter->fmt_databuf.cursor = formatter->fmt_databuf.len;
+							}
+						}
+
+						FILEAM_HANDLE_ERROR;
+
+						MemoryContextSwitchTo(oldctxt);
+					}
+					PG_END_TRY();
+
+					/*
+					 * Examine the function results. If an error was caught
+					 * we already handled it, so after checking the reject
+					 * limit, loop again and call the UDF for the next tuple.
+					 */
+					if (!error_caught)
+					{
+						switch (formatter->fmt_notification)
+						{
+							case FMT_NONE:
+
+								/* got a tuple back */
+
+								tuple = formatter->fmt_tuple;
+								pstate->processed++;
+								MemoryContextReset(formatter->fmt_perrow_ctx);
+
+								return tuple;
+
+							case FMT_NEED_MORE_DATA:
+
+								/*
+								 * Callee consumed all data in the buffer.
+								 * Prepare to read more data into it.
+								 */
+								pstate->raw_buf_done = true;
+								justifyDatabuf(&formatter->fmt_databuf);
+
+								continue;
+
+							default:
+								elog(ERROR, "unsupported formatter notification (%d)",
+											formatter->fmt_notification);
+								break;
 						}
 					}
-
-					FILEAM_HANDLE_ERROR;
-
-					MemoryContextSwitchTo(oldctxt);
-				}
-				PG_END_TRY();
-
-				/*
-				 * Examine the function results. If an error was caught
-				 * we already handled it, so after checking the reject
-				 * limit, loop again and call the UDF for the next tuple.
-				 */
-				if (!error_caught)
-				{
-					switch (formatter->fmt_notification)
+					else
 					{
-						case FMT_NONE:
-
-							/* got a tuple back */
-
-							tuple = formatter->fmt_tuple;
-							pstate->processed++;
-							MemoryContextReset(formatter->fmt_perrow_ctx);
-
-							return tuple;
-
-						case FMT_NEED_MORE_DATA:
-
-							/*
-							 * Callee consumed all data in the buffer.
-							 * Prepare to read more data into it.
-							 */
-							pstate->raw_buf_done = true;
-							justifyDatabuf(&formatter->fmt_databuf);
-
-							continue;
-
-						default:
-							elog(ERROR, "unsupported formatter notification (%d)",
-										formatter->fmt_notification);
-							break;
+						FILEAM_IF_REJECT_LIMIT_REACHED_ABORT
 					}
-				}
-				else
-				{
-					FILEAM_IF_REJECT_LIMIT_REACHED_ABORT
+
 				}
 			}
+			else
+			{
+				no_more_data = true;
+			}
 		}
-		else
-		{
-			no_more_data = true;
-		}
-	}
 
-	/*
-	 * if we got here we finished reading all the data.
-	 */
-	Assert(no_more_data);
-	scan->fs_inited = false;
-
-	return NULL;
+		/*
+		 * if we got here we finished reading all the data.
+		 */
+		Assert(no_more_data);
+		scan->fs_inited = false;
+		return NULL;
 }
 
 static HeapTuple
@@ -1604,12 +1631,10 @@ lookupCustomFormatter(char *formatter_name, bool iswritable)
 							 new_formatter_name),
 					 errOmitLocation(true)));
 
-		if(NULL != new_formatter_name)
-			pfree(new_formatter_name);
+		pfree(new_formatter_name);
 
 		return procOid;
 }
-
 
 /*
  * Initialize the data parsing state.
@@ -1656,7 +1681,7 @@ InitParseState(CopyState pstate, Relation relation,
 	/*
 	 * Error handling setup
 	 */
-	if (rejectlimit == -1)
+	if (rejectlimit == -1 || hasErrTblInFmtOpts(fmtOpts))
 	{
 		/* Default error handling - "all-or-nothing" */
 		pstate->cdbsreh = NULL; /* no SREH */
@@ -1738,15 +1763,31 @@ InitParseState(CopyState pstate, Relation relation,
 	Insist(PG_VALID_ENCODING(encoding));
 	pstate->client_encoding = encoding;
 	setEncodingConversionProc(pstate, encoding, iswritable);
-	pstate->need_transcoding = (pstate->client_encoding != GetDatabaseEncoding() ||
-								pg_database_encoding_max_length() > 1);
+
+	if (format_is_custom) {
+		pstate->need_transcoding = pstate->client_encoding != GetDatabaseEncoding();
+	}
+	else
+	{
+		pstate->need_transcoding = (pstate->client_encoding != GetDatabaseEncoding() ||
+								   pg_database_encoding_max_length() > 1);
+	}
+
 	pstate->encoding_embeds_ascii = PG_ENCODING_IS_CLIENT_ONLY(pstate->client_encoding);
 
 	/*
 	 * Now parse the data FORMAT options.
 	 */
 	format_str = pstrdup((char *) strVal(linitial(fmtOpts)));
+
 	parseFormatString(pstate, format_str, format_is_custom);
+	if (pstate->need_transcoding && iswritable && !format_is_custom) {
+	  pstate->delim = pg_server_to_custom(pstate->delim,
+	                                                  strlen(pstate->delim),
+	                                                  pstate->client_encoding,
+	                                                  pstate->enc_conversion_proc);
+	}
+
 
 	/*
 	 * Custom format: get formatter name and find it in the catalog
@@ -1850,9 +1891,12 @@ InitParseState(CopyState pstate, Relation relation,
 		 * we need to convert null_print to client encoding, because it
 		 * will be sent directly with CopySendString.
 		 */
-		if (pstate->need_transcoding)
-			pstate->null_print_client = pg_server_to_client(pstate->null_print,
-															pstate->null_print_len);
+		if (pstate->need_transcoding) {
+		  pstate->null_print_client = pg_server_to_custom(pstate->null_print,
+														pstate->null_print_len,
+														pstate->client_encoding,
+														pstate->enc_conversion_proc);
+		}
 	}
 
 
@@ -1915,6 +1959,7 @@ FunctionCallPrepareFormatter(FunctionCallInfoData*	fcinfo,
 							 /* ResultSetInfo */ NULL);
 }
 
+
 /*
  * open the external source for scanning (RET only)
  *
@@ -1930,6 +1975,8 @@ open_external_readable_source(FileScanDesc scan)
 	extvar_t 	extvar;
 	int 		response_code;
 	const char*	response_string;
+
+	elog(LOG, "open_external_readable_source() called");
 
 	/* set up extvar */
 	memset(&extvar, 0, sizeof(extvar));
@@ -1982,6 +2029,8 @@ open_external_writable_source(ExternalInsertDesc extInsertDesc)
 	extvar_t 	extvar;
 	int 		response_code;
 	const char*	response_string;
+
+	elog(LOG, "open_external_writable_source() is called.");
 
 	/* set up extvar */
 	memset(&extvar, 0, sizeof(extvar));
@@ -2070,9 +2119,7 @@ external_getdata(URL_FILE *extfile, CopyState pstate, int maxread, ExternalSelec
 			ereport(ERROR,
 					(errcode_for_file_access(),
 					 errmsg("could not read from external file: %m")));
-
 	}
-
 	return bytesread;
 }
 
@@ -2704,9 +2751,10 @@ static void parseFormatString(CopyState pstate, char *fmtstr, bool iscustom)
 					if (token)
 					{
 						pstate->delim = pstrdup(token);
-
 						if (pg_strcasecmp(pstate->delim, "off") == 0)
 							pstate->delimiter_off = true;
+						else if (strlen(pstate->delim) > 1)
+							pstate->delimiter_multibytes = true;
 					}
 					else
 						goto error;

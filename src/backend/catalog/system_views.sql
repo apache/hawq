@@ -421,6 +421,17 @@ CREATE VIEW pg_resqueue_status AS
 
 -- External table views
 
+-- magma node status view
+CREATE VIEW hawq_magma_status AS
+    SELECT * FROM hawq_magma_status() AS s
+    (node text,
+     compactJobRunning text,
+     compactJob text,
+     compactActionJobRunning text,
+     compactActionJob text,
+     dirs text,
+     description text);
+
 CREATE VIEW pg_max_external_files AS
     SELECT   address::name as hostname, count(*) as maxfiles
     FROM     gp_segment_configuration

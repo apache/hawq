@@ -453,5 +453,8 @@ DATA(insert (   27   20 6021 e ));
 DATA(insert OID = 9901 (	27 3300    0 e ));
 DATA(insert OID = 9902 ( 3300	 27    0 e ));
 
+/* json to/from jsonb */
+DATA(insert ( 193 3802 0 e ));
+DATA(insert ( 3802 193 0 e ));
 
 #endif   /* PG_CAST_H */

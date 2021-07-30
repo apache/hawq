@@ -33,6 +33,7 @@
 #include "cdb/cdbsharedstorageop.h"
 #include "cdb/cdbdispatchresult.h"
 #include "cdb/dispatcher.h"
+#include "cdb/dispatcher_new.h"
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbpartition.h"
@@ -157,9 +158,7 @@ void PerformSharedStorageOpTasks(SharedStorageOpTasks *tasks,
 
   QueryResource *resource =
       AllocateResource(QRL_INHERIT, 0, 0, tasks->numTasks, 1, NULL, 0);
-  DispatchDataResult result;
-  dispatch_statement_node((Node *) stat, contextdisp, resource, &result);
-  dispatch_free_result(&result);
+  mainDispatchStmtNode((Node *) stat, contextdisp, resource, NULL);
   FreeResource(resource);
   DropQueryContextInfo(contextdisp);
 
@@ -311,24 +310,9 @@ static void LockSegfilesOnMasterForSingleRel(Relation rel, int32 segno) {
   /*
    * do not lock segfile with content id = -1
    */
-  /*
-   for (i = 1; i < rel->rd_segfile0_count; ++i)
-   {
-   if (RelationIsAoRows(rel) || RelationIsParquet(rel))
-   {
-   LockRelationAppendOnlySegmentFile(&rel->rd_node, segno,
-   AccessExclusiveLock, false, i - 1);
-   }
-   }
-   */
-  {
-    if (RelationIsAoRows(rel) || RelationIsParquet(rel)) {
-      LockRelationAppendOnlySegmentFile(&rel->rd_node, segno,
-      AccessExclusiveLock,
-                                        false);
-    }
-  }
-
+  if (RelationIsAo(rel))
+    LockRelationAppendOnlySegmentFile(&rel->rd_node, segno, AccessExclusiveLock,
+                                      false);
 }
 
 void LockSegfilesOnMaster(Relation rel, int32 segno) {

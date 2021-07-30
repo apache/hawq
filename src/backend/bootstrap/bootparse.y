@@ -408,7 +408,8 @@ Boot_CreateStmt:
 													  true,
 													  &typid,
 						 					  		  /* persistentTid */ NULL,
-						 					  		  /* persistentSerialNum */ NULL);
+						 					  		  /* persistentSerialNum */ NULL,
+						 					  		  /* formattername */ NULL);
 						elog(DEBUG4, "relation created with oid %u", id);
 					}
 					do_end();

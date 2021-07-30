@@ -251,6 +251,7 @@ cdbconn_initSegmentDescriptor(SegmentDatabaseDescriptor *segdbDesc,
     /* Connection info */
     segdbDesc->conn = NULL;
     segdbDesc->motionListener = 0;
+    segdbDesc->my_listener = 0;
     segdbDesc->whoami = NULL;
 
     /* Connection error info */
@@ -336,6 +337,7 @@ cdbconn_doConnect(SegmentDatabaseDescriptor *segdbDesc,
          * where it listens for connections from the gang below.
          */
         segdbDesc->motionListener = PQgetQEdetail(segdbDesc->conn, false);
+        segdbDesc->my_listener = segdbDesc->conn->my_listener;
         
         segdbDesc->backendPid = PQbackendPID(segdbDesc->conn);
 
@@ -389,4 +391,133 @@ cdbconn_setSliceIndex(SegmentDatabaseDescriptor    *segdbDesc,
     return true;
 }                               /* cdbconn_setSliceIndex */
 
+bool /* returns true if connected */
+cdbconn_main_doconnect(SegmentDatabaseDescriptor *segdbDesc,
+                       const char *connection_string, PQExpBuffer connMsg) {
+  if (!segdbDesc->conn) {
+    /*
+     * Call libpq to connect
+     */
+    segdbDesc->conn = PQconnectdb(connection_string);
 
+    /* Build whoami string to identify the QE for use in messages. */
+    if (!cdbconn_setSliceIndex(segdbDesc, -1)) {
+      if (!segdbDesc->errcode)
+        segdbDesc->errcode = ERRCODE_GP_INTERCONNECTION_ERROR;
+
+      /* Don't use elog, it's not thread-safe */
+      if (gp_log_gang >= GPVARS_VERBOSITY_DEBUG)
+        write_log("%s\n", segdbDesc->error_message.data);
+
+      PQfinish(segdbDesc->conn);
+      segdbDesc->conn = NULL;
+    }
+
+    /*
+     * Check for connection failure.
+     */
+    if (PQstatus(segdbDesc->conn) == CONNECTION_BAD) {
+      if (!segdbDesc->errcode)
+        segdbDesc->errcode = ERRCODE_GP_INTERCONNECTION_ERROR;
+
+      write_log("Master unable to connect to %s : %s\nConnection option: %s",
+                segdbDesc->whoami, PQerrorMessage(segdbDesc->conn),
+                connection_string);
+
+      appendPQExpBuffer(&segdbDesc->error_message,
+                        "Master unable to connect to %s: %s\n",
+                        segdbDesc->whoami, PQerrorMessage(segdbDesc->conn));
+
+      /* Don't use elog, it's not thread-safe */
+      if (gp_log_gang >= GPVARS_VERBOSITY_DEBUG)
+        write_log("%s\n", segdbDesc->error_message.data);
+
+      PQfinish(segdbDesc->conn);
+      segdbDesc->conn = NULL;
+      return false;
+    }
+    /*
+     * Successfully connected.
+     */
+    PQsetNoticeReceiver(segdbDesc->conn, &MPPnoticeReceiver, segdbDesc);
+  }
+  /* Command the QE to initialize its motion layer.
+   * Wait for it to respond giving us the TCP port number
+   * where it listens for connections from the gang below.
+   */
+  PQgetQEsDetail(segdbDesc->conn, connMsg->data, connMsg->len);
+
+
+  /*
+   * Check for connection reset.
+   */
+  if (PQstatus(segdbDesc->conn) == CONNECTION_BAD)
+  {
+      if (!segdbDesc->errcode)
+          segdbDesc->errcode = ERRCODE_GP_INTERCONNECTION_ERROR;
+
+      appendPQExpBuffer(&segdbDesc->error_message,
+                        "Master unable to connect to %s: %s\n",
+                        segdbDesc->whoami,
+                        PQerrorMessage(segdbDesc->conn));
+
+      PQfinish(segdbDesc->conn);
+      segdbDesc->conn = NULL;
+  }
+
+  return segdbDesc->conn != NULL;
+} /* cdbconn_main_doconnect */
+
+bool                            /* returns true if connected */
+cdbconn_proxy_doconnect(SegmentDatabaseDescriptor    *segdbDesc,
+                  const char                   *connMsg) {
+
+  /*
+     * Call libpq to connect
+     */
+    segdbDesc->conn = PQconnectdb(connMsg);
+
+    /*
+     * Check for connection failure.
+     */
+    if (PQstatus(segdbDesc->conn) == CONNECTION_BAD)
+    {
+        if (!segdbDesc->errcode)
+            segdbDesc->errcode = ERRCODE_GP_INTERCONNECTION_ERROR;
+
+        write_log("Master unable to connect to %s : %s\nConnection option: %s",
+                          segdbDesc->whoami,
+                          PQerrorMessage(segdbDesc->conn),
+                          connMsg);
+
+        appendPQExpBuffer(&segdbDesc->error_message,
+                          "Master unable to connect to %s: %s\n",
+                          segdbDesc->whoami,
+                          PQerrorMessage(segdbDesc->conn));
+
+        /* Don't use elog, it's not thread-safe */
+        if (gp_log_gang >= GPVARS_VERBOSITY_DEBUG)
+            write_log("%s\n", segdbDesc->error_message.data);
+
+        PQfinish(segdbDesc->conn);
+        segdbDesc->conn = NULL;
+    }
+    /*
+     * Successfully connected.
+     */
+    else
+    {
+      PQsetNoticeReceiver(segdbDesc->conn, &MPPnoticeReceiver, segdbDesc);
+        /* Command the QE to initialize its motion layer.
+         * Wait for it to respond giving us the TCP port number
+         * where it listens for connections from the gang below.
+         */
+      segdbDesc->motionListener = PQgetQEdetail(segdbDesc->conn, false);
+              segdbDesc->my_listener = segdbDesc->conn->my_listener;
+
+              segdbDesc->backendPid = PQbackendPID(segdbDesc->conn);
+    }
+
+    return segdbDesc->conn != NULL;
+
+}

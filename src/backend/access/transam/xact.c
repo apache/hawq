@@ -22,9 +22,12 @@
 
 #include "access/appendonlywriter.h"
 #include "access/multixact.h"
+#include "access/plugstorage.h"
+#include "access/read_cache.h"
 #include "access/subtrans.h"
 #include "access/transam.h"
 #include "access/twophase.h"
+#include "access/xact.h"
 #include "access/xlogutils.h"
 #include "access/fileam.h"
 #include "catalog/namespace.h"
@@ -46,6 +49,7 @@
 #include "utils/guc.h"
 #include "utils/inval.h"
 #include "utils/memutils.h"
+#include "utils/palloc.h"
 #include "utils/relcache.h"
 #include "utils/resscheduler.h"
 #include "access/clog.h"
@@ -79,6 +83,10 @@ int32 gp_subtrans_warn_limit = 16777216; /* 16 million */
  * and will complain loudly if its violated.
  */
 bool		seqXlogWrite;
+
+int queryCmdId;
+
+bool isCleanupAbortTransaction;
 
 /*
  *	transaction states - transaction state from server perspective
@@ -253,6 +261,34 @@ static SubXactCallbackItem *SubXact_callbacks = NULL;
  */
 File subxip_file = 0;
 
+/*
+ * Runtime transaction information for magma service
+ */
+static PlugStorageTransactionData TopPlugStorageTransactionData = {
+	.type                    = T_PlugStorageTransactionData,
+	.pst_proc_oid            = (Oid)0,              /* function oid */
+	.pst_transaction_id      = InvalidTransactionId,/* transaction id */
+	.pst_transaction_status  = PS_TXN_STS_DEFAULT,  /* transaction status */
+	.pst_transaction_command = PS_TXN_CMD_INVALID,  /* transaction command */
+	.pst_transaction_dist    = NULL                 /* magma transaction info */
+};
+
+static PlugStorageTransaction TopPlugStorageTransaction = &TopPlugStorageTransactionData;
+
+/*
+ * Runtime snapshot information for metadata dispatch
+ */
+static MagmaSnapshot TopPlugStorageSnapshotData = {
+    .currentTransaction.txnId = 0,
+    .currentTransaction.txnStatus = 0,
+    .txnActions.txnActionStartOffset = 0,
+    .txnActions.txnActions = NULL,
+    .txnActions.txnActionSize = 0,
+    .cmdIdInTransaction = 0
+};
+
+static MagmaSnapshot *TopPlugStorageSnapshot = &TopPlugStorageSnapshotData;
+
 /* local function prototypes */
 static void AssignSubTransactionId(TransactionState s);
 static void AtAbort_ActiveQueryResource(void);
@@ -317,6 +353,189 @@ char *XactInfoKind_Name(
 	case XACT_INFOKIND_PREPARE: 	return "Prepare";
 	default:
 		return "Unknown";
+	}
+}
+
+/* ----------------------------------------------------------------
+ *	transaction state accessors for magma
+ * ----------------------------------------------------------------
+ */
+PlugStorageTransaction
+PlugStorageGetTransaction(void)
+{
+	return TopPlugStorageTransaction;
+}
+
+PlugStorageTransactionStatus
+PlugStorageGetTransactionStatus(void)
+{
+	return TopPlugStorageTransaction->pst_transaction_status;
+}
+
+MagmaSnapshot *
+PlugStorageGetTransactionSnapshot(void)
+{
+	return TopPlugStorageTransaction->pst_transaction_dist;
+}
+
+void PlugStorageSetIsCleanupAbort(bool isCleanup)
+{
+  isCleanupAbortTransaction = isCleanup;
+}
+bool PlugStorageGetIsCleanupAbort(void)
+{
+  return isCleanupAbortTransaction;
+}
+
+extern void PlugStorageSetTransactionSnapshot(MagmaSnapshot *snapshot)
+{
+    Insist(snapshot != NULL);
+
+	/*
+	 * The memory should be freed when query execution is finished.
+	 * For now, let memory context handle it.
+	 */
+	if (Gp_role == GP_ROLE_DISPATCH)
+	{
+	    Insist(TopPlugStorageTransaction->pst_transaction_dist != NULL);
+	}
+	else if (Gp_role == GP_ROLE_EXECUTE &&
+	         TopPlugStorageTransaction->pst_transaction_dist == NULL)
+	{
+	    TopPlugStorageTransaction->pst_transaction_dist = malloc(sizeof(MagmaSnapshot));
+	    memset(TopPlugStorageTransaction->pst_transaction_dist, 0, sizeof(MagmaSnapshot));
+	    TopPlugStorageTransaction->pst_transaction_dist->currentTransaction.txnId = 0;
+	    TopPlugStorageTransaction->pst_transaction_dist->currentTransaction.txnStatus = 0;
+	    TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActionStartOffset = 0;
+	    TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActions = NULL;
+	    TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActionSize = 0;
+	}
+
+	// set current transaction for current snapshot
+	TopPlugStorageTransaction->pst_transaction_dist->currentTransaction.txnId =
+	        snapshot->currentTransaction.txnId;
+	TopPlugStorageTransaction->pst_transaction_dist->currentTransaction.txnStatus =
+	        snapshot->currentTransaction.txnStatus;
+
+	// set command id
+	TopPlugStorageTransaction->pst_transaction_dist->cmdIdInTransaction =
+	        snapshot->cmdIdInTransaction;
+
+	// reallocate memory for visible HLC map for current snapshot
+	free(TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActions);
+
+	TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActionStartOffset =
+	    snapshot->txnActions.txnActionStartOffset;
+	TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActions =
+	    malloc(sizeof(MagmaTxnAction) *snapshot->txnActions.txnActionSize);
+
+	// set visible HLC map for current snapshot
+	TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActionSize =
+	    snapshot->txnActions.txnActionSize;
+	for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+	{
+	    TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActions[i].txnId =
+	            snapshot->txnActions.txnActions[i].txnId;
+	    TopPlugStorageTransaction->pst_transaction_dist->txnActions.txnActions[i].txnStatus =
+	            snapshot->txnActions.txnActions[i].txnStatus;
+    }
+}
+
+void
+PlugStorageBeginTransaction(List* magmaTableFullNames)
+{
+	if ((Gp_role == GP_ROLE_DISPATCH) && IsNormalProcessingMode())
+	{
+		PlugStorageTransaction pst = TopPlugStorageTransaction;
+		// start a new transaction
+		if (pst->pst_transaction_id != GetTopTransactionId())
+		{
+			if (!OidIsValid(pst->pst_proc_oid))
+			{
+				pst->pst_proc_oid =
+				    LookupPlugStorageValidatorFunc("magma", "transaction");
+				Assert(OidIsValid(pst->pst_proc_oid));
+
+				fmgr_info(pst->pst_proc_oid, &(pst->pst_transaction_fmgr_info));
+			}
+
+			Assert(pst->pst_transaction_status == PS_TXN_STS_DEFAULT);
+			pst->pst_transaction_command = PS_TXN_CMD_BEGIN;
+			InvokePlugStorageFormatTransaction(pst, magmaTableFullNames);
+			elog(DEBUG1, "PS TXN: BEGIN (%llu, %u, %llu, %u)",
+			     pst->pst_transaction_dist->currentTransaction.txnId,
+			     pst->pst_transaction_dist->currentTransaction.txnStatus,
+			     pst->pst_transaction_dist->txnActions.txnActionStartOffset,
+			     pst->pst_transaction_dist->txnActions.txnActionSize);
+			pst->pst_transaction_id = GetTopTransactionId();
+			pst->pst_transaction_status = PS_TXN_STS_STARTED;
+		}
+	}
+}
+
+void
+PlugStorageCommitTransaction(void)
+{
+	if ((Gp_role == GP_ROLE_DISPATCH) && IsNormalProcessingMode())
+	{
+		PlugStorageTransaction pst = TopPlugStorageTransaction;
+		if (pst->pst_transaction_id != InvalidTransactionId)
+		{
+			if (!OidIsValid(pst->pst_proc_oid))
+			{
+				pst->pst_proc_oid =
+				    LookupPlugStorageValidatorFunc("magma", "transaction");
+				Assert(OidIsValid(pst->pst_proc_oid));
+
+				fmgr_info(pst->pst_proc_oid, &(pst->pst_transaction_fmgr_info));
+			}
+
+			Assert(pst->pst_transaction_id == GetTopTransactionId());
+			Assert(pst->pst_transaction_status == PS_TXN_STS_STARTED);
+			pst->pst_transaction_command = PS_TXN_CMD_COMMIT;
+			elog(DEBUG1, "PS TXN: COMMIT (%llu, %u, %llu, %u)",
+			     pst->pst_transaction_dist->currentTransaction.txnId,
+			     pst->pst_transaction_dist->currentTransaction.txnStatus,
+			     pst->pst_transaction_dist->txnActions.txnActionStartOffset,
+			     pst->pst_transaction_dist->txnActions.txnActionSize);
+			InvokePlugStorageFormatTransaction(pst, NULL);
+			pst->pst_transaction_dist = NULL;
+			pst->pst_transaction_id = InvalidTransactionId;
+			pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
+		}
+	}
+}
+
+void
+PlugStorageAbortTransaction(void)
+{
+	if ((Gp_role == GP_ROLE_DISPATCH) && IsNormalProcessingMode())
+	{
+		PlugStorageTransaction pst = TopPlugStorageTransaction;
+		if (pst->pst_transaction_id != InvalidTransactionId)
+		{
+			if (!OidIsValid(pst->pst_proc_oid))
+			{
+				pst->pst_proc_oid =
+				    LookupPlugStorageValidatorFunc("magma", "transaction");
+				Assert(OidIsValid(pst->pst_proc_oid));
+
+				fmgr_info(pst->pst_proc_oid, &(pst->pst_transaction_fmgr_info));
+			}
+
+			Assert(pst->pst_transaction_id == GetTopTransactionId());
+			Assert(pst->pst_transaction_status == PS_TXN_STS_STARTED);
+			pst->pst_transaction_command = PS_TXN_CMD_ABORT;
+			elog(DEBUG1, "PS TXN: ABORT (%llu, %u, llu, %u)",
+			     pst->pst_transaction_dist->currentTransaction.txnId,
+			     pst->pst_transaction_dist->currentTransaction.txnStatus,
+			     pst->pst_transaction_dist->txnActions.txnActionStartOffset,
+			     pst->pst_transaction_dist->txnActions.txnActionSize);
+			InvokePlugStorageFormatTransaction(pst, NULL);
+			pst->pst_transaction_dist = NULL;
+			pst->pst_transaction_id = InvalidTransactionId;
+			pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
+		}
 	}
 }
 
@@ -2233,6 +2452,11 @@ StartTransaction(void)
 	s->state = TRANS_INPROGRESS;
 
 	ShowTransactionState("StartTransaction");
+
+	/*
+	 * begin transaction in magma service now
+	 */
+	/* PlugStorageBeginTransaction(); */
 }
 
 /*
@@ -2263,6 +2487,12 @@ CommitTransaction(void)
 	if (Gp_role == GP_ROLE_EXECUTE && !Gp_is_writer)
 		elog(DEBUG1,"CommitTransaction: called as segment Reader");
 	
+	/*
+	 * commit transaction in magma service now
+	 */
+	PlugStorageCommitTransaction();
+	AtEOXact_ReadCache(true);
+
 	/*
 	 * Do pre-commit processing (most of this stuff requires database access,
 	 * and in fact could still cause an error...)
@@ -2737,6 +2967,11 @@ AbortTransaction(void)
 	/* Prevent cancel/die interrupt while cleaning up */
 	HOLD_INTERRUPTS();
 
+	/*
+	 * abort transaction in magma service now
+	 */
+	PlugStorageAbortTransaction();
+	AtEOXact_ReadCache(false);
 
 	/* Make sure we have a valid memory context and resource owner */
 	AtAbort_Memory();
@@ -3289,6 +3524,7 @@ AbortCurrentTransaction(void)
 				 */
 				if (s->state == TRANS_START)
 					s->state = TRANS_INPROGRESS;
+				PlugStorageSetIsCleanupAbort(true);
 				AbortTransaction();
 				CleanupTransaction();
 			}
@@ -3299,6 +3535,7 @@ AbortCurrentTransaction(void)
 			 * & cleanup transaction.
 			 */
 		case TBLOCK_STARTED:
+		  PlugStorageSetIsCleanupAbort(true);
 			AbortTransaction();
 			CleanupTransaction();
 			SetBlockState(s, TBLOCK_DEFAULT );
@@ -3312,6 +3549,7 @@ AbortCurrentTransaction(void)
 			 * state.
 			 */
 		case TBLOCK_BEGIN:
+		  PlugStorageSetIsCleanupAbort(true);
 			AbortTransaction();
 			CleanupTransaction();
 			SetBlockState(s, TBLOCK_DEFAULT);
@@ -3323,6 +3561,7 @@ AbortCurrentTransaction(void)
 			 * ABORT state.  We will stay in ABORT until we get a ROLLBACK.
 			 */
 		case TBLOCK_INPROGRESS:
+		  PlugStorageSetIsCleanupAbort(true);
 			AbortTransaction();
 			SetBlockState(s, TBLOCK_ABORT);
 			/* CleanupTransaction happens when we exit TBLOCK_ABORT_END */
@@ -3334,6 +3573,7 @@ AbortCurrentTransaction(void)
 			 * the transaction).
 			 */
 		case TBLOCK_END:
+		  PlugStorageSetIsCleanupAbort(true);
 			AbortTransaction();
 			CleanupTransaction();
 			SetBlockState(s, TBLOCK_DEFAULT);
@@ -3363,6 +3603,7 @@ AbortCurrentTransaction(void)
 			 * Abort, cleanup, go to idle state.
 			 */
 		case TBLOCK_ABORT_PENDING:
+		  PlugStorageSetIsCleanupAbort(true);
 			AbortTransaction();
 			CleanupTransaction();
 			SetBlockState(s, TBLOCK_DEFAULT);
@@ -3374,6 +3615,7 @@ AbortCurrentTransaction(void)
 			 * the transaction).
 			 */
 		case TBLOCK_PREPARE:
+		  PlugStorageSetIsCleanupAbort(true);
 			AbortTransaction();
 			CleanupTransaction();
 			SetBlockState(s, TBLOCK_DEFAULT);
@@ -4487,6 +4729,7 @@ AbortOutOfAnyTransaction(void)
 			case TBLOCK_ABORT_PENDING:
 			case TBLOCK_PREPARE:
 				/* In a transaction, so clean up */
+			  PlugStorageSetIsCleanupAbort(true);
 				AbortTransaction();
 				CleanupTransaction();
 				SetBlockState(s, TBLOCK_DEFAULT);

@@ -186,6 +186,12 @@ ExecRenameStmt(RenameStmt *stmt)
 				relid = RangeVarGetRelid(stmt->relation, false, false /*allowHcatalog*/);
 				CheckRelationOwnership(relid, true);
 
+				// disable alter rename for magma
+				if (RelationIsMagmaTable2(relid))
+				{
+					ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+							errmsg("ALTER TABLE ... RENAME is not supported for magma")));
+				}
 				switch (stmt->renameType)
 				{
 					case OBJECT_COLUMN:
@@ -304,9 +310,11 @@ ExecAlterOwnerStmt(AlterOwnerStmt *stmt)
 			break;
 
 		case OBJECT_SCHEMA:
-			if (!gp_called_by_pgdump)
-							ereport(ERROR,
-									(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter schema owner statement yet") ));
+			/*
+			 if (!gp_called_by_pgdump)
+				 ereport(ERROR,
+					 (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support alter schema owner statement yet") ));
+			 */
 			AlterSchemaOwner(strVal(linitial(stmt->object)), newowner);
 			break;
 

@@ -19,6 +19,7 @@ package org.apache.hawq.pxf.service.rest;
  * under the License.
  */
 
+
 import java.io.DataInputStream;
 import java.io.InputStream;
 import java.util.Map;
@@ -79,8 +80,10 @@ import org.apache.hawq.pxf.service.utilities.SecuredHDFS;
 
  */
 
+
 /**
- * This class handles the subpath /&lt;version&gt;/Writable/ of this REST component
+ * This class handles the subpath /&lt;version&gt;/Writable/ of this
+ * REST component
  */
 @Path("/" + Version.PXF_PROTOCOL_VERSION + "/Writable/")
 public class WritableResource extends RestResource{
@@ -117,14 +120,14 @@ public class WritableResource extends RestResource{
 
         ProtocolData protData = new ProtocolData(params);
         protData.setDataSource(path);
+
+        SecuredHDFS.verifyToken(protData, servletContext);
         Bridge bridge = new WriteBridge(protData);
 
         // THREAD-SAFE parameter has precedence
         boolean isThreadSafe = protData.isThreadSafe() && bridge.isThreadSafe();
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Request for " + path + " handled " +
-                    (isThreadSafe ? "without" : "with") + " synchronization");
-        }
+        LOG.debug("Request for " + path + " handled " +
+                (isThreadSafe ? "without" : "with") + " synchronization");
 
         return isThreadSafe ?
                 writeResponse(bridge, path, inputStream) :
@@ -140,12 +143,14 @@ public class WritableResource extends RestResource{
 
     private static Response writeResponse(Bridge bridge,
                                           String path,
-                                          InputStream inputStream)
-            throws Exception {
+                                          InputStream inputStream) throws Exception {
+
+        String returnMsg;
+
         // Open the output file
         bridge.beginIteration();
+
         long totalWritten = 0;
-        Exception ex = null;
 
         // dataStream will close automatically in the end of the try.
         // inputStream is closed by dataStream.close().
@@ -153,22 +158,21 @@ public class WritableResource extends RestResource{
             while (bridge.setNext(dataStream)) {
                 ++totalWritten;
             }
-        } catch (ClientAbortException cae) {
-            LOG.error("Remote connection closed by HAWQ", cae);
-        } catch (Exception e) {
-            LOG.error("Exception: totalWritten so far " + totalWritten + " to " + path, e);
-            ex = e;
+        } catch (ClientAbortException e) {
+            LOG.debug("Remote connection closed by HAWQ", e);
+        } catch (Exception ex) {
+            LOG.debug("totalWritten so far " + totalWritten + " to " + path);
             throw ex;
         } finally {
             try {
                 bridge.endIteration();
             } catch (Exception e) {
-                throw (ex == null) ? e: ex;
+                // ignore ... any significant errors should already have been handled
             }
         }
 
         String censuredPath = Utilities.maskNonPrintables(path);
-        String returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
+        returnMsg = "wrote " + totalWritten + " bulks to " + censuredPath;
         LOG.debug(returnMsg);
 
         return Response.ok(returnMsg).build();

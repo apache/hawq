@@ -220,7 +220,6 @@ void set_current_fragment_headers(gphadoop_context* context)
 	churl_headers_override(context->churl_headers, "X-GP-DATA-DIR", frag_data->source_name);
 	churl_headers_override(context->churl_headers, "X-GP-DATA-FRAGMENT", frag_data->index);
 	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-METADATA", frag_data->fragment_md);
-	churl_headers_override(context->churl_headers, "X-GP-FRAGMENT-INDEX", frag_data->index);
 
 	if (frag_data->user_data)
 	{
@@ -234,13 +233,13 @@ void set_current_fragment_headers(gphadoop_context* context)
 	if (frag_data->profile)
 	{
 		/* if current fragment has optimal profile set it*/
-		churl_headers_override(context->churl_headers, "X-GP-OPTIONS-PROFILE", frag_data->profile);
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", frag_data->profile);
 		elog(DEBUG2, "pxf: set_current_fragment_headers: using profile: %s", frag_data->profile);
 
 	} else if (context->gphd_uri->profile)
 	{
 		/* if current fragment doesn't have any optimal profile, set to use profile from url */
-		churl_headers_override(context->churl_headers, "X-GP-OPTIONS-PROFILE", context->gphd_uri->profile);
+		churl_headers_override(context->churl_headers, "X-GP-PROFILE", context->gphd_uri->profile);
 		elog(DEBUG2, "pxf: set_current_fragment_headers: using profile: %s", context->gphd_uri->profile);
 	}
 	/* if there is no profile passed in url, we expect to have accessor+fragmenter+resolver so no action needed by this point */

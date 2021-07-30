@@ -3401,6 +3401,7 @@ relation_oids()
 			case RELSTORAGE_HEAP:
 			case RELSTORAGE_AOROWS:
 			case RELSTORAGE_PARQUET:
+			case RELSTORAGE_ORC:
 			case RELSTORAGE_EXTERNAL:
 			{
 				Oid relOid = HeapTupleGetOid(tuple);
@@ -4224,4 +4225,41 @@ child_triggers(Oid relationId, int32 triggerType)
 	
 	/* no child triggers matching the given type */
 	return found;
+}
+
+/*
+ *  get the real length according to pDatum
+ *  it's very useful when you get all atts of the type, because you do not
+ *  need to read the tuple or execute any sql.
+ */
+int32_t get_typlen_fast(Oid id, bool passbyval, int32_t typlen, Datum* pDatum) {
+  int32_t data_length = typlen;
+  if (passbyval) {
+    /* pass-by-value */
+    if( typlen>sizeof(Datum) || typlen<1 ){
+      elog(ERROR, "Type(id=%d) got an invalid length as PassByValue-Type: %d", id, typlen);
+    }
+  } else if (-1 == typlen) {
+    /* varlena */
+    if (VARATT_IS_EXTERNAL_D(pDatum)) {
+      //  external type
+      data_length = VARSIZE_EXTERNAL(DatumGetPointer(pDatum));
+    } else if (VARATT_IS_SHORT_D(pDatum)) {
+      //  2 bytes
+      data_length = VARSIZE_SHORT(DatumGetPointer(pDatum));
+    } else {
+      //  4 bytes
+      data_length = VARSIZE(DatumGetPointer(pDatum));
+    }
+  } else if (-2 == typlen) {
+    /* cstring */
+    data_length = strlen(DatumGetCString(pDatum)) + 1;
+  } else {
+    /* fixed-length pass-by-reference */
+    if( typlen<1 ){
+      elog(ERROR, "Type(id=%d) got an invalid length as PassByRefernce-Type: %d", id, typlen);
+    }
+  }
+
+  return data_length;
 }

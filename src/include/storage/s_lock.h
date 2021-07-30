@@ -897,6 +897,10 @@ spin_delay(void)
 #endif
 
 
+#elif defined(__clang__) || defined(__GNUC__)
+typedef int slock_t;
+#define TAS(lock)	__sync_lock_test_and_set(lock, 1)
+#define S_UNLOCK(lock)	__sync_lock_release(lock)
 #else	/* !HAVE_SPINLOCKS */
 
 

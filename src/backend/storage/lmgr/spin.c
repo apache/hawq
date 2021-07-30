@@ -25,6 +25,7 @@
 #include "miscadmin.h"
 #include "storage/lwlock.h"
 #include "storage/spin.h"
+#include "storage/pg_sema.h"
 
 
 #ifdef HAVE_SPINLOCKS
@@ -65,7 +66,7 @@ SpinlockSemas(void)
  */
 
 void
-s_init_lock_sema(volatile slock_t *lock)
+s_init_lock_sema(volatile slock_t *lock, bool nested)
 {
 	PGSemaphoreCreate((PGSemaphore) lock);
 }

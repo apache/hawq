@@ -79,6 +79,9 @@ extern void MirroredFileSysObj_ScheduleDropDbDir(
 	int64 			persistentSerialNum,
 	bool			sharedStorage);
 
+extern void scheduleDropDbExtDir(
+	char            *dbname);
+
 extern void MirroredFileSysObj_DropDbDir(
 	DbDirNode					*dbDirNode,
 

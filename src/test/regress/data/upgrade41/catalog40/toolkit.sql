@@ -271,7 +271,7 @@ CREATE EXTERNAL WEB TABLE gp_toolkit.__gp_log_segment_ext
     logstack text
 )
 EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv' 
-FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+FORMAT 'CSV' (DELIMITER ',' NULL '' QUOTE '"');
 
 REVOKE ALL ON TABLE gp_toolkit.__gp_log_segment_ext FROM public;
 
@@ -318,7 +318,7 @@ CREATE EXTERNAL WEB TABLE gp_toolkit.__gp_log_master_ext
     logstack text
 )
 EXECUTE E'cat $GP_SEG_DATADIR/pg_log/*.csv' ON MASTER
-FORMAT 'CSV' (DELIMITER AS ',' NULL AS '' QUOTE AS '"');
+FORMAT 'CSV' (DELIMITER ',' NULL '' QUOTE '"');
 
 REVOKE ALL ON TABLE gp_toolkit.__gp_log_master_ext FROM public;
 

@@ -299,6 +299,7 @@ cdbpathlocus_from_baserel(struct PlannerInfo   *root,
     {
 		    /* Are the rows distributed by hashing on specified columns? */
 		    bool isRelationRuntimeHash = true;
+		    bool isRelationMagma = false;
 		    if (allocatedResource && root->glob->relsType != NIL) {
 			      List* relsType = root->glob->relsType;
 			      Oid baseRelOid = 0;
@@ -318,12 +319,17 @@ cdbpathlocus_from_baserel(struct PlannerInfo   *root,
 				        CurrentRelType *relType = (CurrentRelType *) lfirst(lc);
 				        if (relType->relid == baseRelOid) {
 					          isRelationRuntimeHash = relType->isHash;
+					            if (dataStoredInMagmaByOid(relType->relid)){
+					              isRelationMagma = true;
+					              policy->bucketnum = relType->range_num;
+					            }
 				        }
 			      }
 		    }
     	    /* we determine the runtime table distribution type here*/
     	    if (isRelationRuntimeHash && (policy->nattrs > 0) &&
-    	    	((allocatedResource && list_length(root->glob->resource->segments) == policy->bucketnum) || !allocatedResource))
+    	      ((allocatedResource && (isRelationMagma || list_length(root->glob->resource->segments) == policy->bucketnum))
+    	      || !allocatedResource))
     	    {
 	          List *partkey = cdb_build_distribution_pathkeys(root,rel, policy->nattrs, policy->attrs);
 	          CdbPathLocus_MakeHashed(&result, partkey);

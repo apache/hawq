@@ -20,7 +20,10 @@ subdir = src/bin/gpcheckhdfs
 top_builddir = ../../..
 include $(top_builddir)/src/Makefile.global
 
-LIBS := -lprotobuf -lboost_system -lboost_date_time -lstdc++ -lhdfs3 -lgsasl $(LIBS)
+LIBS := -lprotobuf -lboost_system -lboost_date_time -lpthread -lhdfs3 -lgsasl $(LIBS)
+
+CFLAGS := $(CFLAGS)
+LDFLAGS := $(LDFLAGS) -stdlib=libc++
 
 OBJS=gpcheckhdfs.o 
 

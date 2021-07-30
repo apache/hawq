@@ -320,6 +320,7 @@ extern char *PQport(const PGconn *conn);
 extern char *PQtty(const PGconn *conn);
 extern char *PQoptions(const PGconn *conn);
 extern int	PQgetQEdetail(PGconn *conn, bool alwaysFetch); /* GPDB -- retrieve QE-backend details. */
+extern int PQgetQEsDetail(PGconn *conn, char *connMsg, int connMsgLen);
 extern ConnStatusType PQstatus(const PGconn *conn);
 extern PGTransactionStatusType PQtransactionStatus(const PGconn *conn);
 extern const char *PQparameterStatus(const PGconn *conn,
@@ -420,6 +421,8 @@ extern char *PQbuildGpQueryString(const char  *command,
 								   int			identity_len,
 								   const char  *resource,
 								   int          resource_len,
+									 const char	 *commonPlan,
+									 int					commonPlanLen,
 								   int          flags,
 								   int          gp_command_count,
 								   int			localSlice,
@@ -445,6 +448,49 @@ extern char *PQbuildGpQueryString(const char  *command,
 					  			   pqbool		outerUserIsSuper,
 					 			   Oid			currentUserId,
 								   int         *final_len);
+
+extern char *PQbuildGpNewQueryString(const char  *command,
+                   int          command_len,
+                   const char  *querytree,
+                   int          querytree_len,
+                   const char  *plantree,
+                   int          plantree_len,
+                   const char  *params,
+                   int          params_len,
+                   const char  *sliceinfo,
+                   int          sliceinfo_len,
+                   const char  *snapshotInfo,
+                   int      snapshotInfo_len,
+                   const char  *identity,
+                   int      identity_len,
+                   const char  *resource,
+                   int          resource_len,
+                   const char  *commonPlan,
+                   int          commonPlanLen,
+                   int          flags,
+                   int          gp_command_count,
+                   int      rootIdx,
+                   const char  *seqServerHost,
+                   int          seqServerHostlen,
+                   int          seqServerPort,
+                   int        primary_gang_id,
+/* Ugly, because c.h might not be included in all files that use this */
+#ifdef HAVE_INT64
+                   int64
+#else
+#ifdef HAVE_LONG_INT_64
+                   long int
+#else
+                   long long int
+#endif
+#endif
+                          currentStatementStartTimestamp,
+                   Oid      sessionUserId,
+                   pqbool   sessionUserIsSuper,
+                     Oid      outerUserId,
+                     pqbool   outerUserIsSuper,
+                   Oid      currentUserId,
+                   int         *final_len);
 
 extern char *PQbuildGpDtxProtocolCommand(
 					  int						flags,

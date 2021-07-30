@@ -302,7 +302,8 @@ create_toast_table(Relation rel, Oid toastOid, Oid toastIndexOid,
 										   true,
 										   comptypeOid,
 										   /* persistentTid */ NULL,
-										   /* persistentSerialNum */ NULL);
+										   /* persistentSerialNum */ NULL,
+										   /* formattername */ NULL);
 
 	/* make the toast relation visible, else index creation will fail */
 	CommandCounterIncrement();
@@ -433,7 +434,7 @@ RelationNeedsToastTable(Relation rel)
 	/*
 	 * in hawq, we cannot use toast table for dispatched table.
 	 */
-	if (RelationIsAoRows(rel) || RelationIsParquet(rel))
+	if (RelationIsAo(rel))
 		return false ;
 
 	tupdesc = rel->rd_att;

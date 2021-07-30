@@ -46,6 +46,7 @@
  *
  *-------------------------------------------------------------------------
  */
+
 #include "postgres.h"
 #include "fmgr.h"
 #include "miscadmin.h"
@@ -56,6 +57,7 @@
 #include "access/heapam.h"
 #include "access/sysattr.h"
 #include "access/transam.h"
+#include "access/read_cache.h"
 #include "access/reloptions.h"
 #include "access/sysattr.h"
 #include "access/xact.h"
@@ -111,6 +113,7 @@
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 #include "utils/guc.h"
+#include "utils/hawq_type_mapping.h"
 #include "utils/inval.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"             /* CDB: GetMemoryChunkContext */
@@ -118,6 +121,8 @@
 #include "utils/relcache.h"
 #include "utils/syscache.h"
 #include "utils/uri.h"
+
+
 
 typedef struct pg_result PGresult;
 extern void PQclear(PGresult *res);
@@ -134,12 +139,14 @@ static void MetaTrackAddUpdInternal(cqContext  *pcqCtx,
 
 
 static void AddNewRelationTuple(Relation pg_class_desc,
-					Relation new_rel_desc,
-					Oid new_rel_oid, Oid new_type_oid,
-					Oid relowner,
-					char relkind,
-					char relstorage,
-					Datum reloptions);
+                                Relation new_rel_desc,
+                                Oid new_rel_oid, Oid new_type_oid,
+                                Oid relowner,
+                                char relkind,
+                                char relstorage,
+                                Datum reloptions,
+                                const char *formattername);
+
 static Oid AddNewRelationType(const char *typeName,
 				   Oid typeNamespace,
 				   Oid new_rel_oid,
@@ -295,8 +302,8 @@ heap_create(const char *relname,
 {
 	bool		create_storage;
 	Relation	rel;
-	bool		isAppendOnly = (relstorage == RELSTORAGE_AOROWS || relstorage == RELSTORAGE_PARQUET);
-	bool		skipCreatingSharedTable = false;
+  bool isAppendOnly = relstorage_is_ao(relstorage);
+  bool		skipCreatingSharedTable = false;
 
 	/* The caller must have provided an OID for the relation. */
 	Assert(OidIsValid(relid));
@@ -714,11 +721,7 @@ CheckAttributeType(const char *attname, Oid atttypid)
  *		parquet table doesn't support array type
  * --------------------------------
  */
-void CheckAttributeForParquet(TupleDesc tupdesc, char relstorage){
-
-	if(relstorage != RELSTORAGE_PARQUET){
-		return;
-	}
+void CheckAttributeForParquet(TupleDesc tupdesc){
 	int	natts = tupdesc->natts;
 	for(int i = 0; i < natts; i++){
 		switch(tupdesc->attrs[i]->atttypid){
@@ -734,6 +737,8 @@ void CheckAttributeForParquet(TupleDesc tupdesc, char relstorage){
 			case HAWQ_TYPE_NUMERIC:
 			case HAWQ_TYPE_BYTE:
 			case HAWQ_TYPE_TEXT:
+			case HAWQ_TYPE_JSON:
+			case HAWQ_TYPE_JSONB:
 			case HAWQ_TYPE_XML:
 			case HAWQ_TYPE_MACADDR:
 			case HAWQ_TYPE_INET:
@@ -772,6 +777,21 @@ void CheckAttributeForParquet(TupleDesc tupdesc, char relstorage){
 	}
 }
 
+void CheckAttributeForOrc(TupleDesc desc) {
+  int natts = desc->natts;
+  for (int i = 0; i < natts; i++) {
+    if (checkORCUnsupportedDataType(desc->attrs[i]->atttypid))
+      ereport(ERROR, (errcode(ERRCODE_INVALID_COLUMN_DEFINITION),
+                      errmsg("data type for column %s is not supported yet",
+                             NameStr(desc->attrs[i]->attname)),
+                      errOmitLocation(true)));
+    if (desc->attrs[i]->attndims != 0) {
+      ereport(ERROR, (errcode(ERRCODE_INVALID_TABLE_DEFINITION),
+                      errmsg("array type of column \"%s\" is not supported yet",
+                             NameStr(desc->attrs[i]->attname))));
+    }
+  }
+}
 
 /* MPP-6929: metadata tracking */
 /* --------------------------------
@@ -1240,13 +1260,14 @@ InsertPgClassTuple(Relation pg_class_desc,
  */
 static void
 AddNewRelationTuple(Relation pg_class_desc,
-					Relation new_rel_desc,
-					Oid new_rel_oid,
-					Oid new_type_oid,
-					Oid relowner,
-					char relkind,
-					char relstorage,
-					Datum reloptions)
+                    Relation new_rel_desc,
+                    Oid new_rel_oid,
+                    Oid new_type_oid,
+                    Oid relowner,
+                    char relkind,
+                    char relstorage,
+                    Datum reloptions,
+                    const char *formattername)
 {
 	Form_pg_class new_rel_reltup;
 
@@ -1285,6 +1306,15 @@ AddNewRelationTuple(Relation pg_class_desc,
 			new_rel_reltup->relpages = 0;
 			new_rel_reltup->reltuples = 0;
 			break;
+	}
+
+	/* for magma* external table, the default page and tuple counters are set as
+	 * one native table, i.e. (0, 0), this enables automatic analyze when setting
+	 * is on_no_stats */
+	if (formattername != NULL &&
+	    (pg_strncasecmp(formattername, "magma", sizeof("magma") - 1) == 0)) {
+	  new_rel_reltup->relpages = 0;
+	  new_rel_reltup->reltuples = 0;
 	}
 
 	/* Initialize relfrozenxid */
@@ -1544,7 +1574,8 @@ heap_create_with_catalog(const char *relname,
 						 bool allow_system_table_mods,
 						 Oid *comptypeOid,
 						 ItemPointer persistentTid,
-						 int64 *persistentSerialNum)
+						 int64 *persistentSerialNum,
+						 const char *formattername)
 {
 	Relation	pg_class_desc;
 	Relation	gp_relfile_node_desc;
@@ -1585,6 +1616,13 @@ heap_create_with_catalog(const char *relname,
 		relstorage = stdRdOptions->columnstore;
 	}
 	
+	if (IsBuiltinTablespace(reltablespace) && appendOnlyRel) {
+		ereport(ERROR,
+			(errcode(ERRCODE_SYNTAX_ERROR),
+					errmsg("can not create ao format table on pg_default tablespace"),
+					errhint("check default_tablespace and user specific tablespace, switch to hdfs tablespace instead"),
+					errOmitLocation(true)));
+	}
 	reltablespace = GetSuitableTablespace(relkind, relstorage,
 									  reltablespace, &override);
 	if (override)
@@ -1620,7 +1658,8 @@ heap_create_with_catalog(const char *relname,
 		IsNormalProcessingMode() &&
         (Gp_role == GP_ROLE_DISPATCH))
 	{
-		if (relstorage == RELSTORAGE_PARQUET)
+		if (relstorage == RELSTORAGE_PARQUET ||
+		    relstorage == RELSTORAGE_ORC)
 			ereport(ERROR,
 					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
 					 errmsg(
@@ -1640,7 +1679,10 @@ heap_create_with_catalog(const char *relname,
 
 	CheckAttributeNamesTypes(tupdesc, relkind);
 
-	CheckAttributeForParquet(tupdesc, relstorage);
+	if (relstorage == RELSTORAGE_PARQUET)
+	  CheckAttributeForParquet(tupdesc);
+	else if (relstorage == RELSTORAGE_ORC)
+	  CheckAttributeForOrc(tupdesc);
 
 	if (get_relname_relid(relname, relnamespace))
 		ereport(ERROR,
@@ -1756,13 +1798,14 @@ heap_create_with_catalog(const char *relname,
 	 * when we checked for a duplicate name above.
 	 */
 	AddNewRelationTuple(pg_class_desc,
-						new_rel_desc,
-						relid,
-						new_type_oid,
-						ownerid,
-						relkind,
-						relstorage,
-						reloptions);
+	                    new_rel_desc,
+	                    relid,
+	                    new_type_oid,
+	                    ownerid,
+	                    relkind,
+	                    relstorage,
+	                    reloptions,
+	                    formattername);
 
 	if (gp_relfile_node_desc != NULL)
 	{
@@ -1799,6 +1842,24 @@ heap_create_with_catalog(const char *relname,
 							  InvalidOid,
 							  InvalidOid);
 		}
+		else if(relstorage == RELSTORAGE_ORC)
+    {
+      InsertAppendOnlyEntry(relid,
+                0,
+                0,
+                0,
+                safefswritesize,
+                0,
+                0,
+                0,
+                false,
+                true,
+                stdRdOptions->compresstype,
+                InvalidOid,
+                InvalidOid,
+                InvalidOid,
+                InvalidOid);
+    }
 		else if (relstorage == RELSTORAGE_AOROWS)
 		{
 			InsertAppendOnlyEntry(relid,
@@ -2362,11 +2423,11 @@ remove_gp_relation_node_and_schedule_drop(
 			 relpath(rel->rd_node),
 			 rel->rd_rel->relfilenode);
 
-	relStorageMgr = ((RelationIsAoRows(rel) || RelationIsParquet(rel)) ?
-													PersistentFileSysRelStorageMgr_AppendOnly:
-													PersistentFileSysRelStorageMgr_BufferPool);
+  relStorageMgr = RelationIsAo(rel) ?
+                    PersistentFileSysRelStorageMgr_AppendOnly:
+                    PersistentFileSysRelStorageMgr_BufferPool;
 
-	if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool)
+  if (relStorageMgr == PersistentFileSysRelStorageMgr_BufferPool)
 	{
 		MirroredFileSysObj_ScheduleDropBufferPoolRel(rel);
 
@@ -2468,7 +2529,7 @@ heap_drop_with_catalog(Oid relid)
 
 	relkind = rel->rd_rel->relkind;
 
-	is_appendonly_rel = (RelationIsAoRows(rel) || RelationIsParquet(rel));
+	is_appendonly_rel = RelationIsAo(rel);
 	is_external_rel = RelationIsExternal(rel);
 	is_foreign_rel = RelationIsForeign(rel);
 
@@ -2579,7 +2640,48 @@ heap_drop_with_catalog(Oid relid)
 		if (category != NULL &&
 		    pg_strncasecmp(category, "internal", strlen("internal")) == 0)
 		{
+			if (IS_MAGMA_URI(url))   /* magma */
+			{
+				// ensure there have one location at least
+				Assert(list_length(entry_locations) >= 1);
+				/* get database name for the relation */
+				char *database_name = get_database_name(MyDatabaseId);
 
+				/* get schema name for the relation */
+				Form_pg_class relform = rel->rd_rel;
+				char *schema_name = get_namespace_name(relform->relnamespace);
+
+				/* get table name for the relation */
+				char *table_name = NameStr(relform->relname);
+
+				Oid	procOid = LookupMagmaFunc("magma", "droptable");
+				FmgrInfo procInfo;
+				if (OidIsValid(procOid))
+				{
+					fmgr_info(procOid, &procInfo);
+				}
+				else
+				{
+					elog(ERROR, "magma_droptable function was not found for pluggable storage");
+				}
+				// start transaction in magma for DROP TABLE
+				if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
+				{
+				    PlugStorageBeginTransaction(NULL);
+				}
+				Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
+
+				// drop table in magma now
+				ExtTableEntry *exttable = GetExtTableEntry(RelationGetRelid(rel));
+				InvokeMagmaDropTable(&procInfo,
+				                     exttable,
+				                     database_name,
+				                     schema_name,
+				                     table_name,
+				                     PlugStorageGetTransactionSnapshot());
+				ReadCacheHashEntryReviseOnCommit(RelationGetRelid(rel), true);
+
+			}
 
 			if (IS_HDFS_URI(url))   /* ORC, TEXT, CSV */
 			{
@@ -2620,6 +2722,34 @@ heap_drop_with_catalog(Oid relid)
 
 }
 
+/*
+ * postRemoveSchema will remove possibly exist folder for external table.
+ * filepath/tablespace/database/schema.
+ */
+void
+postRemoveSchema(char *schemaname)
+{
+	char *schemaPath = NULL;
+	char *fileSpacePath = NULL;
+	Oid dtsoid = get_database_dts(MyDatabaseId);
+	GetFilespacePathForTablespace(dtsoid, &fileSpacePath);
+	char *tblspace = getTablespaceNameFromOid(dtsoid);
+	char *dbname = get_database_name(MyDatabaseId);
+
+	/* there is not real path and folder for schema in local filesystem*/
+	if (fileSpacePath == NULL && dtsoid == DEFAULTTABLESPACE_OID){
+		return;
+	}
+	int len = strlen(fileSpacePath) + strlen(tblspace) +
+			strlen(dbname) + strlen(schemaname) + 4;
+	schemaPath = palloc0(sizeof(char) * len);
+
+	sprintf(schemaPath, "%s/%s/%s/%s",
+			fileSpacePath, tblspace, dbname, schemaname);
+
+	RemovePath(schemaPath, 1);
+	pfree(schemaPath);
+}
 
 /*
  * Store a default expression for column attnum of relation rel.
@@ -3456,7 +3586,7 @@ heap_truncate(List *relids)
 		/*
 		 * CONCERN: Not clear this EVER makes sense for Append-Only.
 		 */
-		if (RelationIsAoRows(rel) || RelationIsParquet(rel))
+		if (RelationIsAo(rel))
 		{
 			aoEntry = GetAppendOnlyEntry(rid, SnapshotNow);
 
@@ -3741,8 +3871,7 @@ setNewRelfilenodeCommon(Relation relation, Oid newrelfilenode)
 	newrnode = relation->rd_node;
 	newrnode.relNode = newrelfilenode;
 
-	isAppendOnly = (relation->rd_rel->relstorage == RELSTORAGE_AOROWS || 
-					relation->rd_rel->relstorage == RELSTORAGE_PARQUET);
+	isAppendOnly = RelationIsAo(relation);
 	
 	relname = RelationGetRelationName(relation);
 
@@ -3903,4 +4032,25 @@ setNewRelfilenodeToOid(Relation relation, Oid newrelfilenode)
 	setNewRelfilenodeCommon(relation, newrelfilenode);
 
 	return newrelfilenode;
+}
+
+Oid orcSetNewRelfilenode(Oid relid) {
+  Relation rel = heap_open(relid, AccessShareLock);
+
+  Oid newOid = GetNewRelFileNode(rel->rd_rel->reltablespace,
+                                 rel->rd_rel->relisshared, NULL, true);
+
+  remove_gp_relation_node_and_schedule_drop(rel);
+  RelFileNode newrnode = rel->rd_node;
+  newrnode.relNode = newOid;
+
+  MirroredFileSysObj_TransactionCreateRelationDir(
+      &newrnode, false, &rel->rd_relationnodeinfo.persistentTid,
+      &rel->rd_relationnodeinfo.persistentSerialNum);
+
+  rel->rd_relationnodeinfo.isPresent = true;
+
+  heap_close(rel, AccessShareLock);
+
+  return newOid;
 }
