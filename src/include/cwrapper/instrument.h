@@ -10,6 +10,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct MyInstrumentation {
   struct MyInstrumentation *leftTree;
   struct MyInstrumentation *rightTree;
@@ -50,5 +54,9 @@ __attribute__((weak)) void MyInstrStartNode(MyInstrumentation *instr) {}
 __attribute__((weak)) void MyInstrStopNode(MyInstrumentation *instr, uint64_t nTuples) {}
 
 __attribute__((weak)) void MyInstrEndLoop(MyInstrumentation *instr) {}
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // DBCOMMON_SRC_DBCOMMON_UTILS_INSTRUMENT_H_

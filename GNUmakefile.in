@@ -10,6 +10,7 @@ include $(top_builddir)/src/Makefile.global
 
 all:
 #	$(MAKE) -C doc $@
+	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
@@ -19,6 +20,7 @@ all:
 
 install:
 #	$(MAKE) -C doc $@
+	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@
@@ -56,6 +58,7 @@ feature-test-clean:
 # it's not built by default
 clean:
 #	$(MAKE) -C doc $@
+	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C contrib $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
@@ -72,6 +75,7 @@ clean:
 # will be gone too soon.
 distclean maintainer-clean:
 #	-$(MAKE) -C doc $@
+	$(MAKE) -C depends/libhdfs3 $@
 	-$(MAKE) -C contrib $@
 	-$(MAKE) -C config $@
 	-$(MAKE) -C tools $@

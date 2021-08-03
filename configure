@@ -6711,7 +6711,7 @@ $as_echo "$as_me: WARNING: *** Include directory $dir does not exist." >&2;}
   fi
 done
 IFS=$ac_save_IFS
-
+INCLUDES="$INCLUDES -I/usr/local/hawq/include"
 
 
 #
@@ -6731,12 +6731,14 @@ $as_echo "$as_me: WARNING: *** Library directory $dir does not exist." >&2;}
   fi
 done
 IFS=$ac_save_IFS
-
+LIBDIRS="$LIBDIRS -L/usr/local/hawq/lib"
 
 #
 # Assignments
 #
 
+CFLAGS="$CFLAGS -w"
+CXXFLAGS="$CXXFLAGS -w"
 CPPFLAGS="$CPPFLAGS $INCLUDES"
 LDFLAGS="$LDFLAGS $LIBDIRS"
 
@@ -15246,8 +15248,8 @@ int does_int64_work()
     return 0;
   return 1;
 }
-main() {
-  exit(! does_int64_work());
+int main() {
+  return(! does_int64_work());
 }
 _ACEOF
 if ac_fn_c_try_run "$LINENO"; then :
@@ -15326,8 +15328,8 @@ int does_int64_work()
     return 0;
   return 1;
 }
-main() {
-  exit(! does_int64_work());
+int main() {
+  return(! does_int64_work());
 }
 _ACEOF
 if ac_fn_c_try_run "$LINENO"; then :
@@ -15419,8 +15421,8 @@ int does_int64_snprintf_work()
     return 0;			/* either multiply or snprintf is busted */
   return 1;
 }
-main() {
-  exit(! does_int64_snprintf_work());
+int main() {
+  return(! does_int64_snprintf_work());
 }
 _ACEOF
 if ac_fn_c_try_run "$LINENO"; then :
@@ -17094,6 +17096,8 @@ fi
 
 ac_config_files="$ac_config_files GNUmakefile src/VERSIONS.mk src/pl/pljava/src/java/Makefile.global"
 
+ac_config_files="$ac_config_files depends/libhdfs3/Makefile.global"
+
 ac_config_files="$ac_config_files src/Makefile.global"
 
 ac_config_files="$ac_config_files ranger-plugin/Makefile.global"
@@ -17823,6 +17827,7 @@ do
   case $ac_config_target in
     "src/backend/port/tas.s") CONFIG_LINKS="$CONFIG_LINKS src/backend/port/tas.s:src/backend/port/tas/${tas_file}" ;;
     "GNUmakefile") CONFIG_FILES="$CONFIG_FILES GNUmakefile" ;;
+    "depends/libhdfs3/Makefile.global") CONFIG_FILES="$CONFIG_FILES depends/libhdfs3/Makefile.global" ;;
     "src/VERSIONS.mk") CONFIG_FILES="$CONFIG_FILES src/VERSIONS.mk" ;;
     "src/pl/pljava/src/java/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/pl/pljava/src/java/Makefile.global" ;;
     "src/Makefile.global") CONFIG_FILES="$CONFIG_FILES src/Makefile.global" ;;

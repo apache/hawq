@@ -13,7 +13,7 @@ top_builddir = ..
 
 include Makefile.global
 
-all install installdirs uninstall distprep: install-cwrapper
+all install installdirs uninstall distprep: check-and-install-cwrapper
 	$(MAKE) -C port $@
 	$(MAKE) -C timezone $@
 	$(MAKE) -C backend $@
@@ -26,7 +26,8 @@ all install installdirs uninstall distprep: install-cwrapper
 	$(MAKE) -C test/regress $@
 	$(MAKE) -C tools/fsync $@
 
-install-cwrapper:
+check-and-install-cwrapper:
+ifeq ("$(wildcard $(DEPENDENCY_PATH)/include/cwrapper-installed)", "")
 	rm -rf $(DEPENDENCY_PATH)/include/executor
 	rm -rf $(DEPENDENCY_PATH)/include/scheduler
 	rm -rf $(DEPENDENCY_PATH)/include/magma
@@ -54,6 +55,8 @@ install-cwrapper:
 	$(INSTALL_DATA) include/cwrapper/orc-format-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
 	$(INSTALL_DATA) include/cwrapper/text-format-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
 	$(INSTALL_DATA) include/cwrapper/magma-format-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
+	touch $(DEPENDENCY_PATH)/include/cwrapper-installed
+endif
 
 feature-test:
 	$(MAKE) -C test feature-test
@@ -86,7 +89,16 @@ uninstall: uninstall-local
 uninstall-local:
 	rm -f $(addprefix '$(DESTDIR)$(pgxsdir)/$(subdir)'/, Makefile.global Makefile.port Makefile.shlib nls-global.mk)
 
-clean:
+clear-cwrapper:
+	rm -rf $(DEPENDENCY_PATH)/include/executor
+	rm -rf $(DEPENDENCY_PATH)/include/scheduler
+	rm -rf $(DEPENDENCY_PATH)/include/magma
+	rm -rf $(DEPENDENCY_PATH)/include/dbcommon
+	rm -rf $(DEPENDENCY_PATH)/include/univplan
+	rm -rf $(DEPENDENCY_PATH)/include/storage
+	rm -f $(DEPENDENCY_PATH)/include/cwrapper-installed
+
+clean: clear-cwrapper
 	$(MAKE) -C port $@
 	$(MAKE) -C timezone $@
 	$(MAKE) -C backend $@
@@ -102,7 +114,7 @@ clean:
 	$(MAKE) -C test/feature $@
 	$(MAKE) -C tools/fsync $@
 
-distclean maintainer-clean:
+distclean maintainer-clean: clear-cwrapper
 	$(MAKE) -C port $@
 	$(MAKE) -C timezone $@
 	$(MAKE) -C backend $@

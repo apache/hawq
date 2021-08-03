@@ -726,6 +726,8 @@ Namenode * hdfsGetHANamenodesWithConfig(const char * conf, const char * nameserv
 void hdfsFreeNamenodeInformation(Namenode * namenodes, int size);
 
 typedef struct BlockLocation {
+    uint32_t rangeId;
+    uint32_t replicaGroupId;
     int corrupt;            // If the block is corrupt
     int numOfNodes;         // Number of Datanodes which keep the block
     char ** hosts;          // Datanode hostnames
