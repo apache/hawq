@@ -1,9 +1,0 @@
-.DS_Store
-.cproject
-.project
-.settings
-.pydevproject
-Makefile.global
-*.pyc
-build/
-CodeCoverageReport/
