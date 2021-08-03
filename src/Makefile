@@ -111,7 +111,6 @@ clean: clear-cwrapper
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	$(MAKE) -C test/regress $@
-	$(MAKE) -C test/feature $@
 	$(MAKE) -C tools/fsync $@
 
 distclean maintainer-clean: clear-cwrapper
@@ -128,7 +127,6 @@ distclean maintainer-clean: clear-cwrapper
 	$(MAKE) -C tutorial NO_PGXS=1 $@
 	$(MAKE) -C test/thread $@
 	$(MAKE) -C test/regress $@
-	$(MAKE) -C test/feature clean
 	$(MAKE) -C tools/fsync $@
 	rm -f Makefile.port Makefile.global
 

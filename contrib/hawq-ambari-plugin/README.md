@@ -57,7 +57,7 @@ Properties specified in the [build.properties](build.properties) file:
 To build the rpm for hawq-ambari-plugin, change the [build.properties](build.properties) file with the required parameters and run ```mvn install``` command under hawq-ambari-plugin directory:
 ```
 $ pwd
-incubator-hawq/contrib/hawq-ambari-plugin
+hawq/contrib/hawq-ambari-plugin
 $ mvn clean resources:copy-resources rpm:rpm -Dbuild_number=1
 ```
 

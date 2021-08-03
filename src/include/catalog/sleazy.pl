@@ -277,7 +277,7 @@ then that value is used.
 
 Apache HAWQ
 
-Address bug reports and comments to: dev@hawq.incubator.apache.org
+Address bug reports and comments to: dev@hawq.apache.org
 
 =cut
 # SLZY_POD_HDR_END

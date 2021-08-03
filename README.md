@@ -1,20 +1,20 @@
-![HAWQ](http://hawq.incubator.apache.org/images/logo-hawq.png)
+![HAWQ](http://hawq.apache.org/images/logo-hawq.png)
 
 ---
 
 |CI Process|Status|
 |---|---|
-|Travis CI Build|[![https://travis-ci.org/apache/incubator-hawq.svg?branch=master](https://travis-ci.org/apache/incubator-hawq.png?branch=master)](https://travis-ci.org/apache/incubator-hawq?branch=master)|
+|Travis CI Build|[![https://travis-ci.org/apache/hawq.svg?branch=master](https://travis-ci.org/apache/hawq.png?branch=master)](https://travis-ci.org/apache/hawq?branch=master)|
 |Apache Release Audit Tool ([RAT](https://creadur.apache.org/rat/))|[![Rat Status](https://builds.apache.org/buildStatus/icon?job=HAWQ-rat)](https://builds.apache.org/view/HAWQ/job/HAWQ-rat/)|
-|Coverity Static Analysis   |[![Coverity Scan Build](https://scan.coverity.com/projects/apache-incubator-hawq/badge.svg)](https://scan.coverity.com/projects/apache-incubator-hawq)|
+|Coverity Static Analysis   |[![Coverity Scan Build](https://scan.coverity.com/projects/apache-hawq/badge.svg)](https://scan.coverity.com/projects/apache-hawq)|
 
 ---
 
-[Website](http://hawq.incubator.apache.org/) |
+[Website](http://hawq.apache.org/) |
 [Wiki](https://cwiki.apache.org/confluence/display/HAWQ) |
-[Documentation](http://hawq.incubator.apache.org/docs/userguide/2.2.0.0-incubating/overview/HAWQOverview.html) |
-[Developer Mailing List](mailto:dev@hawq.incubator.apache.org) |
-[User Mailing List](mailto:user@hawq.incubator.apache.org) |
+[Documentation](http://hawq.apache.org/docs/userguide/latest/) |
+[Developer Mailing List](mailto:dev@hawq.apache.org) |
+[User Mailing List](mailto:user@hawq.apache.org) |
 [Q&A Collections](https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=65144284) |
 [Open Defect](https://issues.apache.org/jira/browse/HAWQ)
 
@@ -43,7 +43,7 @@ Apache HAWQ is a Hadoop native SQL query engine that combines the key technologi
  - Support most third party tools: Tableau, SAS et al.
  - Standard connectivity: JDBC/ODBC
 
-# Build & Setup HAWQ++ on Mac
+# Build & Setup HAWQ on Mac
 
 ## Step 1 Setup HDFS
 
@@ -148,7 +148,7 @@ hadoop fs -ls /
 
 **When things go wrong, check the log and view the FAQ in wiki first.**
 
-## Step 2 Setup hawq++
+## Step 2 Setup hawq
 
 ### Step 2.1 System configuration
 
@@ -194,7 +194,7 @@ sudo install -o $USER -d /usr/local/hawq
 1. Setup toolchain and thirdparty dependency referring to [here](https://github.com/oushu-io/hornet/tree/master/thirdparty).
 2. Build hornet referring to [here](https://github.com/oushu-io/hornet#hornet).
 
-### Step 2.4 Build HAWQ++
+### Step 2.4 Build HAWQ
 
 - 2.4.1 Add hawq environment information to `~/.bashrc`, and **`source ~/.bashrc`** to make it effect.
 
@@ -205,7 +205,7 @@ sudo install -o $USER -d /usr/local/hawq
   export DEPENDENCY_PATH=/opt/dependency/package
   source /opt/dependency-Darwin/package/env.sh
   ```
-- 2.4.2 Build HAWQ++
+- 2.4.2 Build HAWQ
 
   ```bash
   cd ~/dev/hawq
@@ -218,7 +218,7 @@ sudo install -o $USER -d /usr/local/hawq
   ```
 
 
-### Step 2.5 Configure HAWQ++
+### Step 2.5 Configure HAWQ
 
 ```shell
 mkdir /tmp/magma_master
@@ -227,7 +227,7 @@ mkdir /tmp/magma_segment
 
 Feel free to use the default `/usr/local/hawq/etc/hawq-site.xml`. Pay attention to mapping `hawq_dfs_url` to `fs.defaultFS` in `${HADOOP_HOME}/etc/hadoop/core-site.xml`.
 
-### Step 2.6 Init/Start/Stop HAWQ++
+### Step 2.6 Init/Start/Stop HAWQ
 
 ```bash
 # Before initializing HAWQ, you need to install HDFS and make sure it works.
@@ -278,11 +278,11 @@ hawq stop/restart/start cluster
 > ps -ef | grep magma | grep -v grep | awk '{print $2}'| xargs kill -9
 > ```
 
-# Build HAWQ++ on Centos 7
+# Build HAWQ on Centos 7
 
 Almost the same as that on macOS, feel free to have a try, referring to [here](https://github.com/oushu-io/knowledgebase/wiki/Build-HAWQ-on-Linux-macOS#build-hawq-on-linuxmacos).
 
-# Build HAWQ++ on Centos 7(6.X) using docker
+# Build HAWQ on Centos 7(6.X) using docker
 
 Almost the same as that on macOS, feel free to have a try, referring to [here](https://github.com/oushu-io/knowledgebase/wiki/Build-HAWQ-in-Docker-Container#build-hawq-in-docker-container).
 

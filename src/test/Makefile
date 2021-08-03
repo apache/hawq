@@ -11,15 +11,11 @@
 #
 #-------------------------------------------------------------------------
 
-.PHONY: feature_test clean distclean
+.PHONY: clean distclean
 
 .DEFAULT:
 	$(MAKE) -C regress $@
 
-feature-test:
-	$(MAKE) -C feature all
-
 clean:
-	$(MAKE) -C feature clean
 
 distclean: clean

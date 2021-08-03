@@ -88,5 +88,4 @@ small memory footprint code base. In addition, it is easy to use and deploy.
 /sbin/ldconfig
 
 %changelog
-* Sun Oct 04 2015 Zhanwei Wang <wangzw@wangzw.org> - 2.2.30-1
 - Initial RPM release

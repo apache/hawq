@@ -1,6 +1,5 @@
 Source: libhdfs3
 Priority: optional
-Maintainer: Zhanwei Wang <wangzw@wangzw.org>
 Build-Depends: debhelper (>= 9), cmake, libprotobuf-dev, protobuf-compiler, libxml2-dev, libkrb5-dev, uuid-dev, libgsasl7-dev
 Standards-Version: 3.9.5
 Section: libs

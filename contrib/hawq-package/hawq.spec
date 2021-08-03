@@ -30,7 +30,7 @@ Version:    %{hawq_version}
 Release:    %{rpm_os_version}
 License:    ASL 2.0
 Group:      Applications/Databases
-URL:        http://hawq.incubator.apache.org
+URL:        http://hawq.apache.org
 Prefix:     /usr/local
 BuildArch:  %{arch}
 SOURCE0 :   apache-hawq-src-%{hawq_version}-incubating.tar.gz
