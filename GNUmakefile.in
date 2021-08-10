@@ -20,7 +20,7 @@ all:
 
 install:
 #	$(MAKE) -C doc $@
-	$(MAKE) -C depends/libhdfs3 $@
+#	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C src $@
 	$(MAKE) -C config $@
 	$(MAKE) -C contrib $@

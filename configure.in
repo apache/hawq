@@ -924,7 +924,7 @@ for dir in $with_includes $SRCH_INC; do
   fi
 done
 IFS=$ac_save_IFS
-INCLUDES="$INCLUDES -I/usr/local/hawq/include"
+INCLUDES="$INCLUDES -I$ac_pwd/depends/libhdfs3/build/install/include -I$ac_pwd/src/include/cwrapper"
 AC_SUBST(INCLUDES)
 
 
@@ -944,7 +944,7 @@ for dir in $LIBRARY_DIRS $SRCH_LIB; do
   fi
 done
 IFS=$ac_save_IFS
-LIBDIRS="$LIBDIRS -L/usr/local/hawq/lib"
+LIBDIRS="$LIBDIRS -L$ac_pwd/depends/libhdfs3/build/install/lib"
 
 #
 # Assignments

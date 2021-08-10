@@ -102,7 +102,7 @@ endif
 
 ALLOBJS = $(OBJS) $(SUBDIROBJS)
 
-dispatcher_new.o : $(DEPENDENCY_PATH)/include/univplan/cwrapper/univplan-c.h
-dispatcher.o : $(DEPENDENCY_PATH)/include/univplan/cwrapper/univplan-c.h
+dispatcher_new.o : $(top_srcdir)/src/include/cwrapper/univplan/cwrapper/univplan-c.h
+dispatcher.o : $(top_srcdir)/src/include/cwrapper/univplan/cwrapper/univplan-c.h
 
 include $(top_srcdir)/src/backend/common.mk

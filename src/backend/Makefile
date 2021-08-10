@@ -38,6 +38,10 @@ ifeq ($(PORTNAME), darwin)
 LDOPTS = -Z
 endif
 
+ifeq ($(shell uname), Linux)
+	CFLAGS += -Wl,--unresolved-symbols=ignore-all
+endif
+
 ifeq ($(enable_connectemc), yes)
 CONNECTEMCLIB += -lemcconnect
 endif

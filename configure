@@ -6693,6 +6693,9 @@ fi
 rm -f conftest*
 
 
+if test "x$prefix" = "xNONE" ; then
+  prefix=$ac_default_prefix
+fi
 
 #
 # Include directories
@@ -6711,7 +6714,7 @@ $as_echo "$as_me: WARNING: *** Include directory $dir does not exist." >&2;}
   fi
 done
 IFS=$ac_save_IFS
-INCLUDES="$INCLUDES -I/usr/local/hawq/include"
+INCLUDES="$INCLUDES -I$prefix/include -I$ac_pwd/src/include/cwrapper"
 
 
 #
@@ -6731,7 +6734,7 @@ $as_echo "$as_me: WARNING: *** Library directory $dir does not exist." >&2;}
   fi
 done
 IFS=$ac_save_IFS
-LIBDIRS="$LIBDIRS -L/usr/local/hawq/lib"
+LIBDIRS="$LIBDIRS -L$prefix/lib"
 
 #
 # Assignments

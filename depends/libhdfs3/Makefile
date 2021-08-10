@@ -42,7 +42,7 @@ ifeq ($(with_libhdfs3), yes)
 # We will need to install it temporarily under build/install for hawq building.
 all: build
 	cd $(top_builddir)/$(subdir)/build; mkdir -p install; \
-	$(MAKE) DESTDIR=$(abs_top_builddir)/$(subdir)/build/install install
+	$(MAKE) install
 
 install: build
 	cd $(top_builddir)/$(subdir)/build && $(MAKE) install

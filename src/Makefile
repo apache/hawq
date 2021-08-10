@@ -13,7 +13,7 @@ top_builddir = ..
 
 include Makefile.global
 
-all install installdirs uninstall distprep: check-and-install-cwrapper
+all install installdirs uninstall distprep:
 	$(MAKE) -C port $@
 	$(MAKE) -C timezone $@
 	$(MAKE) -C backend $@
@@ -26,37 +26,10 @@ all install installdirs uninstall distprep: check-and-install-cwrapper
 	$(MAKE) -C test/regress $@
 	$(MAKE) -C tools/fsync $@
 
-check-and-install-cwrapper:
-ifeq ("$(wildcard $(DEPENDENCY_PATH)/include/cwrapper-installed)", "")
-	rm -rf $(DEPENDENCY_PATH)/include/executor
-	rm -rf $(DEPENDENCY_PATH)/include/scheduler
-	rm -rf $(DEPENDENCY_PATH)/include/magma
-	rm -rf $(DEPENDENCY_PATH)/include/dbcommon
-	rm -rf $(DEPENDENCY_PATH)/include/univplan
-	rm -rf $(DEPENDENCY_PATH)/include/storage
-	mkdir -p $(DEPENDENCY_PATH)/include/executor/cwrapper
-	mkdir -p $(DEPENDENCY_PATH)/include/scheduler/cwrapper
-	mkdir -p $(DEPENDENCY_PATH)/include/magma/cwrapper
-	mkdir -p $(DEPENDENCY_PATH)/include/dbcommon/function
-	mkdir -p $(DEPENDENCY_PATH)/include/dbcommon/type
-	mkdir -p $(DEPENDENCY_PATH)/include/dbcommon/utils
-	mkdir -p $(DEPENDENCY_PATH)/include/univplan/cwrapper
-	mkdir -p $(DEPENDENCY_PATH)/include/storage/cwrapper
-	$(INSTALL_DATA) include/cwrapper/cached-result.h '$(DEPENDENCY_PATH)/include/executor/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/executor-c.h '$(DEPENDENCY_PATH)/include/executor/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/scheduler-c.h '$(DEPENDENCY_PATH)/include/scheduler/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/magma-client-c.h '$(DEPENDENCY_PATH)/include/magma/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/func-kind.cg.h '$(DEPENDENCY_PATH)/include/dbcommon/function/'
-	$(INSTALL_DATA) include/cwrapper/type-kind.h '$(DEPENDENCY_PATH)/include/dbcommon/type/'
-	$(INSTALL_DATA) include/cwrapper/instrument.h '$(DEPENDENCY_PATH)/include/dbcommon/utils/'
-	$(INSTALL_DATA) include/cwrapper/univplan-c.h '$(DEPENDENCY_PATH)/include/univplan/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/hdfs-file-system-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/hive-file-system-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/orc-format-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/text-format-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
-	$(INSTALL_DATA) include/cwrapper/magma-format-c.h '$(DEPENDENCY_PATH)/include/storage/cwrapper/'
-	touch $(DEPENDENCY_PATH)/include/cwrapper-installed
-endif
+all: clear-duplicated-includes
+
+clear-duplicated-includes:
+	rm -rf $(top_builddir)/.github/workflows/scripts/download/dependency/package/include/magma
 
 feature-test:
 	$(MAKE) -C test feature-test
@@ -89,16 +62,7 @@ uninstall: uninstall-local
 uninstall-local:
 	rm -f $(addprefix '$(DESTDIR)$(pgxsdir)/$(subdir)'/, Makefile.global Makefile.port Makefile.shlib nls-global.mk)
 
-clear-cwrapper:
-	rm -rf $(DEPENDENCY_PATH)/include/executor
-	rm -rf $(DEPENDENCY_PATH)/include/scheduler
-	rm -rf $(DEPENDENCY_PATH)/include/magma
-	rm -rf $(DEPENDENCY_PATH)/include/dbcommon
-	rm -rf $(DEPENDENCY_PATH)/include/univplan
-	rm -rf $(DEPENDENCY_PATH)/include/storage
-	rm -f $(DEPENDENCY_PATH)/include/cwrapper-installed
-
-clean: clear-cwrapper
+clean:
 	$(MAKE) -C port $@
 	$(MAKE) -C timezone $@
 	$(MAKE) -C backend $@
@@ -113,7 +77,7 @@ clean: clear-cwrapper
 	$(MAKE) -C test/regress $@
 	$(MAKE) -C tools/fsync $@
 
-distclean maintainer-clean: clear-cwrapper
+distclean maintainer-clean:
 	$(MAKE) -C port $@
 	$(MAKE) -C timezone $@
 	$(MAKE) -C backend $@

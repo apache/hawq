@@ -78,15 +78,15 @@ if [[ $(uname -s) == Linux ]]; then
   fi
 
   export PATH=$HAWQ_TOOLCHAIN_PATH/gcc/bin:$HAWQ_TOOLCHAIN_PATH/cmake/bin:$PATH
-  export LD_LIBRARY_PATH=$HAWQ_TOOLCHAIN_PATH/gcc/lib64/:$LD_LIBRARY_PATH
+  export LD_LIBRARY_PATH=$HAWQ_TOOLCHAIN_PATH/gcc/lib64/:/tmp/hawq/lib:$LD_LIBRARY_PATH
 
   export CPATH=$HAWQ_TOOLCHAIN_PATH/gcc/include/c++/7.4.0/:$HAWQ_TOOLCHAIN_PATH/gcc/include/c++/7.4.0/x86_64-pc-linux-gnu/
   export CPATH=$CPATH:/usr/include/x86_64-linux-gnu/
   export LIBRARY_PATH=$HAWQ_TOOLCHAIN_PATH/gcc/lib64/:/usr/lib/x86_64-linux-gnu/
 
   unset CPPFLAGS
-  export CFLAGS='-std=gnu11 -fno-use-linker-plugin'
-  export CXXFLAGS='-fpermissive -fno-use-linker-plugin'
+  export CFLAGS='-std=gnu11 -fno-use-linker-plugin -lstdc++'
+  export CXXFLAGS='-fpermissive -fno-use-linker-plugin -lstdc++'
   unset LDFLAGS
 
   export CC=gcc
@@ -101,6 +101,6 @@ fi
 ###
 find . $HAWQ_TOOLCHAIN_PATH/../../../../ -name CMakeCache.txt -delete
 find . $HAWQ_TOOLCHAIN_PATH/../../../../ -name '*build_timestamp' -delete
-rm -rf $HAWQ_TOOLCHAIN_PATH/dependency/package/include/hdfs
-rm -rf $HAWQ_TOOLCHAIN_PATH/dependency/package/lib/libhdfs3*
+#rm -rf $HAWQ_TOOLCHAIN_PATH/dependency/package/include/hdfs
+#rm -rf $HAWQ_TOOLCHAIN_PATH/dependency/package/lib/libhdfs3*
 source $HAWQ_TOOLCHAIN_PATH/dependency/package/env.sh

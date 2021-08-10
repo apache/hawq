@@ -36,7 +36,7 @@ else
 	sed -f $(srcdir)/Gen_dummy_probes.sed $< >$@
 endif
 
-hawq_funcoid_mapping.h: Gen_hawq_funcoid_mapping.sh $(DEPENDENCY_PATH)/include/dbcommon/function/func-kind.cg.h
+hawq_funcoid_mapping.h: Gen_hawq_funcoid_mapping.sh $(top_srcdir)/src/include/cwrapper/dbcommon/function/func-kind.cg.h
 	bash Gen_hawq_funcoid_mapping.sh fmgroids.h hawq_funcoid_mapping.h
 
 clean:
