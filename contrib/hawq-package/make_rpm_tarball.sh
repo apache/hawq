@@ -69,15 +69,15 @@ echo "Copied all the HAWQ/PXF/Range-plugin rpm packages."
 ls ${RPM_PKG_DIR}/
 
 # Make tarball for all the HAWQ/PXF/RANGER rpms
-tar czvf apache-hawq-rpm-${HAWQ_RELEASE_VERSION}-incubating.tar.gz  hawq_rpm_packages
+tar czvf apache-hawq-rpm-${HAWQ_RELEASE_VERSION}.tar.gz  hawq_rpm_packages
 if [ $? != 0 ]; then
     echo "Make HAWQ/PXF/Ranger-plugin rpm tarball failed."
     exit $?
 else
     echo "Make HAWQ/PXF/Ranger-plugin rpm tarball successfully."
     echo "You can find the rpm binary tarball at:"
-    echo "${CUR_DIR}/apache-hawq-rpm-${HAWQ_RELEASE_VERSION}-incubating.tar.gz"
-    ls -l apache-hawq-rpm-${HAWQ_RELEASE_VERSION}-incubating.tar.gz
+    echo "${CUR_DIR}/apache-hawq-rpm-${HAWQ_RELEASE_VERSION}.tar.gz"
+    ls -l apache-hawq-rpm-${HAWQ_RELEASE_VERSION}.tar.gz
 fi
 
 exit 0
