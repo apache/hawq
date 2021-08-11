@@ -11,9 +11,6 @@ Fresh installation from 3.0.0.0 source code
 Fresh installation from 3.0.0.0 rpm package
 -------------------------------------------
 1. Setup 3.0.0.0 yum repository
-   $ cd /etc/yum.repos.d
-   $ sudo wget  http://yum.oushu.io/oushurepo/yumrepo/release/oushu-database/centos7/3.0.0.0/oushu-database.repo
-   $ sudo wget http://yum.oushu.io/oushurepo/yumrepo/oushu-database-utils/centos7/1.1.0.0/oushu-database-utils.repo
 
 2. Install rpm package
    $ sudo yum install -y hawq
@@ -32,13 +29,8 @@ Upgrade from 2.2.0.0 to 3.3.0.0
    $ cp -rf $GPHOME/etc ~/
 
 3. Backup 2.2.0.0 yum repository on each node
-   $ sudo mv /etc/yum.repos.d/oushu-hawq++.repo /etc/yum.repos.d/oushu-hawq++.repo.bak
-   $ sudo mv /etc/yum.repos.d/oushu-hawq++-utils.repo /etc/yum.repos.d/oushu-hawq++-utils.repo.bak
 
 4. Setup 3.0.0.0 yum repository on each node
-   $ sudo wget -O /etc/yum.repos.d/oushu-database.repo http://yum.oushu.io/oushurepo/yumrepo/test/oushu-database/centos7/3.0.0.0/oushu-database.repo
-   $ sudo wget -O /etc/yum.repos.d/oushu-database-utils.repo http://yum.oushu.io/oushurepo/yumrepo/oushu-database-utils/centos7/1.1.0.0/oushu-database-utils.repo
-   $ sudo yum makecache
 
 5. Install 3.0.0.0 rpm package on each node
    $ sudo yum remove -y hawq

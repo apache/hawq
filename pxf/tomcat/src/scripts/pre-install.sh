@@ -32,4 +32,4 @@ getent group $group > /dev/null || $groupadd -r $group
 getent passwd $user > /dev/null || $useradd --comment "tomcat server user" -M -r -g $group $user
 
 # Create base directory
-mkdir -p /opt/oushu
+mkdir -p /opt/hawq

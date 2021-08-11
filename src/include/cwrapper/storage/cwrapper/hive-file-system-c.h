@@ -16,12 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-////////////////////////////////////////////////////////////////////////////
-// Copyright 2018, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-////////////////////////////////////////////////////////////////////////////
 
 #ifndef STORAGE_SRC_STORAGE_CWRAPPER_HIVE_FILE_SYSTEM_C_H_
 #define STORAGE_SRC_STORAGE_CWRAPPER_HIVE_FILE_SYSTEM_C_H_

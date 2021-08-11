@@ -16,12 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2016, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
 
 #ifndef DBCOMMON_SRC_DBCOMMON_FUNCTION_FUNC_KIND_H_
 #define DBCOMMON_SRC_DBCOMMON_FUNCTION_FUNC_KIND_H_
@@ -31,7 +25,6 @@
 
 /*
  * DO NOT EDIT!"
- * This file is generated from : /Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h
  */
 
 enum FuncKind {
@@ -39,7 +32,6 @@ enum FuncKind {
 // OpExpr::setOpFuncId chooses the specific function to use:
 // 1. val op val 2. val op vec 3. vec op val 4. vec op vec
 
-///Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h:61
 
   TINYINT_LESS_THAN_TINYINT = 0,
   TINYINT_LESS_THAN_SMALLINT = 1,
@@ -288,7 +280,6 @@ enum FuncKind {
   DECIMAL_GREATER_THAN_DECIMAL = 244,
   DECIMAL_GREATER_EQ_DECIMAL = 245,
 
-///Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h:74
 
   TINYINT_MUL_TINYINT = 246,
   TINYINT_MUL_SMALLINT = 247,
@@ -443,7 +434,6 @@ enum FuncKind {
 // dummy aggregate function id denotes its correlated function, and it shares
 // the same value with the lower bound its correlated function ids
 
-///Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h:127
 
 
   AVG_TINYINT = 394,
@@ -588,7 +578,6 @@ enum FuncKind {
   COUNT_ADD = 455,
 
 
-///Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h:157
 
   TINYINT_TO_SMALLINT = 456,
   TINYINT_TO_INT = 457,
@@ -633,7 +622,6 @@ enum FuncKind {
   DECIMAL_TO_FLOAT = 496,
   DECIMAL_TO_DOUBLE = 497,
 
-///Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h:165
 
   INTERVAL_LESS_THAN_INTERVAL = 498,
   INTERVAL_LESS_EQ_INTERVAL = 499,
@@ -654,7 +642,6 @@ enum FuncKind {
   TIMESTAMP_GREATER_THAN_DATE = 514,
   TIMESTAMP_GREATER_EQ_DATE = 515,
 
-///Users/oushu/dev/hornet-opensource/dbcommon/src/dbcommon/function/func-kind.h:175
 
   INTERVAL_ADD_INTERVAL = 516,
   INTERVAL_SUB_INTERVAL = 517,

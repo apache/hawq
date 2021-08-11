@@ -18382,7 +18382,7 @@ static Datum transformLocationUris(List *locs, List* fmtopts, bool isweb, bool i
 	        errOmitLocation(true)));
 		}
 
-		// Oushu will not support pxf anymore
+		// Apache HAWQ will not support pxf anymore
 		if (is_pxf_protocol(uri))
 		{
 			ereport(ERROR,

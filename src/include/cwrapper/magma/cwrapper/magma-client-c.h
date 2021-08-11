@@ -16,12 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2018, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
 
 #ifndef MAGMA_SRC_MAGMA_CWRAPPER_MAGMA_CLIENT_C_H_
 #define MAGMA_SRC_MAGMA_CWRAPPER_MAGMA_CLIENT_C_H_

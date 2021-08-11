@@ -16,12 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2018, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
+
 #ifndef STORAGE_MAGMA_FORMAT_SRC_STORAGE_CWRAPPER_MAGMA_FORMAT_C_H_
 #define STORAGE_MAGMA_FORMAT_SRC_STORAGE_CWRAPPER_MAGMA_FORMAT_C_H_
 

@@ -16,12 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2016, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
 
 #ifndef EXECUTOR_SRC_EXECUTOR_CWRAPPER_EXECUTOR_C_H_
 #define EXECUTOR_SRC_EXECUTOR_CWRAPPER_EXECUTOR_C_H_

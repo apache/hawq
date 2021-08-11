@@ -16,12 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2016, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
 
 #ifndef STORAGE_SRC_STORAGE_CWRAPPER_ORC_FORMAT_C_H_
 #define STORAGE_SRC_STORAGE_CWRAPPER_ORC_FORMAT_C_H_

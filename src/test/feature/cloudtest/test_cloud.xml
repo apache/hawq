@@ -35,6 +35,6 @@
         </property>
         <property>
                 <name>cloud_user</name>
-                <value>oushu</value>
+                <value>gpadmin</value>
         </property>
 </configuration>

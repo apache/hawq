@@ -181,9 +181,7 @@ kern.corefile=/cores/core.%N.%P
 
 ```bash
 mkdir ~/dev
-git clone git@github.com:oushu-io/hawq ~/dev/hawq
-git clone git@github.com:oushu-io/hornet ~/dev/hornet
-git clone git@github.com:oushu-io/libhdfs3 ~/dev/libhdfs3
+git clone git@github.com:apache/hawq ~/dev/hawq
 
 sudo mkdir -p /opt
 sudo chmod a+w /opt
@@ -191,8 +189,7 @@ sudo install -o $USER -d /usr/local/hawq
 ```
 ### Step 2.3 Setup toolchain and thirdparty dependency
 
-1. Setup toolchain and thirdparty dependency referring to [here](https://github.com/oushu-io/hornet/tree/master/thirdparty).
-2. Build hornet referring to [here](https://github.com/oushu-io/hornet#hornet).
+Setup toolchain and thirdparty dependency
 
 ### Step 2.4 Build HAWQ
 
@@ -209,8 +206,7 @@ sudo install -o $USER -d /usr/local/hawq
 
   ```bash
   cd ~/dev/hawq
-  git checkout oushu-master
-  ln -sf ../../pre-push .git/hooks/pre-push
+  git checkout master
   ln -sf ../../commit-msg .git/hooks/commit-msg
   ./configure
   make -j8
@@ -280,19 +276,17 @@ hawq stop/restart/start cluster
 
 # Build HAWQ on Centos 7
 
-Almost the same as that on macOS, feel free to have a try, referring to [here](https://github.com/oushu-io/knowledgebase/wiki/Build-HAWQ-on-Linux-macOS#build-hawq-on-linuxmacos).
+Almost the same as that on macOS, feel free to have a try.
 
 # Build HAWQ on Centos 7(6.X) using docker
 
-Almost the same as that on macOS, feel free to have a try, referring to [here](https://github.com/oushu-io/knowledgebase/wiki/Build-HAWQ-in-Docker-Container#build-hawq-in-docker-container).
+Almost the same as that on macOS, feel free to have a try.
 
 # Build & Install & Test (Apache HAWQ Version)
 
 ---------------
 Please see HAWQ wiki page:
 https://cwiki.apache.org/confluence/display/HAWQ/Build+and+Install
-
-It is also ok to use the environment for building OushuDB, which saves time.
 
 ```shell
 cd hawq

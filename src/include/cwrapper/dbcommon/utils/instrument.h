@@ -16,12 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2016, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
 
 #ifndef DBCOMMON_SRC_DBCOMMON_UTILS_INSTRUMENT_H_
 #define DBCOMMON_SRC_DBCOMMON_UTILS_INSTRUMENT_H_

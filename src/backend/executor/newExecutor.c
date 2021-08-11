@@ -42,8 +42,8 @@ bool enableOushuDbExtensiveFeatureSupport() {
 void checkOushuDbExtensiveFeatureSupport(char featureCategory[]) {
   if (MyExecutorRun == NULL)
     ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
-                    errmsg("Feature of %s is only supported in OushuDB "
-                        "Enterprise Edition", featureCategory)));
+                    errmsg("Feature of %s is not supported in Apache "
+                        "HAWQ", featureCategory)));
 }
 
 PlanState *newExecutorPlanStateReference = NULL;

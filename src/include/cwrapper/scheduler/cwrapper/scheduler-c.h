@@ -16,12 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-///////////////////////////////////////////////////////////////////////////////
-// Copyright 2016, Oushu Inc.
-// All rights reserved.
-//
-// Author:
-///////////////////////////////////////////////////////////////////////////////
+
 #ifndef SCHEDULER_SRC_SCHEDULER_CWRAPPER_SCHEDULER_C_H_
 #define SCHEDULER_SRC_SCHEDULER_CWRAPPER_SCHEDULER_C_H_
 
