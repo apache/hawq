@@ -393,7 +393,7 @@ AtEOSubXact_SPI(bool isCommit, SubTransactionId mySubid)
 	 * If we are aborting a subtransaction and there is an open SPI context
 	 * surrounding the subxact, clean up to prevent memory leakage.
 	 */
-	if (_SPI_current && !isCommit)
+	if (_SPI_current && !isCommit && _SPI_current->connectSubid >= mySubid)
 	{
 		/* free Executor memory the same as _SPI_end_call would do */
 		MemoryContextResetAndDeleteChildren(_SPI_current->execCxt);
