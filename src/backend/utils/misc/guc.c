@@ -764,6 +764,7 @@ int		optimizer_plan_id;
 int  optimizer_samples_number;
 int  optimizer_log_failure;
 int default_hash_table_bucket_number;
+int gen_new_oid_value;
 int default_magma_hash_table_nvseg_per_seg;
 int hawq_auto_ha_timeout;
 int default_magma_block_size;
@@ -4649,6 +4650,15 @@ static struct config_int ConfigureNamesInt[] =
 		&default_hash_table_bucket_number,
 		8, 1, 65535, NULL, NULL
 	},
+
+  {
+    {"gen_new_oid_value", PGC_USERSET, DEVELOPER_OPTIONS,
+      gettext_noop("Hardcode each newly generated oid value"),
+      NULL
+    },
+    &gen_new_oid_value,
+    0, 0, INT_MAX, NULL, NULL
+  },
 
 	{
 		{"new_executor_partitioned_hash_recursive_depth_limit", PGC_USERSET, QUERY_TUNING_OTHER,

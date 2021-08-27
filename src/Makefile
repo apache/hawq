@@ -46,16 +46,18 @@ install-local: installdirs-local
 	$(INSTALL_DATA) $(srcdir)/nls-global.mk '$(DESTDIR)$(pgxsdir)/$(subdir)/nls-global.mk'
 
 installdirs: installdirs-local
-ifeq ($(with_oushudb_extension), yes)
-	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/magma_* $(DESTDIR)${bindir}
-	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/hawq_heartbeat* $(DESTDIR)${bindir}
-	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/hawq_magma_tool $(DESTDIR)${bindir}
-	${INSTALL_DATA} $(DEPENDENCY_PATH)/include/magma/utils/template-magma-site.xml $(DESTDIR)${sysconfdir}
-	${INSTALL_DATA} $(DEPENDENCY_PATH)/include/magma/utils/magma-site.xml $(DESTDIR)${sysconfdir}
-endif
 
 installdirs-local:
 	$(MKDIR_P) '$(DESTDIR)$(pgxsdir)/$(subdir)'
+ifeq ($(with_oushudb_extension), yes)
+	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/magma_ctl '$(DESTDIR)${bindir}/magma_ctl'
+	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/magma_server '$(DESTDIR)${bindir}/magma_server'
+	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/hawq_heartbeat_monitor '$(DESTDIR)${bindir}/hawq_heartbeat_monitor'
+	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/hawq_heartbeat_sender '$(DESTDIR)${bindir}/hawq_heartbeat_sender'
+	${INSTALL_PROGRAM} $(DEPENDENCY_PATH)/bin/hawq_magma_tool '$(DESTDIR)${bindir}/hawq_magma_tool'
+	${INSTALL_DATA} $(DEPENDENCY_PATH)/include/magma/utils/template-magma-site.xml '$(DESTDIR)${sysconfdir}/template-magma-site.xml'
+	${INSTALL_DATA} $(DEPENDENCY_PATH)/include/magma/utils/magma-site.xml '$(DESTDIR)${sysconfdir}/magma-site.xml'
+endif
 
 uninstall: uninstall-local
 

@@ -122,7 +122,7 @@ static void checkOrcError(OrcFormatData *orcFormatData) {
     ORCFormatFreeORCFormatC(&orcFormatData->fmt);
     ORCFormatFreeStorageFormatC(&orcFormatData->updateDeleteFmt);
     ereport(ERROR,
-            (errcode(errBuf.errCode), errmsg("ORC: %s", errBuf.errMessage)));
+            (errcode(errBuf.errCode), errmsg("%s", errBuf.errMessage)));
   }
 }
 

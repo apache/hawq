@@ -1,0 +1,21 @@
+-- prepare table an test udf
+create table testUdfWithAnalyze(i int, c text);
+CREATE TABLE
+create function test() returns void as $$
+begin
+  insert into testUdfWithAnalyze select generate_series(1,100),'abc';
+  analyze testUdfWithAnalyze;
+end;
+$$ language plpgsql;
+CREATE FUNCTION
+-- run test
+alter resource queue pg_default with (active_statements=1);
+ALTER QUEUE
+select test();  -- should complete without error raised
+ test 
+------
+ 
+(1 row)
+
+alter resource queue pg_default with (active_statements=20);
+ALTER QUEUE

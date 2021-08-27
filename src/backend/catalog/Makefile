@@ -144,6 +144,7 @@ install-data: $(BKIFILES) installdirs
 	$(INSTALL_DATA) $(call vpathsearch,filesystem.sql) '$(DESTDIR)$(datadir)/filesystem.sql'
 	$(INSTALL_DATA) $(srcdir)/../utils/adt/array_distance_install.sql '$(DESTDIR)$(datadir)/array_distance_install.sql'
 	$(INSTALL_DATA) $(srcdir)/../utils/adt/array_distance_uninstall.sql '$(DESTDIR)$(datadir)/array_distance_uninstall.sql'
+	$(INSTALL_DATA) $(srcdir)/../utils/adt/json_install.sql '$(DESTDIR)$(datadir)/json_install.sql'
 
 ifeq ($(with_orc), yes)
 	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_install.sql '$(DESTDIR)$(datadir)/orc_install.sql'

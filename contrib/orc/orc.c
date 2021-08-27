@@ -643,7 +643,7 @@ Datum orc_beginscan(PG_FUNCTION_ARGS)
         ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(user_data->fmt);
 	if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION)
 	{
-		ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+		ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
 	}
 
 	/* 5. Save file_scan_desc */
@@ -772,7 +772,7 @@ Datum orc_getnext(PG_FUNCTION_ARGS) {
     ORCFormatEndORCFormatC(user_data->fmt);
     e = ORCFormatGetErrorORCFormatC(user_data->fmt);
     if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
-      ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+      ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
     }
 
     ORCFormatFreeORCFormatC(&(user_data->fmt));
@@ -802,7 +802,7 @@ Datum orc_getnext(PG_FUNCTION_ARGS) {
     slot->PRIVATE_tts_values = NULL;
     ExecClearTuple(slot);
   } else {
-    ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+    ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
   }
   PG_RETURN_BOOL(false);
 }
@@ -865,14 +865,14 @@ Datum orc_rescan(PG_FUNCTION_ARGS)
 		ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(user_data->fmt);
 		if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION)
 		{
-			ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+			ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
 		}
 	} else {
 		ORCFormatRescanORCFormatC(user_data->fmt);
 		ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(user_data->fmt);
 		if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION)
 		{
-			ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+			ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
 		}
 	}
 
@@ -993,7 +993,7 @@ Datum orc_stopscan(PG_FUNCTION_ARGS)
     ORCFormatEndORCFormatC(user_data->fmt);
     e = ORCFormatGetErrorORCFormatC(user_data->fmt);
     if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
-      ereport(LOG, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+      ereport(LOG, (errcode(e->errCode), errmsg("%s", e->errMessage)));
     }
 
     ORCFormatFreeORCFormatC(&(user_data->fmt));
@@ -1029,7 +1029,7 @@ Datum orc_stopscan(PG_FUNCTION_ARGS)
     tts->PRIVATE_tts_isnull = NULL;
     ExecClearTuple(tts);
   } else {
-    ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+    ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
   }
 
   PG_RETURN_VOID();
@@ -1261,7 +1261,7 @@ Datum orc_insert_init(PG_FUNCTION_ARGS)
 	ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(user_data->fmt);
 	if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION)
 	{
-		ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+		ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
 	}
 
 	/* 4. Save the result */
@@ -1515,7 +1515,7 @@ Datum orc_insert(PG_FUNCTION_ARGS)
 	ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(user_data->fmt);
 	if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION)
 	{
-		ereport(ERROR,(errcode(e->errCode),errmsg("ORC::%s", e->errMessage)));
+		ereport(ERROR,(errcode(e->errCode),errmsg("%s", e->errMessage)));
 	}
 
 	ps->ps_tuple_oid = InvalidOid;
@@ -1540,7 +1540,7 @@ Datum orc_insert_finish(PG_FUNCTION_ARGS)
 	ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(user_data->fmt);
 	if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION)
 	{
-		ereport(ERROR, (errcode(e->errCode), errmsg("ORC:%s", e->errMessage)));
+		ereport(ERROR, (errcode(e->errCode), errmsg("%s", e->errMessage)));
 	}
 
 	ORCFormatFreeORCFormatC(&(user_data->fmt));

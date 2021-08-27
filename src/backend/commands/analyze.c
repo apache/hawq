@@ -522,15 +522,24 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 	CurrentResourceOwner = asOwner;
 
 	/**
-	 *  we use preferred_seg_num as default and
-	 *  compute target_seg_num based on data size and distributed type
-	 *  if there is no preferred_seg_num.
+	 * We allocate query resource for analyze if there is no active resource
+	 * otherwise, we inherit instead
 	 */
+	QueryResource *savedResource = NULL;
+	savedResource = GetActiveQueryResource();
+
+	QueryResource *resource = NULL;
 	int target_seg_num = preferred_seg_num;
-	if (target_seg_num <= 0) {
-		target_seg_num = calculate_virtual_segment_number(lFullRelOids);
+	if (!savedResource) {
+		/**
+		 *  we use preferred_seg_num as default and
+		 *  compute target_seg_num based on data size and distributed type
+		 *  if there is no preferred_seg_num.
+		 */
+		if (target_seg_num <= 0) {
+			target_seg_num = calculate_virtual_segment_number(lFullRelOids);
+		}
 	}
-	elog(LOG, "virtual segment number of analyze is: %d\n", target_seg_num);
 
 	/**
 	 * We open relations with appropreciate locks
@@ -559,13 +568,12 @@ void analyzeStmt(VacuumStmt *stmt, List *relids, int preferred_seg_num)
 		}
 	}
 
-	/**
-	 * We allocate query resource for analyze
-	 */
-	QueryResource *resource = AllocateResource(QRL_ONCE, 1, 0, target_seg_num, target_seg_num, NULL, 0);
-	QueryResource *savedResource = NULL;
-
-	savedResource = GetActiveQueryResource();
+	if (!savedResource) {
+		elog(LOG, "virtual segment number of analyze is: %d\n", target_seg_num);
+		resource = AllocateResource(QRL_ONCE, 1, 0, target_seg_num, target_seg_num, NULL, 0);
+	} else {
+		resource = AllocateResource(QRL_INHERIT, 0, 0, 0, 0, NULL, 0);
+	}
 	SetActiveQueryResource(resource);
 
 	/**

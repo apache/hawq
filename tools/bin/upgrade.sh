@@ -18,9 +18,10 @@
 #
 
 # parse parameters
-usage() { echo "Usage: $0 [-s <3.3.x.x|2.4.0.0|2.4.0.1>] [-t <4.0.0.0>]" ; exit 1; }
+usage() { echo "Usage: $0 [-s <3.3.x.x|2.4.0.0|2.4.0.1>] [-t <4.0.0.0>] [-h]" ; exit 1; }
 
-while getopts ":s:t:" opt; do
+delete_hcatalog=true;
+while getopts ":s:t:h" opt; do
     case "${opt}" in
         s)
             source_version=${OPTARG}
@@ -37,6 +38,10 @@ while getopts ":s:t:" opt; do
             else
                 usage
             fi
+            ;;
+        h)
+            delete_hcatalog=false
+            echo "Don't delete hcatalog."
             ;;
         *)
             usage
@@ -121,10 +126,12 @@ check_error "start cluster in upgrade mode"
 
 echo "Start hawq cluster in upgrade mode successfully."
 
-# 删除master节点hcatalog数据库
-PGOPTIONS="$OPTIONS" psql -t -p $MASTER_PORT -d template1 -c "delete from pg_database where datname='hcatalog';"
-check_error " delete hcatalog database in master"
-echo "Delete hacatalog database in master successfully."
+if $delete_hcatalog ; then
+    # 删除master节点hcatalog数据库
+    PGOPTIONS="$OPTIONS" psql -t -p $MASTER_PORT -d template1 -c "delete from pg_database where datname='hcatalog';"
+    check_error " delete hcatalog database in master"
+    echo "Delete hacatalog database in master successfully."
+fi
 
 # 删除segment节点hcatalog数据库
 gpssh -f $GPHOME/etc/slaves "source $GPHOME/greenplum_path.sh;PGOPTIONS='$OPTIONS' psql -p $SEGMENT_PORT -d template1 -c \"delete from pg_database where datname='hcatalog';\""
@@ -176,14 +183,6 @@ upgrade_catalog() {
         # 2、hive 安装
         install_function_by_database $1 "hive_install"
     
-        # json defered because oid issue
-        # 3、json相关元数据改动
-        #hawq ssh -f hostfile -e 'PGOPTIONS=\'-c gp_maintenance_conn=true\' psql -a -p $hawq_master_address_port -d template1 -f $GPHOME/share/postgresql/json_install.sql 2>&1 /tmp/json_install.out'
-        #grep ERROR /tmp/josn_install.out | wc -l
-        #if [[ num -ne 0 ]]
-        #echo 'Failed to register json function'
-        #fi
-    
         # 4、orc安装
         install_function_by_database $1 "orc_install"
     
@@ -203,10 +202,13 @@ upgrade_catalog() {
         echo "Add magma role column in pg_authid in database $1 in segment successfully."
     fi
     
-    # 7、magma函数注册
+    # 7、json函数注册
+    install_function_by_database $1 "json_install"
+
+    # 8、magma函数注册
     install_function_by_database $1 "magma_install"
     
-    # 8、监控函数注册
+    # 9、监控函数注册
     install_function_by_database $1 "monitor_install"
 }
 

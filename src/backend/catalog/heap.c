@@ -790,6 +790,21 @@ void CheckAttributeForOrc(TupleDesc desc) {
                       errmsg("array type of column \"%s\" is not supported yet",
                              NameStr(desc->attrs[i]->attname))));
     }
+
+    int32_t datatype =
+        (int32_t)(((Form_pg_attribute)(desc->attrs[i]))->atttypid);
+    int4 typmod = ((Form_pg_attribute)(desc->attrs[i]))->atttypmod;
+    if (HAWQ_TYPE_NUMERIC == datatype) {
+      int4 tmp_typmod = typmod - VARHDRSZ;
+      int precision = (tmp_typmod >> 16) & 0xffff;
+      int scale = tmp_typmod & 0xffff;
+      if (precision < 1 || 38 < precision)
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("ORC DECIMAL precision must be between 1 and 38")));
+      if (scale == 0)
+        ereport(NOTICE, (errmsg("Using a scale of zero for ORC DECIMAL")));
+    }
   }
 }
 

@@ -60,26 +60,26 @@ CREATE OR REPLACE FUNCTION pg_catalog.orc_insert_finish() RETURNS void
 AS '$libdir/orc.so', 'orc_insert_finish'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION hdfs_validate() RETURNS void
+CREATE OR REPLACE FUNCTION pg_catalog.hdfs_validate() RETURNS void
 AS '$libdir/exthdfs.so', 'hdfsprotocol_validate'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION hdfs_blocklocation() RETURNS void
+CREATE OR REPLACE FUNCTION pg_catalog.hdfs_blocklocation() RETURNS void
 AS '$libdir/exthdfs.so', 'hdfsprotocol_blocklocation'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION csv_in() RETURNS record
+CREATE OR REPLACE FUNCTION pg_catalog.csv_in() RETURNS record
 AS '$libdir/extfmtcsv.so', 'extfmtcsv_in'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION csv_out(record) RETURNS bytea
+CREATE OR REPLACE FUNCTION pg_catalog.csv_out(record) RETURNS bytea
 AS '$libdir/extfmtcsv.so', 'extfmtcsv_out'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION text_in() RETURNS record
+CREATE OR REPLACE FUNCTION pg_catalog.text_in() RETURNS record
 AS '$libdir/extfmtcsv.so', 'extfmttext_in'
 LANGUAGE C STABLE;
 
-CREATE OR REPLACE FUNCTION text_out(record) RETURNS bytea
+CREATE OR REPLACE FUNCTION pg_catalog.text_out(record) RETURNS bytea
 AS '$libdir/extfmtcsv.so', 'extfmttext_out'
 LANGUAGE C STABLE;

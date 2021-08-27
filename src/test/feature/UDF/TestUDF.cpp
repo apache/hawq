@@ -344,3 +344,12 @@ TEST_F(TestUDF, TestUDFDebug)
 	std::string ansfile="UDF/ans/test_udf_debug.ans";
 	util.execSpecificSQLFile(sqlfile, outfile, ansfile, "", "", "");
 }
+
+TEST_F(TestUDF, TestUDFWithAnalyzeMaintain)
+{
+	hawq::test::SQLUtility util;
+	std::string sqlfile="UDF/sql/test_udf_with_analyze.sql";
+	std::string outfile="UDF/ans/test_udf_with_analyze.out";
+	std::string ansfile="UDF/ans/test_udf_with_analyze.ans";
+	util.execSpecificSQLFile(sqlfile, outfile, ansfile, "", "", "");
+}

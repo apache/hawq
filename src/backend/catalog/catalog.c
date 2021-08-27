@@ -970,6 +970,9 @@ relationId == PgResQueueToastIndex ||
 Oid
 GetNewOid(Relation relation)
 {
+  if (gp_upgrade_mode && gen_new_oid_value != InvalidOid) {
+    return gen_new_oid_value;
+  }
 	Oid			newOid;
 	Oid			oidIndex;
 	Relation	indexrel;

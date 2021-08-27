@@ -313,6 +313,7 @@ extern int Debug_dtm_action_delay_ms;
 extern int Debug_dtm_action_segment;
 
 extern int default_hash_table_bucket_number;
+extern int gen_new_oid_value;
 extern int default_magma_hash_table_nvseg_per_seg;
 extern int hawq_auto_ha_timeout;
 extern int default_magma_block_size;  //  default magma block size
