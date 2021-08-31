@@ -5322,7 +5322,7 @@ else
 fi
 
 cat >>confdefs.h <<_ACEOF
-#define PG_VERSION_STR "PostgreSQL $PACKAGE_VERSION (Apache HAWQ 3.0.0.0) (Greenplum Database $GP_VERSION) on $host, compiled by $cc_string"
+#define PG_VERSION_STR "PostgreSQL $PACKAGE_VERSION (Apache HAWQ $HQ_VERSION) (Greenplum Database $GP_VERSION) on $host, compiled by $cc_string"
 _ACEOF
 
 
