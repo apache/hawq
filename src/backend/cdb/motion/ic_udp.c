@@ -5461,7 +5461,7 @@ checkExceptions(ChunkTransportState *transportStates, ChunkTransportStateEntry *
 		}
 	}
 
-	if ((retry & 0x3) == 0)
+	if ((retry & 0x3) == 2)
 	{
 		checkDeadlock(pEntry, conn);
 		checkRxThreadError();
@@ -5469,7 +5469,8 @@ checkExceptions(ChunkTransportState *transportStates, ChunkTransportStateEntry *
 	}
 
 	/* NIC on master (and thus the QD connection) may become bad, check it. */
-	if ((retry & 0x3f) == 0)
+	/* We check modulo 2 in case that 'retry' all less than 0x3f */
+	if ((retry & 0x3f) == 2)
 		checkQDConnectionAlive();
 }
 
