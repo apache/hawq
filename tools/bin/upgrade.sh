@@ -72,12 +72,22 @@ check_error() {
     fi
 }
 
+get_guc(){
+    local res=`grep -A 2 $1 $GPHOME/etc/hawq-site.xml| grep \<value\> | awk -F '[>]' '{print $2}'|awk -F '[<]' '{print $1}'`
+    echo $res
+}
 # check environment
 if [[ -z $GPHOME ]];then
     echo "Environment variable GPHOME is not set."
     exit 1
 fi
 source $GPHOME/greenplum_path.sh
+
+user=`whoami`
+if [[ "$user" != "gpadmin" ]]; then
+    echo "Failed! User running the script shoule be gpadmin."
+    exit 1
+fi
 
 # check master version
 version_str=`hawq --version`
@@ -89,11 +99,19 @@ if [[ "$version" != "$target_version" ]];then
 fi
 echo "Upgrade begin, you can find logs of each module in folder $HOME/hawqAdminLogs/upgrade"
 
-MASTER_HOST=`cat $GPHOME/etc/hawq-site.xml | grep -A 1 'hawq_master_address_host' | tail -n 1 | awk -F '[>]' '{print $2}'|awk -F '[<]' '{print $1}'`
-MASTER_PORT=`cat $GPHOME/etc/hawq-site.xml | grep -A 1 'hawq_master_address_port' | tail -n 1 | awk -F '[>]' '{print $2}'|awk -F '[<]' '{print $1}'`
-SEGMENT_PORT=`cat $GPHOME/etc/hawq-site.xml | grep -A 1 'hawq_segment_address_port' | tail -n 1 | awk -F '[>]' '{print $2}'|awk -F '[<]' '{print $1}'`
+MASTER_HOST=`get_guc "hawq_master_address_host"`
+MASTER_PORT=`get_guc "hawq_master_address_port"`
+SEGMENT_PORT=`get_guc "hawq_segment_address_port"`
+MASTER_TEMP_DIR=`get_guc "hawq_master_temp_directory"`
+SEGMENT_TEMP_DIR=`get_guc "hawq_segment_temp_directory"`
 SEGMENT_HOSTS=`cat $GPHOME/etc/slaves`
 OPTIONS='-c gp_maintenance_conn=true'
+
+# check whether all tmp dir exsits
+ls $MASTER_TEMP_DIR $SEGMENT_TEMP_DIR
+check_error "check master and segment temp dir on master"
+gpssh -f $GPHOME/etc/slaves "ls $MASTER_TEMP_DIR $SEGMENT_TEMP_DIR"
+check_error "check master and segment temp dir on all segments"
 
 # check whether all segments replaced with new binary
 result=`gpssh -f $GPHOME/etc/slaves "source $GPHOME/greenplum_path.sh;hawq --version;"`
