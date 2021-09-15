@@ -60,13 +60,15 @@ cat <<EOF
 PATH=\$GPHOME/bin:\$JAVA_HOME/bin:\$PATH
 EOF
 
+PERL_VERSION=`perl -v 2>/dev/null | sed -n 's/This is perl.*v[a-z ]*\([0-9]\.[0-9][0-9.]*\).*$/\1/p'`
+
 if [ "${PLAT}" = "Darwin" ] ; then
 	cat <<EOF
 DYLD_LIBRARY_PATH=\$GPHOME/lib:\$JAVA_HOME/jre/lib/amd64/server:\$DYLD_LIBRARY_PATH
 EOF
 else
     cat <<EOF
-LD_LIBRARY_PATH=\$GPHOME/lib:\$JAVA_HOME/jre/lib/amd64/server:\$LD_LIBRARY_PATH
+LD_LIBRARY_PATH=\$GPHOME/lib:\$GPHOME/lib/perl5/${PERL_VERSION}/x86_64-linux-thread-multi/CORE:\$JAVA_HOME/jre/lib/amd64/server:\$LD_LIBRARY_PATH
 EOF
 fi
 
@@ -83,6 +85,13 @@ EOF
     else
     cat <<EOF
 DYLD_LIBRARY_PATH=\$DEPENDENCY_PATH/lib:\$DYLD_LIBRARY_PATH
+EOF
+fi
+
+#setup PERLPATH
+if [ "${PLAT}" != "Darwin" ] ; then
+    cat <<EOF
+PERL5LIB=\$GPHOME/lib/perl5/${PERL_VERSION}:\$GPHOME/lib/perl5/site_perl/${PERL_VERSION}
 EOF
 fi
 
@@ -115,6 +124,7 @@ cat <<EOF
 export GPHOME
 export PATH
 export DEPENDENCY_PATH
+export PERL5LIB
 EOF
 
 if [ "${PLAT}" != "Darwin" ] ; then
