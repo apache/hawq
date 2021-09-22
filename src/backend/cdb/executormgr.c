@@ -355,10 +355,7 @@ executormgr_cancel(QueryExecutor *executor)
 
 	success = (PQcancel(cn, errbuf, sizeof(errbuf)) != 0);
 	if(!success){
-	  write_log("executormgr_cancel cancel (seg%d %s:%d) failed",
-	            executor->desc->segment->segindex,
-	            executor->desc->segment->hostname,
-	            executor->desc->segment->port);
+	  write_log("executormgr_cancel cancel failed, %s.", errbuf);
 	}
 
 #if 0
