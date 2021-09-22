@@ -468,10 +468,7 @@ bool executormgr_main_cancel(struct MyQueryExecutor *qe) {
   MemSet(errbuf, 0, sizeof(errbuf));
   bool success = (PQcancel(cn, errbuf, sizeof(errbuf)) != 0);
   if(!success){
-    write_log("executormgr_cancel cancel (seg%d %s:%d) failed",
-              qe->desc->segment->segindex,
-              qe->desc->segment->hostname,
-              qe->desc->segment->port);
+    write_log("executormgr_main_cancel cancel failed, %s.", errbuf);
   }
   PQfreeCancel(cn);
 
@@ -492,10 +489,7 @@ bool executormgr_proxy_cancel(struct MyQueryExecutor *qe, bool cancelRequest) {
     MemSet(errbuf, 0, sizeof(errbuf));
     success = (PQcancel(cn, errbuf, sizeof(errbuf)) != 0);
     if(!success){
-      write_log("executormgr_cancel cancel (seg%d %s:%d) failed",
-                qe->desc->segment->segindex,
-                qe->desc->segment->hostname,
-                qe->desc->segment->port);
+      write_log("executormgr_proxy_cancel cancel failed, %s.", errbuf);
     }
     PQfreeCancel(cn);
   }
