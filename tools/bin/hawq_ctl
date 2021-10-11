@@ -22,6 +22,7 @@ try:
     import os
     import sys
     import re
+    import math
     import logging, time
     import subprocess
     import threading
@@ -309,6 +310,26 @@ class HawqInit:
             logger.error("Set default_hash_table_bucket_number failed")
         return result
 
+    def set_main_disp_connections_per_thread(self):
+        if 'main_disp_connections_per_thread' in self.hawq_dict:
+            logger.info("main_disp_connections_per_thread is %s" % self.hawq_dict['main_disp_connections_per_thread'])
+            return 0
+
+        if int(self.hosts_count_number) == 0:
+            segments_num = 1
+        else:
+            segments_num = int(self.hosts_count_number)
+
+        main_disp_connections_per_thread = max(2, math.ceil(segments_num / 10))
+        logger.info("Set main_disp_connections_per_thread as: %s" % main_disp_connections_per_thread)
+        ignore_bad_hosts = '--ignore-bad-hosts' if opts.ignore_bad_hosts else ''
+        cmd = "hawq config -c main_disp_connections_per_thread -v %s --skipvalidation -q %s > /dev/null" % \
+               (main_disp_connections_per_thread, ignore_bad_hosts)
+        result = local_ssh(cmd, logger)
+        if result != 0:
+            logger.error("Set main_disp_connections_per_thread failed")
+        return result
+
     def _get_master_init_cmd(self):
         cmd = "%s/bin/lib/hawqinit.sh master '%s' '%s'" % \
                 (self.GPHOME, self.GPHOME, self.hawq_init_with_hdfs)
@@ -453,6 +474,7 @@ class HawqInit:
     def _init_cluster(self):
         logger.info("%s segment hosts defined" % self.hosts_count_number)
         check_return_code(self.set_default_hash_table_bucket_number())
+        check_return_code(self.set_main_disp_connections_per_thread())
         check_return_code(self.set_replace_datanode_on_failure())
         if self.with_magma:
             check_return_code(self.set_init_with_magma())
@@ -523,6 +545,7 @@ class HawqInit:
             check_return_code(self.set_new_standby_host())
             logger.info("%s segment hosts defined" % self.hosts_count_number)
             check_return_code(self.set_default_hash_table_bucket_number())
+            check_return_code(self.set_main_disp_connections_per_thread())
             check_return_code(self.set_replace_datanode_on_failure())
             logger.info("Start to init master")
             cmd = self._get_master_init_cmd()
