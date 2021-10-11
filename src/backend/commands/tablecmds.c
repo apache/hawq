@@ -1183,7 +1183,7 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 	if (filespace_name)
 		pfree(filespace_name);
 
-	if (isExternalHdfs)
+	if (isExternalHdfs && iswritable)
 	{
 		if (list_length(exttypeDesc->location_list)!= 1)
 			ereport(ERROR,
