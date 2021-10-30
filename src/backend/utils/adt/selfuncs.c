@@ -3884,7 +3884,7 @@ examine_variable(PlannerInfo *root, Node *node, int varRelid,
 						 * should match has_unique_index().
 						 */
 						if (index->unique &&
-							index->ncolumns == 1 &&
+							index->nkeycolumns == 1 &&
 							index->indpred == NIL)
 							vardata->isunique = true;
 						/* Has it got stats? */

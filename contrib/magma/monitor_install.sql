@@ -1,12 +1,6 @@
 ------------------------------------------------------------------
 -- hawq status
 ------------------------------------------------------------------
-CREATE FUNCTION pg_catalog.hawq_magma_status() RETURNS SETOF record LANGUAGE internal VOLATILE STRICT AS 'hawq_magma_status' WITH (OID=5085, DESCRIPTION="Return magma node information");
-
-CREATE OR REPLACE FUNCTION pg_catalog.magma_getstatus() RETURNS void
-AS '$libdir/magma.so', 'magma_getstatus'
-LANGUAGE C STABLE;
-
 CREATE VIEW pg_catalog.hawq_magma_status AS
     SELECT * FROM hawq_magma_status() AS s
     (node text,

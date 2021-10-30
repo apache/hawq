@@ -1365,7 +1365,8 @@ RelationInitIndexAccessInfo(Relation relation)
 	Oid		   *operator;
 	RegProcedure *support;
 	FmgrInfo   *supportinfo;
-	int			natts;
+	int     indnatts;
+	int     indnkeyatts;
 	uint16		amstrategies;
 	uint16		amsupport;
 
@@ -1412,10 +1413,11 @@ RelationInitIndexAccessInfo(Relation relation)
 	ReleaseSysCache(tuple);
 	relation->rd_am = aform;
 
-	natts = relation->rd_rel->relnatts;
-	if (natts != relation->rd_index->indnatts)
-		elog(ERROR, "relnatts disagrees with indnatts for index %u",
+	indnatts = RelationGetNumberOfAttributes(relation);
+	if (indnatts != IndexRelationGetNumberOfAttributes(relation))
+	  elog(ERROR, "relnatts disagrees with indnatts for index %u",
 			 RelationGetRelid(relation));
+	indnkeyatts = IndexRelationGetNumberOfKeyAttributes(relation);
 	amstrategies = aform->amstrategies;
 	amsupport = aform->amsupport;
 
@@ -1435,7 +1437,8 @@ RelationInitIndexAccessInfo(Relation relation)
 	relation->rd_indexcxt = indexcxt;
 
 	/*
-	 * Allocate arrays to hold data
+	 * Allocate arrays to hold data. Opclasses are not used for included
+	 * columns, so allocate them for indnkeyatts only.
 	 */
 	relation->rd_aminfo = (RelationAmInfo *)
 		MemoryContextAllocZero(indexcxt, sizeof(RelationAmInfo));
@@ -1443,13 +1446,13 @@ RelationInitIndexAccessInfo(Relation relation)
 	if (amstrategies > 0)
 		operator = (Oid *)
 			MemoryContextAllocZero(indexcxt,
-								   natts * amstrategies * sizeof(Oid));
+			                       indnkeyatts * amstrategies * sizeof(Oid));
 	else
 		operator = NULL;
 
 	if (amsupport > 0)
 	{
-		int			nsupport = natts * amsupport;
+		int			nsupport = indnkeyatts * amsupport;
 
 		support = (RegProcedure *)
 			MemoryContextAllocZero(indexcxt, nsupport * sizeof(RegProcedure));
@@ -1472,7 +1475,7 @@ RelationInitIndexAccessInfo(Relation relation)
 	 */
 	IndexSupportInitialize(relation->rd_indclass,
 						   operator, support,
-						   amstrategies, amsupport, natts);
+						   amstrategies, amsupport, indnkeyatts);
 
 	/*
 	 * expressions and predicate cache will be filled later

@@ -150,9 +150,8 @@ ifeq ($(with_orc), yes)
 	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_install.sql '$(DESTDIR)$(datadir)/orc_install.sql'
 	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/hive_install.sql '$(DESTDIR)$(datadir)/hive_install.sql'
 	$(INSTALL_DATA) $(srcdir)/../../../contrib/orc/orc_uninstall.sql '$(DESTDIR)$(datadir)/orc_uninstall.sql'
-	$(INSTALL_SCRIPT) $(srcdir)/../../../contrib/oushu/orc_debug_metadata.py '$(DESTDIR)$(bindir)/orc_debug_metadata.py'
-	$(INSTALL_SCRIPT) $(srcdir)/../../../contrib/oushu/orc_debug_statistics.py '$(DESTDIR)$(bindir)/orc_debug_statistics.py'
-	$(INSTALL_DATA) $(srcdir)/../../../contrib/oushu/load_orc_debug_udf.sql '$(DESTDIR)$(datadir)/load_orc_debug_udf.sql'
+	$(INSTALL_SCRIPT) $(srcdir)/../../../contrib/hornet/orc_debug_metadata.py '$(DESTDIR)$(bindir)/orc_debug_metadata.py'
+	$(INSTALL_SCRIPT) $(srcdir)/../../../contrib/hornet/orc_debug_statistics.py '$(DESTDIR)$(bindir)/orc_debug_statistics.py'
 endif
 	$(INSTALL_DATA) $(srcdir)/sql_features.txt '$(DESTDIR)$(datadir)/sql_features.txt'
 	$(INSTALL_DATA) $(call vpathsearch,gp_toolkit.sql) '$(DESTDIR)$(datadir)/gp_toolkit.sql'

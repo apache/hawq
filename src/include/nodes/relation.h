@@ -530,7 +530,9 @@ typedef struct IndexOptInfo
 	/* index descriptor information */
 	int			ncolumns;		/* number of columns in index */
 	Oid		   *classlist;		/* OIDs of operator classes for columns */
-	int		   *indexkeys;		/* column numbers of index's keys, or 0 */
+	int     nkeycolumns;  /* number of key columns in index */
+	int      *indexkeys;    /* column numbers of index's attributes both
+                 * key and included columns, or 0 */
 	Oid		   *ordering;		/* OIDs of sort operators for each column */
 	Oid			relam;			/* OID of the access method (in pg_am) */
 

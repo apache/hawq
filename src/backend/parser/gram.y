@@ -309,6 +309,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 				opt_column_list columnList columnListPlus opt_name_list exttab_auth_list keyvalue_list
 				opt_inherited_column_list
 				sort_clause opt_sort_clause sortby_list index_params
+				opt_include opt_c_include index_including_params
 				name_list from_clause from_list opt_array_bounds
 				qualified_name_list any_name any_name_list
 				any_operator expr_list attrs
@@ -528,7 +529,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 	HANDLER HASH HAVING HEADER_P HOLD HOST HOUR_P
 
-	IDENTITY_P IF_P  IGNORE_P ILIKE IMMEDIATE IMMUTABLE IMPLICIT_P IN_P INCLUDING
+	IDENTITY_P IF_P  IGNORE_P ILIKE IMMEDIATE IMMUTABLE IMPLICIT_P IN_P INCLUDE INCLUDING
 	INCLUSIVE
 	INCREMENT
 	INDEX INDEXES INHERIT INHERITS INITIALLY INNER_P INOUT INPUT_P
@@ -3872,7 +3873,7 @@ ConstraintElem:
 					n->indexspace = NULL;
 					$$ = (Node *)n;
 				}
-			| UNIQUE '(' columnList ')' opt_definition OptConsTableSpace
+			| UNIQUE '(' columnList ')' opt_c_include opt_definition OptConsTableSpace
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_UNIQUE;
@@ -3880,11 +3881,12 @@ ConstraintElem:
 					n->raw_expr = NULL;
 					n->cooked_expr = NULL;
 					n->keys = $3;
-					n->options = $5;
-					n->indexspace = $6;
+					n->including = $5;
+					n->options = $6;
+					n->indexspace = $7;
 					$$ = (Node *)n;
 				}
-			| PRIMARY KEY '(' columnList ')' opt_definition OptConsTableSpace
+			| PRIMARY KEY '(' columnList ')' opt_c_include opt_definition OptConsTableSpace
 				{
 					Constraint *n = makeNode(Constraint);
 					n->contype = CONSTR_PRIMARY;
@@ -3892,8 +3894,9 @@ ConstraintElem:
 					n->raw_expr = NULL;
 					n->cooked_expr = NULL;
 					n->keys = $4;
-					n->options = $6;
-					n->indexspace = $7;
+					n->including = $6;
+					n->options = $7;
+					n->indexspace = $8;
 					$$ = (Node *)n;
 				}
 			| FOREIGN KEY '(' columnList ')' REFERENCES qualified_name
@@ -3955,6 +3958,11 @@ columnElem: ColId
 					$$ = (Node *) makeString($1);
 				}
 		;
+
+opt_c_include:	INCLUDE '(' columnList ')'			{ $$ = $3; }
+			 |		/* EMPTY */						{ $$ = NIL; }
+		;
+
 
 key_match:  MATCH FULL
 			{
@@ -6962,7 +6970,7 @@ opt_granted_by: GRANTED BY RoleId						{ $$ = $3; }
 
 IndexStmt:	CREATE index_opt_unique INDEX index_name
 			ON qualified_name access_method_clause '(' index_params ')'
-			opt_definition OptTableSpace where_clause
+			opt_include opt_definition OptTableSpace where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
@@ -6971,15 +6979,16 @@ IndexStmt:	CREATE index_opt_unique INDEX index_name
 					n->relation = $6;
 					n->accessMethod = $7;
 					n->indexParams = $9;
-					n->options = $11;
-					n->tableSpace = $12;
-					n->whereClause = $13;
+					n->indexIncludingParams = $11;
+					n->options = $12;
+					n->tableSpace = $13;
+					n->whereClause = $14;
 					n->idxOids = NULL;
 					$$ = (Node *)n;
 				}
 			| CREATE index_opt_unique INDEX CONCURRENTLY index_name
 			ON qualified_name access_method_clause '(' index_params ')'
-			opt_definition OptTableSpace where_clause
+			opt_include opt_definition OptTableSpace where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
@@ -6988,9 +6997,10 @@ IndexStmt:	CREATE index_opt_unique INDEX index_name
 					n->relation = $7;
 					n->accessMethod = $8;
 					n->indexParams = $10;
-					n->options = $12;
-					n->tableSpace = $13;
-					n->whereClause = $14;
+					n->indexIncludingParams = $12;
+					n->options = $13;
+					n->tableSpace = $14;
+					n->whereClause = $15;
 
                     if (!gp_create_index_concurrently)
 					{
@@ -7047,6 +7057,15 @@ index_elem:	ColId opt_class
 					$$->opclass = $4;
 				}
 		;
+
+opt_include:		INCLUDE '(' index_including_params ')'			{ $$ = $3; }
+			 |		/* EMPTY */						{ $$ = NIL; }
+		;
+
+index_including_params:	index_elem						{ $$ = list_make1($1); }
+			| index_including_params ',' index_elem		{ $$ = lappend($1, $3); }
+		;
+
 
 opt_class:	any_name								{ $$ = $1; }
 			| USING any_name						{ $$ = $2; }
@@ -12867,6 +12886,7 @@ unreserved_keyword:
 			| IMMEDIATE
 			| IMMUTABLE
 			| IMPLICIT_P
+			| INCLUDE
 			| INCLUDING
 			| INCLUSIVE
 			| INCREMENT

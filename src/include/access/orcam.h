@@ -33,14 +33,14 @@ typedef struct OrcInsertDescData {
   Relation rel;
   int32 segno;
   int64 insertCount;
-  OrcFormatData* orcFormatData;
+  OrcFormatData *orcFormatData;
   QueryContextDispatchingSendBack sendback;
   MemoryContext memCxt;
 } OrcInsertDescData;
 
 typedef struct OrcScanDescData {
   Relation rel;
-  OrcFormatData* orcFormatData;
+  OrcFormatData *orcFormatData;
   ItemPointerData cdb_fake_ctid;
 } OrcScanDescData;
 
@@ -48,7 +48,7 @@ typedef struct OrcDeleteDescData {
   Relation rel;
   int32 newSegno;
   Datum rowId;
-  OrcFormatData* orcFormatData;
+  OrcFormatData *orcFormatData;
   QueryContextDispatchingSendBack sendback;
   bool directDispatch;
 } OrcDeleteDescData;
@@ -58,51 +58,51 @@ typedef struct OrcUpdateDescData {
   int32 newSegno;
   int64 updateCount;
   Datum rowId;
-  TupleTableSlot* slot;
-  OrcFormatData* orcFormatData;
+  TupleTableSlot *slot;
+  OrcFormatData *orcFormatData;
   QueryContextDispatchingSendBack sendback;
   bool directDispatch;
   MemoryContext memCxt;
 } OrcUpdateDescData;
 
 // insert
-extern OrcInsertDescData* orcBeginInsert(Relation rel,
-                                         ResultRelSegFileInfo* segfileinfo);
-extern Oid orcInsert(OrcInsertDescData* insertDesc, TupleTableSlot* slot);
-extern Oid orcInsertValues(OrcInsertDescData* insertDesc, Datum* values,
-                           bool* nulls, TupleDesc tupleDesc);
-extern void orcEndInsert(OrcInsertDescData* insertDesc);
+extern OrcInsertDescData *orcBeginInsert(Relation rel,
+                                         ResultRelSegFileInfo *segfileinfo);
+extern Oid orcInsert(OrcInsertDescData *insertDesc, TupleTableSlot *slot);
+extern Oid orcInsertValues(OrcInsertDescData *insertDesc, Datum *values,
+                           bool *nulls, TupleDesc tupleDesc);
+extern void orcEndInsert(OrcInsertDescData *insertDesc);
 
 // scan
-extern void orcBeginScan(struct ScanState* scanState);
-extern TupleTableSlot* orcScanNext(struct ScanState* scanState);
-extern void orcEndScan(struct ScanState* scanState);
-extern void orcReScan(struct ScanState* scanState);
+extern void orcBeginScan(struct ScanState *scanState);
+extern TupleTableSlot *orcScanNext(struct ScanState *scanState);
+extern void orcEndScan(struct ScanState *scanState);
+extern void orcReScan(struct ScanState *scanState);
 
-extern OrcScanDescData* orcBeginRead(Relation rel, Snapshot snapshot,
-                                     TupleDesc desc, List* fileSplits,
-                                     bool* colToReads, void* pushDown);
-extern void orcReadNext(OrcScanDescData* scanData, TupleTableSlot* slot);
-extern void orcEndRead(OrcScanDescData* scanData);
-extern void orcResetRead(OrcScanDescData* scanData);
+extern OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot,
+                                     TupleDesc desc, List *fileSplits,
+                                     bool *colToReads, void *pushDown);
+extern void orcReadNext(OrcScanDescData *scanData, TupleTableSlot *slot);
+extern void orcEndRead(OrcScanDescData *scanData);
+extern void orcResetRead(OrcScanDescData *scanData);
 
 // delete
-extern OrcDeleteDescData* orcBeginDelete(Relation rel, List* fileSplits,
-                                         List* relFileNodeInfo,
+extern OrcDeleteDescData *orcBeginDelete(Relation rel, List *fileSplits,
+                                         List *relFileNodeInfo,
                                          bool orderedRowId,
                                          bool directDispatch);
-extern void orcDelete(OrcDeleteDescData* deleteDesc);
-extern uint64 orcEndDelete(OrcDeleteDescData* deleteDesc);
+extern void orcDelete(OrcDeleteDescData *deleteDesc);
+extern uint64 orcEndDelete(OrcDeleteDescData *deleteDesc);
 
 // update
-extern OrcUpdateDescData* orcBeginUpdate(Relation rel, List* fileSplits,
-                                         List* relFileNodeInfo,
+extern OrcUpdateDescData *orcBeginUpdate(Relation rel, List *fileSplits,
+                                         List *relFileNodeInfo,
                                          bool orderedRowId,
                                          bool directDispatch);
-extern void orcUpdate(OrcUpdateDescData* updateDesc);
-extern uint64 orcEndUpdate(OrcUpdateDescData* updateDesc);
+extern void orcUpdate(OrcUpdateDescData *updateDesc);
+extern uint64 orcEndUpdate(OrcUpdateDescData *updateDesc);
 
 // utils
-extern bool isDirectDispatch(Plan* plan);
+extern bool isDirectDispatch(Plan *plan);
 
 #endif /* ORCAM_H_ */

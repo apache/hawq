@@ -2013,6 +2013,7 @@ _outIndexOptInfo(StringInfo str, IndexOptInfo *node)
 	WRITE_UINT_FIELD(pages);
 	WRITE_FLOAT_FIELD(tuples, "%.0f");
 	WRITE_INT_FIELD(ncolumns);
+	WRITE_INT_FIELD(nkeycolumns);
 
 	appendStringInfoLiteral(str, " :classlist");
 	for (i = 0; i < node->ncolumns; i++)
@@ -2262,6 +2263,7 @@ _outIndexStmt(StringInfo str, IndexStmt *node)
 	WRITE_STRING_FIELD(accessMethod);
 	WRITE_STRING_FIELD(tableSpace);
 	WRITE_NODE_FIELD(indexParams);
+	WRITE_NODE_FIELD(indexIncludingParams);
 	WRITE_NODE_FIELD(options);
 
 	WRITE_NODE_FIELD(whereClause);
@@ -3854,6 +3856,7 @@ _outConstraint(StringInfo str, Constraint *node)
 		case CONSTR_PRIMARY:
 			appendStringInfoLiteral(str, "PRIMARY_KEY");
 			WRITE_NODE_FIELD(keys);
+			WRITE_NODE_FIELD(including);
 			WRITE_NODE_FIELD(options);
 			WRITE_STRING_FIELD(indexspace);
 			break;
@@ -3861,6 +3864,7 @@ _outConstraint(StringInfo str, Constraint *node)
 		case CONSTR_UNIQUE:
 			appendStringInfoLiteral(str, "UNIQUE");
 			WRITE_NODE_FIELD(keys);
+			WRITE_NODE_FIELD(including);
 			WRITE_NODE_FIELD(options);
 			WRITE_STRING_FIELD(indexspace);
 			break;

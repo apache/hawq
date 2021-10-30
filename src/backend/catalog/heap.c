@@ -2986,6 +2986,7 @@ StoreRelCheck(Relation rel, char *ccname, char *ccbin, Oid conOid)
 								   RelationGetRelid(rel),		/* relation */
 								   attNos,		/* attrs in the constraint */
 								   keycount,		/* # attrs in the constraint */
+								   keycount,
 								   InvalidOid,	/* not a domain constraint */
 								   InvalidOid,	/* Foreign key fields */
 								   NULL,

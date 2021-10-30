@@ -482,19 +482,19 @@ BEGIN {
 		else if (oid == 668)
 			print "STRING_BPCHAR,";
 		else if (oid == 873)
-			printf "STRING_LPAD,";
+			print "STRING_LPAD,";
 		else if (oid == 874)
-			printf "STRING_RPAD,";
+			print "STRING_RPAD,";
 		else if (oid == 879)
-			printf "STRING_LPAD_NOFILL,";
+			print "STRING_LPAD_NOFILL,";
 		else if (oid == 880)
-			printf "STRING_RPAD_NOFILL,";
+			print "STRING_RPAD_NOFILL,";
 		else if (oid == 2557)
 			print "INT_TO_BOOLEAN,";
 		else if (oid == 2558)
 			print "BOOLEAN_TO_INT,";
 		else if (oid == 878)
-			printf "STRING_TRANSLATE,";
+			print "STRING_TRANSLATE,";
 		
 		else if (oid == 221 || oid == 1395)
 			print "DOUBLE_ABS,";

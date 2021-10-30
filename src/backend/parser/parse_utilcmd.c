@@ -194,9 +194,10 @@ generateClonedIndexStmt(CreateStmtContext *cxt, Relation source_idx,
 
 	/* Build the list of IndexElem */
 	index->indexParams = NIL;
+	index->indexIncludingParams = NIL;
 
 	indexpr_item = list_head(indexprs);
-	for (keyno = 0; keyno < idxrec->indnatts; keyno++)
+	for (keyno = 0; keyno < idxrec->indnkeyatts; keyno++)
 	{
 		IndexElem  *iparam;
 		AttrNumber	attnum = idxrec->indkey.values[keyno];
@@ -237,6 +238,33 @@ generateClonedIndexStmt(CreateStmtContext *cxt, Relation source_idx,
 		iparam->opclass = get_opclass(indclass->values[keyno], keycoltype);
 
 		index->indexParams = lappend(index->indexParams, iparam);
+	}
+
+	/* Handle included columns separately */
+	for (keyno = idxrec->indnkeyatts; keyno < idxrec->indnatts; keyno++)
+	{
+	  IndexElem  *iparam;
+	  AttrNumber  attnum = idxrec->indkey.values[keyno];
+
+	  iparam = makeNode(IndexElem);
+
+	  if (AttributeNumberIsValid(attnum))
+	  {
+	    /* Simple index column */
+	    char     *attname;
+
+	    attname = get_attname(indrelid, attnum);
+	    keycoltype = get_atttype(indrelid, attnum);
+
+	    iparam->name = attname;
+	    iparam->expr = NULL;
+	  }
+	  else
+	    ereport(ERROR,
+	            (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+	                errmsg("expressions are not supported in included columns")));
+
+	  index->indexIncludingParams = lappend(index->indexIncludingParams, iparam);
 	}
 
 	/* Copy reloptions if any */
@@ -315,6 +343,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 {
 	IndexStmt  *index;
 	ListCell   *keys;
+	ListCell   *lc;
 	IndexElem  *iparam;
 
 	index = makeNode(IndexStmt);
@@ -350,6 +379,7 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 	index->options = constraint->options;
 	index->tableSpace = constraint->indexspace;
 	index->indexParams = NIL;
+	index->indexIncludingParams = NIL;
 	index->whereClause = NULL;
 	index->concurrent = false;
 
@@ -473,6 +503,75 @@ transformIndexConstraint(Constraint *constraint, CreateStmtContext *cxt)
 		iparam->expr = NULL;
 		iparam->opclass = NIL;
 		index->indexParams = lappend(index->indexParams, iparam);
+	}
+
+	/* Add included columns to index definition */
+	foreach(lc, constraint->including)
+	{
+	  char     *key = strVal(lfirst(lc));
+	  bool    found = false;
+	  ColumnDef  *column = NULL;
+	  ListCell   *columns;
+	  IndexElem  *iparam;
+	  foreach(columns, cxt->columns)
+	  {
+	    column = (ColumnDef *) lfirst(columns);
+	    if (strcmp(column->colname, key) == 0)
+	    {
+	      found = true;
+	      break;
+	    }
+	    if (!found)
+	    {
+	      if (SystemAttributeByName(key, cxt->hasoids) != NULL)
+	      {
+	        found = true;
+	      }
+	      else if (cxt->inhRelations)
+	      {
+	        /* try inherited tables */
+	        ListCell   *inher;
+	        foreach(inher, cxt->inhRelations)
+	        {
+	          RangeVar   *inh = (RangeVar *) lfirst(inher);
+
+	          Relation  rel;
+	          int     count;
+
+	          rel = heap_openrv(inh, AccessShareLock);
+	          /* check user requested inheritance from valid relkind */
+	          if (rel->rd_rel->relkind != RELKIND_RELATION)
+	            ereport(ERROR, (errcode(ERRCODE_WRONG_OBJECT_TYPE),
+	                errmsg("inherited relation \"%s\" is not a table", inh->relname)));
+	          for (count = 0; count < rel->rd_att->natts; count++)
+	          {
+	            Form_pg_attribute inhattr = rel->rd_att->attrs[count];
+	            char     *inhname = NameStr(inhattr->attname);
+
+	            if (inhattr->attisdropped)
+	              continue;
+	            if (strcmp(key, inhname) == 0)
+	            {
+	              found = true;
+	            }
+	          }
+	          heap_close(rel, NoLock);
+	          if (found)
+	            break;
+	        }
+	      }
+	    }
+	  }
+	  if (!found && !cxt->isalter)
+	    ereport(ERROR,
+	            (errcode(ERRCODE_UNDEFINED_COLUMN), errmsg("column \"%s\" named in key does not exist", key),
+	                errOmitLocation(true)));
+	  /* OK, add it to the index definition */
+	  iparam = makeNode(IndexElem);
+	  iparam->name = pstrdup(key);
+	  iparam->expr = NULL;
+	  iparam->opclass = NIL;
+	  index->indexIncludingParams = lappend(index->indexIncludingParams, iparam);
 	}
 
 	return index;
@@ -772,6 +871,7 @@ transformIndexConstraints(ParseState *pstate, CreateStmtContext *cxt, bool mayDe
 			IndexStmt  *priorindex = lfirst(k);
 
 			if (equal(index->indexParams, priorindex->indexParams) &&
+			    equal(index->indexIncludingParams, priorindex->indexIncludingParams) &&
 				equal(index->whereClause, priorindex->whereClause) &&
 				strcmp(index->accessMethod, priorindex->accessMethod) == 0)
 			{

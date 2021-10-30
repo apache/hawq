@@ -330,7 +330,7 @@ build_minmax_path(PlannerInfo *root, RelOptInfo *rel, MinMaxAggInfo *info)
 		 * designed index, there could be multiple matches, but we only care
 		 * about the first one.)
 		 */
-		for (indexcol = 0; indexcol < index->ncolumns; indexcol++)
+		for (indexcol = 0; indexcol < index->nkeycolumns; indexcol++)
 		{
 			indexscandir = match_agg_to_index_col(info, index, indexcol);
 			if (!ScanDirectionIsNoMovement(indexscandir))

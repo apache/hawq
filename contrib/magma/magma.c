@@ -327,6 +327,7 @@ static inline List *SortMagmaFilesByRangeId(List *files, int32_t length) {
  * Get magma node status
  */
 Datum magma_getstatus(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   elog(DEBUG1, "magma_getstatus begin");
   ExtProtocolMagmaInfo magmadata =
       palloc0(sizeof(ExtProtocolMagmaStatusData));
@@ -351,6 +352,7 @@ Datum magma_getstatus(PG_FUNCTION_ARGS) {
  * Implementation of blocklocation for magma protocol in pluggable storage
  */
 Datum magma_protocol_blocklocation(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   elog(DEBUG3, "magma_protocol_blocklocation begin");
   /*
    * Step 1. prepare instances
@@ -473,6 +475,7 @@ Datum magma_protocol_blocklocation(PG_FUNCTION_ARGS) {
  * Implementation of tablesize caculation for magma protocol in pluggable storage
  */
 Datum magma_protocol_tablesize(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   elog(DEBUG3, "magma_protocol_tablesize begin");
   /*
    * Step 1. prepare instances
@@ -547,6 +550,7 @@ Datum magma_protocol_tablesize(PG_FUNCTION_ARGS) {
  */
 
 Datum magma_protocol_databasesize(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   elog(DEBUG3, "magma_protocol_databasesize begin");
   /*
    * Step 1. prepare instances
@@ -595,6 +599,7 @@ Datum magma_protocol_databasesize(PG_FUNCTION_ARGS) {
  */
 
 Datum magma_protocol_validate(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   elog(DEBUG3, "magma_protocol_validate begin");
 
   /* Check action to be performed */
@@ -638,6 +643,7 @@ Datum magma_protocol_validate(PG_FUNCTION_ARGS) {
  * magma_validate_interfaces(char *formatName)
  */
 Datum magma_validate_interfaces(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorageValidator psv_interface = (PlugStorageValidator)(fcinfo->context);
 
   if (pg_strncasecmp(psv_interface->format_name, "magma",
@@ -658,6 +664,7 @@ Datum magma_validate_interfaces(PG_FUNCTION_ARGS) {
  *                     bool isWritable)
  */
 Datum magma_validate_options(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorageValidator psv = (PlugStorageValidator)(fcinfo->context);
 
   List *format_opts = psv->format_opts;
@@ -743,6 +750,7 @@ Datum magma_validate_options(PG_FUNCTION_ARGS) {
  * magma_validate_encodings(char *encodingName)
  */
 Datum magma_validate_encodings(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorageValidator psv = (PlugStorageValidator)(fcinfo->context);
   char *encoding_name = psv->encoding_name;
 
@@ -764,6 +772,7 @@ Datum magma_validate_encodings(PG_FUNCTION_ARGS) {
  * magma_validate_datatypes(TupleDesc tupDesc)
  */
 Datum magma_validate_datatypes(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorageValidator psv = (PlugStorageValidator)(fcinfo->context);
   TupleDesc tup_desc = psv->tuple_desc;
 
@@ -807,6 +816,7 @@ Datum magma_validate_datatypes(PG_FUNCTION_ARGS) {
 }
 
 Datum magma_createindex(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   char *dbname = ps->ps_db_name;
   char *schemaname = ps->ps_schema_name;
@@ -815,9 +825,9 @@ Datum magma_createindex(PG_FUNCTION_ARGS) {
   MagmaSnapshot *snapshot = &(ps->ps_snapshot);
 
   elog(DEBUG1, "create index use index name:%s, index type:%s,"
-      " columns counts:%d, unique:%d, primary:%d",
+      " columns counts:%d, key counts:%d, unique:%d, primary:%d",
       magmaidx->indexName, magmaidx->indexType, magmaidx->colCount,
-      magmaidx->unique, magmaidx->primary);
+      magmaidx->keynums, magmaidx->unique, magmaidx->primary);
 
   /* create index in magma */
   MagmaClientC *client = create_magma_client_instance();
@@ -833,6 +843,7 @@ Datum magma_createindex(PG_FUNCTION_ARGS) {
 }
 
 Datum magma_dropindex(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   char *dbname = ps->ps_db_name;
   char *schemaname = ps->ps_schema_name;
@@ -856,6 +867,7 @@ Datum magma_dropindex(PG_FUNCTION_ARGS) {
 }
 
 Datum magma_reindex_index(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   char *dbname = ps->ps_db_name;
   char *schemaname = ps->ps_schema_name;
@@ -891,6 +903,7 @@ Datum magma_reindex_index(PG_FUNCTION_ARGS) {
  *                IndexStmt *primarykey)
  */
 Datum magma_createtable(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
 
   char *dbname = ps->ps_db_name;
@@ -1030,6 +1043,7 @@ Datum magma_createtable(PG_FUNCTION_ARGS) {
  *              char *tablename)
  */
 Datum magma_droptable(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
 
   // ExtTableEntry *ete = ps->ps_exttable;
@@ -1054,6 +1068,7 @@ Datum magma_droptable(PG_FUNCTION_ARGS) {
 }
 
 Datum magma_beginscan(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalScan *ext_scan = ps->ps_ext_scan;
   ScanState *scan_state = ps->ps_scan_state;
@@ -1335,6 +1350,7 @@ void free_common_plan_context(CommonPlanContext *ctx) {
  *                 ExternalScanState *extScanState)
  */
 Datum magma_getnext_init(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   // PlanState *plan_state = ps->ps_plan_state;
   // ExternalScanState *ext_scan_state = ps->ps_ext_scan_state;
@@ -1365,6 +1381,7 @@ Datum magma_getnext_init(PG_FUNCTION_ARGS) {
 }
 
 Datum magma_getnext(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
   GlobalFormatUserData *user_data =
@@ -1481,6 +1498,7 @@ Datum magma_getnext(PG_FUNCTION_ARGS) {
  * magma_rescan(FileScanDesc scan)
  */
 Datum magma_rescan(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
   MagmaSnapshot *snapshot = &(ps->ps_snapshot);
@@ -1565,6 +1583,7 @@ Datum magma_rescan(PG_FUNCTION_ARGS) {
  * magma_endscan(FileScanDesc scan)
  */
 Datum magma_endscan(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
 
@@ -1632,6 +1651,7 @@ Datum magma_endscan(PG_FUNCTION_ARGS) {
  * magma_stopscan(FileScanDesc scan)
  */
 Datum magma_stopscan(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
   GlobalFormatUserData *user_data =
@@ -1683,6 +1703,7 @@ Datum magma_stopscan(PG_FUNCTION_ARGS) {
  * magma_begindelete(Relation relation)
  */
 Datum magma_begindelete(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   Relation relation = ps->ps_relation;
   char *serializeSchema = ps->ps_magma_serializeSchema;
@@ -1901,6 +1922,7 @@ Datum magma_begindelete(PG_FUNCTION_ARGS) {
  *           TupleTableSlot *tupTableSlot)
  */
 Datum magma_delete(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc edd = ps->ps_ext_delete_desc;
   TupleTableSlot *tts = ps->ps_tuple_table_slot;
@@ -2071,6 +2093,7 @@ Datum magma_delete(PG_FUNCTION_ARGS) {
  * magma_enddelete(ExternalInsertDesc extDeleteDesc)
  */
 Datum magma_enddelete(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc edd = ps->ps_ext_delete_desc;
 
@@ -2121,6 +2144,7 @@ Datum magma_enddelete(PG_FUNCTION_ARGS) {
  * magma_beginupdate(Relation relation)
  */
 Datum magma_beginupdate(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   Relation relation = ps->ps_relation;
   char *serializeSchema = ps->ps_magma_serializeSchema;
@@ -2343,6 +2367,7 @@ Datum magma_beginupdate(PG_FUNCTION_ARGS) {
  *           TupleTableSlot *tupTableSlot)
  */
 Datum magma_update(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc eud = ps->ps_ext_update_desc;
   TupleTableSlot *tts = ps->ps_tuple_table_slot;
@@ -2522,6 +2547,7 @@ Datum magma_update(PG_FUNCTION_ARGS) {
  * magma_endupdate(ExternalInsertDesc extUpdDesc)
  */
 Datum magma_endupdate(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc eud = ps->ps_ext_update_desc;
 
@@ -2570,6 +2596,7 @@ Datum magma_endupdate(PG_FUNCTION_ARGS) {
  *                char *formatterName)
  */
 Datum magma_insert_init(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   Relation relation = ps->ps_relation;
   int formatterType = ps->ps_formatter_type;
@@ -2825,6 +2852,7 @@ Datum magma_insert_init(PG_FUNCTION_ARGS) {
  *           TupleTableSlot *tupTableSlot)
  */
 Datum magma_insert(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc eid = ps->ps_ext_insert_desc;
   TupleTableSlot *tts = ps->ps_tuple_table_slot;
@@ -3010,6 +3038,7 @@ Datum magma_insert(PG_FUNCTION_ARGS) {
  * magma_insert_finish(ExternalInsertDesc extInsertDesc)
  */
 Datum magma_insert_finish(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc eid = ps->ps_ext_insert_desc;
 
@@ -3058,6 +3087,7 @@ Datum magma_insert_finish(PG_FUNCTION_ARGS) {
  * magma_transaction(PlugStorageTransaction transaction)
  */
 Datum magma_transaction(PG_FUNCTION_ARGS) {
+  checkOushuDbExtensiveFunctionSupport(__func__);
   elog(DEBUG3, "magma_transaction begin");
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   PlugStorageTransaction pst = ps->ps_transaction;

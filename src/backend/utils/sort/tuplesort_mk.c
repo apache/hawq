@@ -882,7 +882,7 @@ tuplesort_begin_index_mk(Relation indexRel,
     if (trace_sort)
         PG_TRACE3(tuplesort__begin, enforceUnique, workMem, randomAccess);
 
-    state->nKeys = RelationGetNumberOfAttributes(indexRel);
+    state->nKeys = IndexRelationGetNumberOfKeyAttributes(indexRel);
     tupdesc = RelationGetDescr(indexRel);
 
     state->copytup = copytup_index;

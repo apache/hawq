@@ -48,7 +48,7 @@ _bt_mkscankey(Relation rel, IndexTuple itup)
 	int			i;
 
 	itupdesc = RelationGetDescr(rel);
-	natts = RelationGetNumberOfAttributes(rel);
+	natts = IndexRelationGetNumberOfKeyAttributes(rel);
 
 	skey = (ScanKey) palloc(natts * sizeof(ScanKeyData));
 
@@ -94,7 +94,7 @@ _bt_mkscankey_nodata(Relation rel)
 	int			natts;
 	int			i;
 
-	natts = RelationGetNumberOfAttributes(rel);
+	natts = IndexRelationGetNumberOfKeyAttributes(rel);
 
 	skey = (ScanKey) palloc(natts * sizeof(ScanKeyData));
 

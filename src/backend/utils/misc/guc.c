@@ -7487,7 +7487,7 @@ static struct config_string ConfigureNamesString[] =
 			GUC_NOT_IN_SAMPLE
 		},
 		&new_executor_enable_external_sort_mode,
-		"OFF", assign_new_executor_mode, NULL
+		"AUTO", assign_new_executor_mode, NULL
 	},
 
 

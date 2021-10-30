@@ -704,7 +704,7 @@ _bt_load(BTWriteState *wstate, BTSpool *btspool, BTSpool *btspool2)
 				load1;
 	TupleDesc	tupdes = RelationGetDescr(wstate->index);
 	int			i,
-				keysz = RelationGetNumberOfAttributes(wstate->index);
+				keysz = IndexRelationGetNumberOfKeyAttributes(wstate->index);
 	ScanKey		indexScanKey = NULL;
 
 	if (merge)

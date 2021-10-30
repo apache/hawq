@@ -51,6 +51,7 @@ CreateConstraintEntry(const char *constraintName,
 					  Oid relId,
 					  const int16 *constraintKey,
 					  int constraintNKeys,
+					  int constraintNTotalKeys,
 					  Oid domainId,
 					  Oid foreignRelId,
 					  const int16 *foreignKey,
@@ -84,14 +85,14 @@ CreateConstraintEntry(const char *constraintName,
 	/*
 	 * Convert C arrays into Postgres arrays.
 	 */
-	if (constraintNKeys > 0)
+	if (constraintNTotalKeys > 0)
 	{
 		Datum	   *conkey;
 
-		conkey = (Datum *) palloc(constraintNKeys * sizeof(Datum));
-		for (i = 0; i < constraintNKeys; i++)
+		conkey = (Datum *) palloc(constraintNTotalKeys * sizeof(Datum));
+		for (i = 0; i < constraintNTotalKeys; i++)
 			conkey[i] = Int16GetDatum(constraintKey[i]);
-		conkeyArray = construct_array(conkey, constraintNKeys,
+		conkeyArray = construct_array(conkey, constraintNTotalKeys,
 									  INT2OID, 2, true, 's');
 	}
 	else
@@ -180,9 +181,9 @@ CreateConstraintEntry(const char *constraintName,
 
 		relobject.classId = RelationRelationId;
 		relobject.objectId = relId;
-		if (constraintNKeys > 0)
+		if (constraintNTotalKeys > 0)
 		{
-			for (i = 0; i < constraintNKeys; i++)
+			for (i = 0; i < constraintNTotalKeys; i++)
 			{
 				relobject.objectSubId = constraintKey[i];
 

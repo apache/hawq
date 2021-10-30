@@ -192,6 +192,7 @@ _bitmap_create_lov_heapandindex(Relation rel,
 	indattrs = tupDesc->natts - 2;
 	indexInfo = makeNode(IndexInfo);
 	indexInfo->ii_NumIndexAttrs = indattrs;
+	indexInfo->ii_NumIndexKeyAttrs = indattrs;
 	indexInfo->ii_Expressions = NIL;
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = make_ands_implicit(NULL);

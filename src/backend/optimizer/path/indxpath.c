@@ -2910,12 +2910,12 @@ expand_indexqual_rowcompare(RestrictInfo *rinfo,
 		 * insist the match be on the first such column, to avoid confusing
 		 * the executor.
 		 */
-		for (i = 0; i < index->ncolumns; i++)
+		for (i = 0; i < index->nkeycolumns; i++)
 		{
 			if (match_index_to_operand(varop, i, index))
 				break;
 		}
-		if (i >= index->ncolumns)
+		if (i >= index->nkeycolumns)
 			break;				/* no match found */
 
 		/* Now, do we have the right operator for this column? */

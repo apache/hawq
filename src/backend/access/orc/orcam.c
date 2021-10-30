@@ -121,8 +121,7 @@ static void checkOrcError(OrcFormatData *orcFormatData) {
     ORCFormatCatchedError errBuf = *e;
     ORCFormatFreeORCFormatC(&orcFormatData->fmt);
     ORCFormatFreeStorageFormatC(&orcFormatData->updateDeleteFmt);
-    ereport(ERROR,
-            (errcode(errBuf.errCode), errmsg("%s", errBuf.errMessage)));
+    ereport(ERROR, (errcode(errBuf.errCode), errmsg("%s", errBuf.errMessage)));
   }
 }
 
@@ -245,7 +244,8 @@ static void convertAndFillIntoOrcFormatData(OrcFormatData *orcFormatData,
     } else if (dataType == HAWQ_TYPE_NUMERIC) {
       Numeric num = DatumGetNumeric(values[i]);
       orcFormatData->colRawValues[i] = (char *)num;
-      if (NUMERIC_IS_NAN(num)) nulls[i] = true;
+      if (NUMERIC_IS_NAN(num))
+        nulls[i] = true;
     }
   }
 }
@@ -337,7 +337,8 @@ OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot, TupleDesc desc,
 
   RelationIncrementReferenceCount(rel);
 
-  if (desc == NULL) desc = RelationGetDescr(rel);
+  if (desc == NULL)
+    desc = RelationGetDescr(rel);
 
   scanDesc->rel = rel;
   orcFormatData->fmt = ORCFormatNewORCFormatC("{}", 0);
@@ -356,7 +357,8 @@ OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot, TupleDesc desc,
                           splits[i].fileName);
   }
 
-  if (splitCount > 0) addFilesystemCredential(splits[0].fileName);
+  if (splitCount > 0)
+    addFilesystemCredential(splits[0].fileName);
 
   void *qualList = NULL;
   CommonPlanContext ctx;
@@ -374,7 +376,8 @@ OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot, TupleDesc desc,
 
   ItemPointerSetInvalid(&scanDesc->cdb_fake_ctid);
 
-  for (int32 i = 0; i < splitCount; ++i) pfree(splits[i].fileName);
+  for (int32 i = 0; i < splitCount; ++i)
+    pfree(splits[i].fileName);
   pfree(splits);
 
   return scanDesc;
@@ -395,60 +398,55 @@ void orcReadNext(OrcScanDescData *scanData, TupleTableSlot *slot) {
   checkOrcError(orcFormatData);
   if (res) {
     for (int32_t i = 0; i < orcFormatData->numberOfColumns; ++i) {
-      if (nulls[i]) continue;
+      if (nulls[i])
+        continue;
 
       switch (tupleDesc->attrs[i]->atttypid) {
-        case HAWQ_TYPE_BOOL: {
-          values[i] = BoolGetDatum(*(bool *)(orcFormatData->colRawValues[i]));
-          break;
-        }
-        case HAWQ_TYPE_INT2: {
-          values[i] =
-              Int16GetDatum(*(int16_t *)(orcFormatData->colRawValues[i]));
-          break;
-        }
-        case HAWQ_TYPE_INT4: {
-          values[i] =
-              Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]));
-          break;
-        }
-        case HAWQ_TYPE_INT8:
-        case HAWQ_TYPE_TIME:
-        case HAWQ_TYPE_TIMESTAMP:
-        case HAWQ_TYPE_TIMESTAMPTZ: {
-          values[i] =
-              Int64GetDatum(*(int64_t *)(orcFormatData->colRawValues[i]));
-          break;
-        }
-        case HAWQ_TYPE_FLOAT4: {
-          values[i] =
-              Float4GetDatum(*(float *)(orcFormatData->colRawValues[i]));
-          break;
-        }
-        case HAWQ_TYPE_FLOAT8: {
-          values[i] =
-              Float8GetDatum(*(double *)(orcFormatData->colRawValues[i]));
-          break;
-        }
-        case HAWQ_TYPE_VARCHAR:
-        case HAWQ_TYPE_TEXT:
-        case HAWQ_TYPE_BPCHAR:
-        case HAWQ_TYPE_BYTE:
-        case HAWQ_TYPE_NUMERIC: {
-          SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[i]),
-                      orcFormatData->colValLength[i]);
-          values[i] = PointerGetDatum(orcFormatData->colRawValues[i]);
-          break;
-        }
-        case HAWQ_TYPE_DATE: {
-          values[i] =
-              Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]) -
-                            POSTGRES_EPOCH_JDATE + UNIX_EPOCH_JDATE);
-          break;
-        }
-        default: {
-          break;
-        }
+      case HAWQ_TYPE_BOOL: {
+        values[i] = BoolGetDatum(*(bool *)(orcFormatData->colRawValues[i]));
+        break;
+      }
+      case HAWQ_TYPE_INT2: {
+        values[i] = Int16GetDatum(*(int16_t *)(orcFormatData->colRawValues[i]));
+        break;
+      }
+      case HAWQ_TYPE_INT4: {
+        values[i] = Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]));
+        break;
+      }
+      case HAWQ_TYPE_INT8:
+      case HAWQ_TYPE_TIME:
+      case HAWQ_TYPE_TIMESTAMP:
+      case HAWQ_TYPE_TIMESTAMPTZ: {
+        values[i] = Int64GetDatum(*(int64_t *)(orcFormatData->colRawValues[i]));
+        break;
+      }
+      case HAWQ_TYPE_FLOAT4: {
+        values[i] = Float4GetDatum(*(float *)(orcFormatData->colRawValues[i]));
+        break;
+      }
+      case HAWQ_TYPE_FLOAT8: {
+        values[i] = Float8GetDatum(*(double *)(orcFormatData->colRawValues[i]));
+        break;
+      }
+      case HAWQ_TYPE_VARCHAR:
+      case HAWQ_TYPE_TEXT:
+      case HAWQ_TYPE_BPCHAR:
+      case HAWQ_TYPE_BYTE:
+      case HAWQ_TYPE_NUMERIC: {
+        SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[i]),
+                    orcFormatData->colValLength[i]);
+        values[i] = PointerGetDatum(orcFormatData->colRawValues[i]);
+        break;
+      }
+      case HAWQ_TYPE_DATE: {
+        values[i] = Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]) -
+                                  POSTGRES_EPOCH_JDATE + UNIX_EPOCH_JDATE);
+        break;
+      }
+      default: {
+        break;
+      }
       }
     }
     TupSetVirtualTupleNValid(slot, slot->tts_tupleDescriptor->natts);
@@ -486,13 +484,15 @@ retry:
   ret = FileRead(file, buf + nRead, amount - nRead);
   if (ret > 0) {
     nRead += ret;
-    if (nRead < amount) goto retry;
+    if (nRead < amount)
+      goto retry;
   } else if (ret < 0) {
-    if (errno == EINTR) goto retry;
+    if (errno == EINTR)
+      goto retry;
     ereport(ERROR, (errcode_for_file_access(),
                     errmsg("could not read file \"%s\": %m", path),
                     errdetail("%s", HdfsGetLastError())));
-  } else {  // EOF
+  } else { // EOF
   }
   return nRead;
 }
@@ -504,7 +504,8 @@ retry:
   ret = FileWrite(file, buf + nWrite, amount - nWrite);
   if (ret >= 0) {
     nWrite += ret;
-    if (nWrite < amount) goto retry;
+    if (nWrite < amount)
+      goto retry;
   } else {
     ereport(ERROR, (errcode_for_file_access(),
                     errmsg("could not read file \"%s\": %m", path),
@@ -548,12 +549,14 @@ static void orcCopyInternal(const char *srcPath, int64 eof,
 }
 
 static bool orcCopy(const char *name, tOffset size, void *arg) {
-  if (size == 0) return false;
+  if (size == 0)
+    return false;
 
   OrcCopyContext *ctx = (OrcCopyContext *)arg;
   char *ptr = strrchr(name, '/');
   int32 segno = pg_atoi(ptr + 1, sizeof(int), 0);
-  if (list_member_int(ctx->segNoList, segno)) return false;
+  if (list_member_int(ctx->segNoList, segno))
+    return false;
 
   sprintf(ctx->srcFile, "%s/%u", ctx->srcDir, segno);
   sprintf(ctx->destFile, "%s/%u", ctx->destDir, segno);
@@ -578,7 +581,8 @@ static void copyFileForDirectDispatch(Oid relId, int32 targetSegNo,
 
   ListCell *cell = NULL;
   foreach (cell, segNoList) {
-    if (lfirst_int(cell) == targetSegNo) continue;
+    if (lfirst_int(cell) == targetSegNo)
+      continue;
 
     QueryContextDispatchingSendBack sendback =
         CreateQueryContextDispatchingSendBack(1);
@@ -605,7 +609,8 @@ static void copyFileForDirectDispatch(Oid relId, int32 targetSegNo,
   pfree(ctx.destFile);
   pfree(ctx.srcFile);
   pfree(ctx.buffer);
-  if (segNoList) pfree(segNoList);
+  if (segNoList)
+    pfree(segNoList);
 }
 
 OrcDeleteDescData *orcBeginDelete(Relation rel, List *fileSplits,
@@ -678,7 +683,8 @@ OrcDeleteDescData *orcBeginDelete(Relation rel, List *fileSplits,
     pfree(oldPath);
   }
 
-  for (int32 i = 0; i < splitCount; ++i) pfree(splits[i].fileName);
+  for (int32 i = 0; i < splitCount; ++i)
+    pfree(splits[i].fileName);
   pfree(splits);
   pfree(basePath);
   pfree(hdfsPath);
@@ -796,7 +802,8 @@ OrcUpdateDescData *orcBeginUpdate(Relation rel, List *fileSplits,
     pfree(oldPath);
   }
 
-  for (int32 i = 0; i < splitCount; ++i) pfree(splits[i].fileName);
+  for (int32 i = 0; i < splitCount; ++i)
+    pfree(splits[i].fileName);
   pfree(splits);
   pfree(basePath);
   pfree(hdfsPath);
