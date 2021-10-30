@@ -529,14 +529,15 @@ DATA(insert ( 1259 gp_segment_id   23 0  4  -8 0 -1 -1 t p i t f f t 0));
 { 0, {"indexrelid"},		26, -1, 4, 1, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }, \
 { 0, {"indrelid"},			26, -1, 4, 2, 0, -1, -1, true, 'p', 'i', true, false, false, true, 0 }, \
 { 0, {"indnatts"},			21, -1, 2, 3, 0, -1, -1, true, 'p', 's', true, false, false, true, 0 }, \
-{ 0, {"indisunique"},		16, -1, 1, 4, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
-{ 0, {"indisprimary"},		16, -1, 1, 5, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
-{ 0, {"indisclustered"},	16, -1, 1, 6, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
-{ 0, {"indisvalid"},		16, -1, 1, 7, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
-{ 0, {"indkey"},			22, -1, -1, 8, 1, -1, -1, false, 'p', 'i', true, false, false, true, 0 }, \
-{ 0, {"indclass"},			30, -1, -1, 9, 1, -1, -1, false, 'p', 'i', true, false, false, true, 0 }, \
-{ 0, {"indexprs"},			25, -1, -1, 10, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
-{ 0, {"indpred"},			25, -1, -1, 11, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }
+{ 0, {"indnkeyatts"},   21, -1, 2, 4, 0, -1, -1, true, 'p', 's', true, false, false, true, 0 }, \
+{ 0, {"indisunique"},		16, -1, 1, 5, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
+{ 0, {"indisprimary"},		16, -1, 1, 6, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
+{ 0, {"indisclustered"},	16, -1, 1, 7, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
+{ 0, {"indisvalid"},		16, -1, 1, 8, 0, -1, -1, true, 'p', 'c', true, false, false, true, 0 }, \
+{ 0, {"indkey"},			22, -1, -1, 9, 1, -1, -1, false, 'p', 'i', true, false, false, true, 0 }, \
+{ 0, {"indclass"},			30, -1, -1, 10, 1, -1, -1, false, 'p', 'i', true, false, false, true, 0 }, \
+{ 0, {"indexprs"},			25, -1, -1, 11, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }, \
+{ 0, {"indpred"},			25, -1, -1, 12, 0, -1, -1, false, 'x', 'i', false, false, false, true, 0 }
 
 
 #endif   /* PG_ATTRIBUTE_H */

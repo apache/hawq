@@ -756,6 +756,12 @@ pg_get_indexdef_worker(Oid indexrelid, int colno, bool showTblSpc,
 	for (keyno = 0; keyno < idxrec->indnatts; keyno++)
 	{
 		AttrNumber	attnum = idxrec->indkey.values[keyno];
+		/* Report the INCLUDED attributes, if any. */
+		if (keyno == idxrec->indnkeyatts)
+		{
+		  appendStringInfoString(&buf, ") INCLUDE (");
+		  sep = "";
+		}
 
 		if (!colno)
 			appendStringInfoString(&buf, sep);
@@ -798,7 +804,7 @@ pg_get_indexdef_worker(Oid indexrelid, int colno, bool showTblSpc,
 		/*
 		 * Add the operator class name
 		 */
-		if (!colno)
+		if (!colno && keyno < idxrec->indnkeyatts)
 			get_opclass_name(indclass->values[keyno], keycoltype,
 							 &buf);
 	}

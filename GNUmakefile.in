@@ -18,7 +18,7 @@ all:
 	$(MAKE) -C ranger-plugin $@
 	@echo "All of HAWQ successfully made. Ready to install."
 
-install:
+install: git-hook
 #	$(MAKE) -C doc $@
 #	$(MAKE) -C depends/libhdfs3 $@
 	$(MAKE) -C src $@
@@ -210,6 +210,9 @@ install-orca:
 	$(MAKE) -C depends/thirdparty/gpos/build/ install
 	$(MAKE) -C depends/thirdparty/gp-xerces/build/ install
 	$(MAKE) -C depends/thirdparty/gporca/build/ install
+
+git-hook:
+	command -v git && git config --local core.hooksPath .github/ || true
 
 .PHONY: dist distdir distcheck
 #unexport split-dist

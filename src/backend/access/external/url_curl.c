@@ -1241,12 +1241,22 @@ URL_FILE *url_curl_fopen(char *url, bool forwrite, extvar_t *ev,
     fill_buffer(file, 1);
 
     /* check the connection for GET request */
-    if (check_response(file, &response_code, &response_string))
-      ereport(ERROR,
-              (errcode(ERRCODE_CONNECTION_FAILURE),
-               errmsg("could not open \"%s\" for reading", file->url),
-               errdetail("Unexpected response from gpfdist server: %d - %s",
-                         response_code, response_string)));
+    // if connection is established, http_response should not be null
+    if (file->u.curl.still_running > 0 || file->u.curl.http_response == 0) {
+      if (check_response(file, &response_code, &response_string))
+        ereport(ERROR,
+                (errcode(ERRCODE_CONNECTION_FAILURE),
+                 errmsg("could not open \"%s\" for reading", file->url),
+                 errdetail("Unexpected response from gpfdist server: %d - %s",
+                           response_code, response_string)));
+    }
+    if (file->u.curl.still_running == 0) {
+      elog(LOG,
+           "session closed when checking the connection in url_curl_fopen, "
+           "http_response = \"%s\".",
+           file->u.curl.http_response);
+    }
+
   } else {
     /* use empty message */
     CURL_EASY_SETOPT(file->u.curl.handle, CURLOPT_POSTFIELDS, "");

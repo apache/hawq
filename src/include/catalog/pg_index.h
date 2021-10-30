@@ -61,6 +61,7 @@ CATALOG(pg_index,2610) BKI_WITHOUT_OIDS
 	Oid			indexrelid;		/* OID of the index */
 	Oid			indrelid;		/* OID of the relation it indexes */
 	int2		indnatts;		/* number of columns in index */
+	int2    indnkeyatts ;  /* number of key columns in index */
 	bool		indisunique;	/* is this a unique index? */
 	bool		indisprimary;	/* is this index for primary key? */
 	bool		indisclustered; /* is this the index last clustered by? */
@@ -87,17 +88,18 @@ typedef FormData_pg_index *Form_pg_index;
  *		compiler constants for pg_index
  * ----------------
  */
-#define Natts_pg_index					11
+#define Natts_pg_index					12
 #define Anum_pg_index_indexrelid		1
 #define Anum_pg_index_indrelid			2
 #define Anum_pg_index_indnatts			3
-#define Anum_pg_index_indisunique		4
-#define Anum_pg_index_indisprimary		5
-#define Anum_pg_index_indisclustered	6
-#define Anum_pg_index_indisvalid		7
-#define Anum_pg_index_indkey			8
-#define Anum_pg_index_indclass			9
-#define Anum_pg_index_indexprs			10
-#define Anum_pg_index_indpred			11
+#define Anum_pg_index_indnkeyatts   4
+#define Anum_pg_index_indisunique		5
+#define Anum_pg_index_indisprimary  6
+#define Anum_pg_index_indisclustered	7
+#define Anum_pg_index_indisvalid		8
+#define Anum_pg_index_indkey			9
+#define Anum_pg_index_indclass			10
+#define Anum_pg_index_indexprs			11
+#define Anum_pg_index_indpred			12
 
 #endif   /* PG_INDEX_H */

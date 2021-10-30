@@ -1512,7 +1512,9 @@ typedef struct Constraint {
   char *name;        /* name, or NULL if unnamed */
   Node *raw_expr;    /* expr, as untransformed parse tree */
   char *cooked_expr; /* expr, as nodeToString representation */
-  List *keys;        /* String nodes naming referenced column(s) */
+  List *keys;        /* String nodes naming referenced key column(s) */
+  List *including;    /* String nodes naming referenced nonkey
+                           * column(s) */
   List *options;     /* options from WITH clause */
   char *indexspace;  /* index tablespace for PKEY/UNIQUE
                                               * constraints; NULL for default */
@@ -2141,6 +2143,8 @@ typedef struct IndexStmt {
   char *accessMethod; /* name of access method (eg. btree) */
   char *tableSpace;   /* tablespace, or NULL to use parent's */
   List *indexParams;  /* a list of IndexElem */
+  List *indexIncludingParams; /* additional columns to index: a list
+                                  * of IndexElem */
   List *options;      /* options from WITH clause */
   Node *whereClause;  /* qualification (partial-index predicate) */
   List *rangetable;   /* range table for qual and/or expressions,

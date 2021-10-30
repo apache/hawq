@@ -166,6 +166,7 @@ DefineIndex(Oid relationId,
 	Datum		reloptions;
 	IndexInfo  *indexInfo;
 	int			numberOfAttributes;
+	int     numberOfKeyAttributes;
 	List	   *old_xact_list;
 	ListCell   *lc;
 	uint32		ixcnt;
@@ -184,10 +185,28 @@ DefineIndex(Oid relationId,
 	cqContext  *amcqCtx;
 	cqContext  *attcqCtx;
 
+	if (list_intersection(stmt->indexParams, stmt->indexIncludingParams) != NIL)
+	  ereport(ERROR,
+	          (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
+	              errmsg("included columns must not intersect with key columns")));
+
 	/*
-	 * count attributes in index
+	 * count key attributes in index
 	 */
-	numberOfAttributes = list_length(attributeList);
+	numberOfKeyAttributes = list_length(stmt->indexParams);
+
+	/*
+	 * We append any INCLUDE columns onto the indexParams list so that we have
+	 * one list with all columns.  Later we can determine which of these are
+	 * key columns, and which are just part of the INCLUDE list by checking
+	 * the list position.  A list item in a position less than
+	 * ii_NumIndexKeyAttrs is part of the key columns, and anything equal to
+	 * and over is part of the INCLUDE columns.
+	 */
+	stmt->indexParams = list_concat(stmt->indexParams,
+	                                stmt->indexIncludingParams);
+	numberOfAttributes = list_length(stmt->indexParams);
+
 	if (numberOfAttributes <= 0)
 		ereport(ERROR,
 				(errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
@@ -214,13 +233,6 @@ DefineIndex(Oid relationId,
 
 	relationId = RelationGetRelid(rel);
 	namespaceId = RelationGetNamespace(rel);
-
-	/*
-	if(RelationIsExternal(rel))
-		ereport(ERROR,
-				(errcode(ERRCODE_GP_FEATURE_NOT_SUPPORTED),
-				 errmsg("cannot create indexes on external tables.")));
-	*/
 		
 	/* Note: during bootstrap may see uncataloged relation */
 	if (rel->rd_rel->relkind != RELKIND_RELATION &&
@@ -553,6 +565,7 @@ DefineIndex(Oid relationId,
 	 */
 	indexInfo = makeNode(IndexInfo);
 	indexInfo->ii_NumIndexAttrs = numberOfAttributes;
+	indexInfo->ii_NumIndexKeyAttrs = numberOfKeyAttributes;
 	indexInfo->ii_Expressions = NIL;	/* for now */
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = make_ands_implicit(predicate);
@@ -562,7 +575,7 @@ DefineIndex(Oid relationId,
 	indexInfo->opaque = (void*)palloc0(sizeof(IndexInfoOpaque));
 
 	classObjectId = (Oid *) palloc(numberOfAttributes * sizeof(Oid));
-	ComputeIndexAttrs(indexInfo, classObjectId, attributeList,
+	ComputeIndexAttrs(indexInfo, classObjectId, stmt->indexParams,
 					  relationId, accessMethodName, accessMethodId,
 					  isconstraint);
 

@@ -419,9 +419,9 @@ UpdateIndexRelation(Oid indexoid,
 	 * caller pass them like this to start with?)
 	 */
 	indkey = buildint2vector(NULL, indexInfo->ii_NumIndexAttrs);
-	indclass = buildoidvector(classOids, indexInfo->ii_NumIndexAttrs);
 	for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
 		indkey->values[i] = indexInfo->ii_KeyAttrNumbers[i];
+	indclass = buildoidvector(classOids, indexInfo->ii_NumIndexKeyAttrs);
 
 	/*
 	 * Convert the index expressions (if any) to a text datum
@@ -468,6 +468,7 @@ UpdateIndexRelation(Oid indexoid,
 	values[Anum_pg_index_indexrelid - 1] = ObjectIdGetDatum(indexoid);
 	values[Anum_pg_index_indrelid - 1] = ObjectIdGetDatum(heapoid);
 	values[Anum_pg_index_indnatts - 1] = Int16GetDatum(indexInfo->ii_NumIndexAttrs);
+	values[Anum_pg_index_indnkeyatts - 1] = Int16GetDatum(indexInfo->ii_NumIndexKeyAttrs);
 	values[Anum_pg_index_indisunique - 1] = BoolGetDatum(indexInfo->ii_Unique);
 	values[Anum_pg_index_indisprimary - 1] = BoolGetDatum(primary);
 	values[Anum_pg_index_indisclustered - 1] = BoolGetDatum(false);
@@ -812,6 +813,7 @@ index_create(Oid heapRelationId,
 											   heapRelationId,
 											   indexInfo->ii_KeyAttrNumbers,
 											   indexInfo->ii_NumIndexAttrs,
+											   indexInfo->ii_NumIndexKeyAttrs,
 											   InvalidOid,	/* no domain */
 											   InvalidOid,	/* no foreign key */
 											   NULL,
@@ -870,7 +872,7 @@ index_create(Oid heapRelationId,
 		}
 
 		/* Store dependency on operator classes */
-		for (i = 0; i < indexInfo->ii_NumIndexAttrs; i++)
+		for (i = 0; i < indexInfo->ii_NumIndexKeyAttrs; i++)
 		{
 			referenced.classId = OperatorClassRelationId;
 			referenced.objectId = classObjectId[i];
@@ -917,6 +919,7 @@ index_create(Oid heapRelationId,
 	else
 		Assert(indexRelation->rd_indexcxt != NULL);
 
+	indexRelation->rd_index->indnkeyatts = indexInfo->ii_NumIndexKeyAttrs;
 	/*
 	 * For upgrade, if we've already created the index in another database,
 	 * we don't need or want to recreate it.
@@ -993,6 +996,7 @@ index_create(Oid heapRelationId,
 		MagmaIndexInfo idxinfo;
 		idxinfo.indexName = indexRelationName;
 		idxinfo.indexType = DEFAULT_INDEX_TYPE;
+		idxinfo.keynums = indexInfo->ii_NumIndexKeyAttrs;
 		idxinfo.primary = isprimary;
 		idxinfo.unique = indexInfo->ii_Unique;
 		idxinfo.indkey = buildint2vector(NULL, indexInfo->ii_NumIndexAttrs);
@@ -1128,6 +1132,7 @@ ext_constraint_create(Oid extRelationId,
 		                                  extRelationId,
 		                                  constraintInfo->ii_KeyAttrNumbers,
 		                                  constraintInfo->ii_NumIndexAttrs,
+		                                  constraintInfo->ii_NumIndexKeyAttrs,
 		                                  InvalidOid,	/* no domain */
 		                                  InvalidOid,	/* no foreign key */
 		                                  NULL,
@@ -1327,15 +1332,18 @@ BuildIndexInfo(Relation index)
 	IndexInfo  *ii = makeNode(IndexInfo);
 	Form_pg_index indexStruct = index->rd_index;
 	int			i;
-	int			numKeys;
+	int			numAtts;
 
 	/* check the number of keys, and copy attr numbers into the IndexInfo */
-	numKeys = indexStruct->indnatts;
-	if (numKeys < 1 || numKeys > INDEX_MAX_KEYS)
+	numAtts = indexStruct->indnatts;
+	if (numAtts < 1 || numAtts > INDEX_MAX_KEYS)
 		elog(ERROR, "invalid indnatts %d for index %u",
-			 numKeys, RelationGetRelid(index));
-	ii->ii_NumIndexAttrs = numKeys;
-	for (i = 0; i < numKeys; i++)
+		     numAtts, RelationGetRelid(index));
+	ii->ii_NumIndexAttrs = numAtts;
+	ii->ii_NumIndexKeyAttrs = indexStruct->indnkeyatts;
+	Assert(ii->ii_NumIndexKeyAttrs != 0);
+	Assert(ii->ii_NumIndexKeyAttrs <= ii->ii_NumIndexAttrs);
+	for (i = 0; i < numAtts; i++)
 		ii->ii_KeyAttrNumbers[i] = indexStruct->indkey.values[i];
 
 	/* fetch any expressions needed for expressional indexes */

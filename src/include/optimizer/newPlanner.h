@@ -61,15 +61,15 @@ typedef struct CommonPlanContext {
   UnivPlanC *univplan;
   bool convertible;
   bool enforceNewScheduler;
-  bool querySelect;  // flag of query statement
-  bool isMagma;  // flag to indicate whether there is a magma table in the plan
+  bool querySelect; // flag of query statement
+  bool isMagma; // flag to indicate whether there is a magma table in the plan
   int magmaRelIndex;
   PlannedStmt *stmt;
   bool setDummyTListRef;
   bool scanReadStatsOnly;
-  Expr *parent;        // used for T_Var, T_Const
-  List *exprBufStack;  // used for T_Case
-  int rangeNum;        // magma range num
+  Expr *parent;       // used for T_Var, T_Const
+  List *exprBufStack; // used for T_Case
+  int rangeNum;       // magma range num
 } CommonPlanContext;
 
 extern bool can_convert_common_plan(QueryDesc *queryDesc,
@@ -89,4 +89,4 @@ extern void planner_init_common_plan_context(PlannedStmt *stmt,
 extern void planner_destroy_common_plan_context(CommonPlanContext *ctx,
                                                 bool enforce);
 
-#endif  // SRC_INCLUDE_OPTIMIZER_NEWPLANNER_H_
+#endif // SRC_INCLUDE_OPTIMIZER_NEWPLANNER_H_

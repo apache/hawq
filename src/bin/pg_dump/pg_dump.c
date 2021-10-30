@@ -3218,7 +3218,8 @@ getIndexes(TableInfo tblinfo[], int numTables)
 				i_oid,
 				i_indexname,
 				i_indexdef,
-				i_indnkeys,
+				i_indnnkeyatts,
+				i_indnatts,
 				i_indkey,
 				i_indisclustered,
 				i_contype,
@@ -3259,6 +3260,8 @@ getIndexes(TableInfo tblinfo[], int numTables)
 						  "SELECT t.tableoid, t.oid, "
 						  "t.relname as indexname, "
 					 "pg_catalog.pg_get_indexdef(i.indexrelid) as indexdef, "
+		                  "i.indnkeyatts AS indnkeyatts, "
+		                  "i.indnatts AS indnatts, "
 						  "t.relnatts as indnkeys, "
 						  "i.indkey, i.indisclustered, "
 						  "c.contype, c.conname, "
@@ -3288,7 +3291,8 @@ getIndexes(TableInfo tblinfo[], int numTables)
 		i_oid = PQfnumber(res, "oid");
 		i_indexname = PQfnumber(res, "indexname");
 		i_indexdef = PQfnumber(res, "indexdef");
-		i_indnkeys = PQfnumber(res, "indnkeys");
+		i_indnnkeyatts = PQfnumber(res, "indnkeyatts");
+		i_indnatts = PQfnumber(res, "indnatts");
 		i_indkey = PQfnumber(res, "indkey");
 		i_indisclustered = PQfnumber(res, "indisclustered");
 		i_contype = PQfnumber(res, "contype");
@@ -3313,7 +3317,8 @@ getIndexes(TableInfo tblinfo[], int numTables)
 			indxinfo[j].dobj.namespace = tbinfo->dobj.namespace;
 			indxinfo[j].indextable = tbinfo;
 			indxinfo[j].indexdef = strdup(PQgetvalue(res, j, i_indexdef));
-			indxinfo[j].indnkeys = atoi(PQgetvalue(res, j, i_indnkeys));
+			indxinfo[j].indnkeyattrs = atoi(PQgetvalue(res, j, i_indnnkeyatts));
+			indxinfo[j].indnattrs = atoi(PQgetvalue(res, j, i_indnatts));
 			indxinfo[j].tablespace = strdup(PQgetvalue(res, j, i_tablespace));
 			indxinfo[j].options = strdup(PQgetvalue(res, j, i_options));
 
@@ -8585,7 +8590,7 @@ dumpConstraint(Archive *fout, ConstraintInfo *coninfo)
 						  fmtId(coninfo->dobj.name),
 						  coninfo->contype == 'p' ? "PRIMARY KEY" : "UNIQUE");
 
-		for (k = 0; k < indxinfo->indnkeys; k++)
+		for (k = 0; k < indxinfo->indnkeyattrs; k++)
 		{
 			int			indkey = (int) indxinfo->indkeys[k];
 			const char *attname;
@@ -8597,6 +8602,22 @@ dumpConstraint(Archive *fout, ConstraintInfo *coninfo)
 			appendPQExpBuffer(q, "%s%s",
 							  (k == 0) ? "" : ", ",
 							  fmtId(attname));
+		}
+		if (indxinfo->indnkeyattrs < indxinfo->indnattrs)
+		  appendPQExpBuffer(q, ") INCLUDE (");
+
+		for (k = indxinfo->indnkeyattrs; k < indxinfo->indnattrs; k++)
+		{
+		  int     indkey = (int) indxinfo->indkeys[k];
+		  const char *attname;
+
+		  if (indkey == InvalidAttrNumber)
+		    break;
+		  attname = getAttrName(indkey, tbinfo);
+
+		  appendPQExpBuffer(q, "%s%s",
+		                    (k == indxinfo->indnkeyattrs) ? "" : ", ",
+		                        fmtId(attname));
 		}
 
 		appendPQExpBuffer(q, ")");

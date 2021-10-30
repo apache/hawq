@@ -1479,7 +1479,7 @@ isAnyIndexColChangedByUpdate(Index resultRelation, Plan *plan, Relation relation
 	{
 		Form_pg_index index = (Form_pg_index) GETSTRUCT(htup);
 		bool colChange = isAnyColChangedByUpdate(resultRelation, plan->targetlist,
-																						 index->indnatts, index->indkey.values);
+																						 index->indnkeyatts, index->indkey.values);
 		if (colChange) {
 			caql_endscan(pcqCtx);
 			heap_close(indrel, AccessShareLock);

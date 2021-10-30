@@ -46,6 +46,13 @@ void checkOushuDbExtensiveFeatureSupport(char featureCategory[]) {
                         "HAWQ", featureCategory)));
 }
 
+void checkOushuDbExtensiveFunctionSupport(char functionString[]) {
+  if (MyExecutorRun == NULL)
+    ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
+                    errmsg("%s function is only supported in OushuDB "
+                        "Enterprise Edition", functionString)));
+}
+
 PlanState *newExecutorPlanStateReference = NULL;
 
 void exec_mpp_query_new(const char *plan, int len, int stageNo, bool setDisplay,

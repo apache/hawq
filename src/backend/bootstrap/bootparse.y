@@ -441,8 +441,22 @@ Boot_InsertStmt:
 Boot_DeclareIndexStmt:
 		  XDECLARE INDEX boot_ident oidspec ON boot_ident USING boot_ident LPAREN boot_index_params RPAREN
 				{
+					IndexStmt *stmt = makeNode(IndexStmt);
 					Oid     relationId;
 					do_start();
+
+					stmt->idxname = $3;
+					stmt->relation = makeRangeVar(NULL, NULL, LexIDStr($6), -1);
+					stmt->accessMethod = $8;
+					stmt->tableSpace = NULL;
+					stmt->indexParams = $10;
+					stmt->indexIncludingParams = NIL;
+					stmt->options = NIL;
+					stmt->whereClause = NULL;
+					stmt->unique = false;
+					stmt->primary = false;
+					stmt->isconstraint = false;
+					stmt->concurrent = false;
 
 					relationId = RangeVarGetRelid(makeRangeVar(NULL, NULL, LexIDStr($6), -1), 
 								false, false);
@@ -456,7 +470,7 @@ Boot_DeclareIndexStmt:
 								NULL, NIL, NIL,
 								false, false, false,
 								false, false, true, false, false,
-								false, NULL);
+								false, stmt);
 					do_end();
 				}
 		;
@@ -464,8 +478,22 @@ Boot_DeclareIndexStmt:
 Boot_DeclareUniqueIndexStmt:
 		  XDECLARE UNIQUE INDEX boot_ident oidspec ON boot_ident USING boot_ident LPAREN boot_index_params RPAREN
 				{
+					IndexStmt *stmt = makeNode(IndexStmt);
 					Oid     relationId;
 					do_start();
+
+					stmt->idxname = $4;
+					stmt->relation = makeRangeVar(NULL, NULL, LexIDStr($7), -1);
+					stmt->accessMethod = $9;
+					stmt->tableSpace = NULL;
+					stmt->indexParams = $11;
+					stmt->indexIncludingParams = NIL;
+					stmt->options = NIL;
+					stmt->whereClause = NULL;
+					stmt->unique = true;
+					stmt->primary = false;
+					stmt->isconstraint = false;
+					stmt->concurrent = false;
 
 					relationId = RangeVarGetRelid(makeRangeVar(NULL, NULL, LexIDStr($7), -1),
 								false, false);
@@ -480,7 +508,7 @@ Boot_DeclareUniqueIndexStmt:
 								true, false, false,
 								false, false, true, false, false,
 								false,
-								NULL);
+								stmt);
 					do_end();
 				}
 		;

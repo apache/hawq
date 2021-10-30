@@ -9261,6 +9261,7 @@ ATAddForeignKeyConstraint(AlteredTableInfo *tab, Relation rel,
 									  RelationGetRelid(rel),
 									  fkattnum,
 									  numfks,
+									  numfks,
 									  InvalidOid,		/* not a domain
 														 * constraint */
 									  RelationGetRelid(pkrel),
@@ -19615,6 +19616,7 @@ void InvokeMagmaCreateIndex(FmgrInfo *func,
 	psdata.magma_idx.unique = index->unique;
 	int idxCount = index->indkey->dim1;
 	psdata.magma_idx.colCount = idxCount;
+	psdata.magma_idx.keynums = index->keynums;
 	psdata.magma_idx.indkey = (int*)palloc0(idxCount * sizeof(int));
 	for (int i = 0; i < idxCount; ++i)
 	{

@@ -689,4 +689,6 @@ bool enableOushuDbExtensiveFeatureSupport();
 /* Log ERROR when extensive feature has not been supported, otherwise do nothing */
 void checkOushuDbExtensiveFeatureSupport(char featureCategory[]);
 
+/* Log ERROR when extensive function has not been supported, otherwise do nothing */
+void checkOushuDbExtensiveFunctionSupport(char functionString[]);
 #endif   /* GUC_H */

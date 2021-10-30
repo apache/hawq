@@ -18,23 +18,15 @@
 #
 
 # parse parameters
-usage() { echo "Usage: $0 [-s <3.3.x.x|2.4.0.0|2.4.0.1>] [-t <4.0.0.0>] [-h]" ; exit 1; }
+usage() { echo "Usage: $0 [-s <3.3.x.x|3.4.x.x|2.4.0.0|2.4.0.1>] [-h]" ; exit 1; }
 
 delete_hcatalog=true;
-while getopts ":s:t:h" opt; do
+while getopts ":s:h" opt; do
     case "${opt}" in
         s)
             source_version=${OPTARG}
-            if [[ "$source_version" =~ 3\.3\.[0-9]\.[0-9] || "$source_version" == "2.4.0.0" || "$source_version" == "2.4.0.1" ]];then
+            if [[ "$source_version" =~ 3\.[34]\.[0-9]\.[0-9] || "$source_version" == "2.4.0.0" || "$source_version" == "2.4.0.1" ]];then
                 echo "Input source version is $source_version."
-            else
-                usage
-            fi
-            ;;
-        t)
-            target_version=${OPTARG}
-            if [[ "$target_version" == "4.0.0.0" ]];then
-                echo "Target source version is $target_version"
             else
                 usage
             fi
@@ -51,7 +43,7 @@ done
 
 shift $((OPTIND-1))
 
-if [ -z "${source_version}" ] || [ -z "${target_version}" ]; then
+if [ -z "${source_version}" ]; then
     usage
 fi
 
@@ -59,6 +51,13 @@ if [[ $source_version == "2.4.0.0" || $source_version == "2.4.0.1" ]]; then
     upgrade_total=true
 else
     upgrade_total=false
+fi
+
+upgrade_magmaview_only=false
+if [[ $source_version =~  3\.4\.[0-9]\.[0-9] ]]; then
+    upgrade_magmaview_only=true
+else
+    upgrade_magmaview_only=false
 fi
 
 check_error() {
@@ -92,26 +91,19 @@ fi
 # check master version
 version_str=`hawq --version`
 check_error "get hawq version on master"
-version=`echo "$version_str"| awk -F '[ ]' '{print $3}'`
-if [[ "$version" != "$target_version" ]];then
-    echo "Hawq version:$version is not same with target version:$target_version in master"
-    exit 1;
-fi
+target_version=`echo "$version_str"| awk -F '[ ]' '{print $3}'`
 echo "Upgrade begin, you can find logs of each module in folder $HOME/hawqAdminLogs/upgrade"
 
 MASTER_HOST=`get_guc "hawq_master_address_host"`
 MASTER_PORT=`get_guc "hawq_master_address_port"`
 SEGMENT_PORT=`get_guc "hawq_segment_address_port"`
 MASTER_TEMP_DIR=`get_guc "hawq_master_temp_directory"`
-SEGMENT_TEMP_DIR=`get_guc "hawq_segment_temp_directory"`
 SEGMENT_HOSTS=`cat $GPHOME/etc/slaves`
 OPTIONS='-c gp_maintenance_conn=true'
 
 # check whether all tmp dir exsits
-ls $MASTER_TEMP_DIR $SEGMENT_TEMP_DIR
+ls $MASTER_TEMP_DIR
 check_error "check master and segment temp dir on master"
-gpssh -f $GPHOME/etc/slaves "ls $MASTER_TEMP_DIR $SEGMENT_TEMP_DIR"
-check_error "check master and segment temp dir on all segments"
 
 # check whether all segments replaced with new binary
 result=`gpssh -f $GPHOME/etc/slaves "source $GPHOME/greenplum_path.sh;hawq --version;"`
@@ -141,7 +133,6 @@ check_error "set allow_system_table_mods to all"
 
 hawq start cluster -a
 check_error "start cluster in upgrade mode"
-
 echo "Start hawq cluster in upgrade mode successfully."
 
 if $delete_hcatalog ; then
@@ -170,7 +161,7 @@ install_function_by_database(){
     check_error "install $2 in database $1 in master" $error_count
     echo "Install $2 in database $1 in master successfully."
 
-    if [[ $1 == "template1" ]];then
+    if [[ $1 == "template1" && $2 != "monitor_install" ]];then
         #segment节点函数注册
         gpssh -f $GPHOME/etc/slaves "source $GPHOME/greenplum_path.sh;PGOPTIONS='$OPTIONS' psql -a -p $SEGMENT_PORT -d $1 -f $GPHOME/share/postgresql/${2}.sql 2>&1" > $HOME/hawqAdminLogs/upgrade/${1}_${2}.out
         check_error "install $2 in database $1 in segment"
@@ -182,6 +173,22 @@ install_function_by_database(){
 }
 
 upgrade_catalog() {
+    if $upgrade_magmaview_only ; then
+        PGOPTIONS="$OPTIONS" psql -p $MASTER_PORT -d $1 -c "drop view pg_catalog.hawq_magma_status;
+        CREATE VIEW pg_catalog.hawq_magma_status AS
+        SELECT * FROM hawq_magma_status() AS s
+        (node text,
+         compactJobRunning text,
+         compactJob text,
+         compactActionJobRunning text,
+         compactActionJob text,
+         dirs text,
+         description text);
+        "
+        check_error "update hawq_magma_status view in database $1 in master"
+        echo "update hawq_magma_status view in database $1 in master"
+        return
+    fi
     # template1库更改元数据
     if $2 ; then
         # 1、增加hive权限认证列
@@ -225,7 +232,7 @@ upgrade_catalog() {
 
     # 8、magma函数注册
     install_function_by_database $1 "magma_install"
-    
+
     # 9、监控函数注册
     install_function_by_database $1 "monitor_install"
 }

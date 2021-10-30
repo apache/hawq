@@ -107,6 +107,7 @@ CatalogIndexInsert(CatalogIndexState indstate, HeapTuple heapTuple)
 		 */
 		Assert(indexInfo->ii_Expressions == NIL);
 		Assert(indexInfo->ii_Predicate == NIL);
+		Assert(indexInfo->ii_NumIndexKeyAttrs != 0);
 
 		/*
 		 * FormIndexDatum fills in its values and isnull parameters with the

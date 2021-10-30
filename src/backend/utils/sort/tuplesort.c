@@ -827,7 +827,7 @@ tuplesort_begin_index(Relation indexRel,
 			 enforceUnique ? 't' : 'f',
 			 workMem, randomAccess ? 't' : 'f');
 
-	state->nKeys = RelationGetNumberOfAttributes(indexRel);
+	state->nKeys = IndexRelationGetNumberOfKeyAttributes(indexRel);
 
 	state->comparetup = comparetup_index;
 	state->copytup = copytup_index;
