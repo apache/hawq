@@ -5521,7 +5521,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 			case 'J':
 			{
-			  proxyDispatchRun(dispatchData, pq_getmsgstring(&input_message));
+			  proxyDispatchRun(dispatchData, pq_getmsgbytes(&input_message, 0));
 			  proxyDispatchWait(dispatchData);
 			  proxyDispatchCleanUp(&dispatchData);
 			  send_ready_for_query = true;
