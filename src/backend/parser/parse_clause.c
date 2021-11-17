@@ -3218,30 +3218,10 @@ addTargetToSortList(ParseState *pstate, TargetEntry *tle,
 		/* if tlist item is an UNKNOWN literal, change it to TEXT */
 		if (restype == UNKNOWNOID && resolveUnknown)
 		{
-			Oid		tobe_type = InvalidOid;
-			int32	tobe_typmod;
-
-			if (pstate->p_setopTypes)
-			{
-				/* UNION, etc. case. */
-				int		idx = tle->resno - 1;
-
-				Assert(pstate->p_setopTypmods);
-				tobe_type = list_nth_oid(pstate->p_setopTypes, idx);
-				tobe_typmod = list_nth_int(pstate->p_setopTypmods, idx);
-			}
-
-			if (!OidIsValid(tobe_type))
-			{
-				tobe_type = TEXTOID;
-				tobe_typmod = -1;
-			}
-			tle->expr = (Expr *) coerce_type(pstate, (Node *) tle->expr,
-											 restype, tobe_type, tobe_typmod,
-											 COERCION_IMPLICIT,
-											 COERCE_IMPLICIT_CAST,
-											 -1);
-			restype = tobe_type;
+			tle->expr = (Expr *) coerce_type(
+					pstate, (Node *) tle->expr, restype, TEXTOID, -1,
+					COERCION_IMPLICIT, COERCE_IMPLICIT_CAST, -1);
+			restype = TEXTOID;
 		}
 
 		sortcl->tleSortGroupRef = assignSortGroupRef(tle, targetlist);
