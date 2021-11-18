@@ -102,7 +102,7 @@ SEGMENT_HOSTS=`cat $GPHOME/etc/slaves`
 OPTIONS='-c gp_maintenance_conn=true'
 
 # check whether all tmp dir exsits
-ls $MASTER_TEMP_DIR
+echo $MASTER_TEMP_DIR | sed "s/,/ /g" | xargs ls
 check_error "check master and segment temp dir on master"
 
 # check whether all segments replaced with new binary
