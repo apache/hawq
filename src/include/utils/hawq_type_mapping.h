@@ -81,6 +81,8 @@
 
 #define HAWQ_TYPE_UNKNOWN 705
 
+#define HAEQ_TYPE_UDT(x) ( x > FirstNormalObjectId)
+
 extern int32_t map_hawq_type_to_common_plan(int32_t hawqTypeID);
 
 // if hawq type unsupported, return true

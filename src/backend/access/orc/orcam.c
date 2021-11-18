@@ -74,6 +74,7 @@ typedef struct OrcFormatData {
   char **colRawValues;
   uint64 *colValLength;
   TimestampType *colTimestamp;
+  struct varlena **colFixedLenUDT;
 } OrcFormatData;
 
 static void initOrcFormatUserData(TupleDesc tup_desc,
@@ -86,8 +87,16 @@ static void initOrcFormatUserData(TupleDesc tup_desc,
   orcFormatData->colRawValues = palloc0(sizeof(char *) * natts);
   orcFormatData->colValLength = palloc0(sizeof(uint64) * natts);
   orcFormatData->colTimestamp = palloc0(sizeof(TimestampType) * natts);
+  orcFormatData->colFixedLenUDT = palloc0(sizeof(struct varlena *) * natts);
 
   for (int i = 0; i < orcFormatData->numberOfColumns; ++i) {
+    // allocate memory for colFixedLenUDT[i] of fixed-length type in advance
+    bool isFixedLengthType = tup_desc->attrs[i]->attlen > 0 ? true : false;
+    if (isFixedLengthType) {
+      orcFormatData->colFixedLenUDT[i] = (struct valena *)palloc0(
+          tup_desc->attrs[i]->attlen + sizeof(uint32_t));
+    }
+
     orcFormatData->colNames[i] = palloc0(NAMEDATALEN);
     strcpy(orcFormatData->colNames[i], tup_desc->attrs[i]->attname.data);
 
@@ -105,8 +114,12 @@ static void initOrcFormatUserData(TupleDesc tup_desc,
 }
 
 static freeOrcFormatUserData(OrcFormatData *orcFormatData) {
-  for (int i = 0; i < orcFormatData->numberOfColumns; ++i)
+  for (int i = 0; i < orcFormatData->numberOfColumns; ++i) {
     pfree(orcFormatData->colNames[i]);
+    if (orcFormatData->colFixedLenUDT[i])
+      pfree(orcFormatData->colFixedLenUDT[i]);
+  }
+
   pfree(orcFormatData->colTimestamp);
   pfree(orcFormatData->colValLength);
   pfree(orcFormatData->colRawValues);
@@ -235,17 +248,37 @@ static void convertAndFillIntoOrcFormatData(OrcFormatData *orcFormatData,
       int *date = (int *)(&(values[i]));
       *date += POSTGRES_EPOCH_JDATE - UNIX_EPOCH_JDATE;
       orcFormatData->colRawValues[i] = (char *)(&(values[i]));
-    } else if (dataType == HAWQ_TYPE_TEXT || dataType == HAWQ_TYPE_BPCHAR ||
-               dataType == HAWQ_TYPE_VARCHAR) {
-      struct varlena *data = PG_DETOAST_DATUM(values[i]);
-      orcFormatData->colRawValues[i] = (char *)data;
-    } else if (dataType == HAWQ_TYPE_BYTE) {
-      orcFormatData->colRawValues[i] = (char *)PG_DETOAST_DATUM(values[i]);
     } else if (dataType == HAWQ_TYPE_NUMERIC) {
       Numeric num = DatumGetNumeric(values[i]);
       orcFormatData->colRawValues[i] = (char *)num;
-      if (NUMERIC_IS_NAN(num))
-        nulls[i] = true;
+      if (NUMERIC_IS_NAN(num)) nulls[i] = true;
+    } else {
+      // Check whether values[i] is fixed length udt.
+      bool isFixedLengthType = tupleDesc->attrs[i]->attlen > 0 ? true : false;
+      bool isPassByVal = tupleDesc->attrs[i]->attbyval;
+      if (isFixedLengthType) {
+        uint32_t dataLen = tupleDesc->attrs[i]->attlen;
+        uint32_t totalLen = dataLen + sizeof(uint32_t);
+
+        uint32_t tmpLen = __builtin_bswap32(totalLen);
+        char *lenArr = (char *)(&tmpLen);
+        memcpy(orcFormatData->colFixedLenUDT[i]->vl_len_, lenArr,
+               sizeof(uint32_t));
+
+        if (isPassByVal) {  // pass by val
+          char *data = (char *)(&values[i]);
+          memcpy(orcFormatData->colFixedLenUDT[i]->vl_dat, data, dataLen);
+          orcFormatData->colRawValues[i] =
+              (char *)(orcFormatData->colFixedLenUDT[i]);
+        } else {  // pass by pointer
+          char *data = (char *)(values[i]);
+          memcpy(orcFormatData->colFixedLenUDT[i]->vl_dat, data, dataLen);
+          orcFormatData->colRawValues[i] =
+              (char *)(orcFormatData->colFixedLenUDT[i]);
+        }
+      } else {
+        orcFormatData->colRawValues[i] = (char *)PG_DETOAST_DATUM(values[i]);
+      }
     }
   }
 }
@@ -402,51 +435,68 @@ void orcReadNext(OrcScanDescData *scanData, TupleTableSlot *slot) {
         continue;
 
       switch (tupleDesc->attrs[i]->atttypid) {
-      case HAWQ_TYPE_BOOL: {
-        values[i] = BoolGetDatum(*(bool *)(orcFormatData->colRawValues[i]));
-        break;
-      }
-      case HAWQ_TYPE_INT2: {
-        values[i] = Int16GetDatum(*(int16_t *)(orcFormatData->colRawValues[i]));
-        break;
-      }
-      case HAWQ_TYPE_INT4: {
-        values[i] = Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]));
-        break;
-      }
-      case HAWQ_TYPE_INT8:
-      case HAWQ_TYPE_TIME:
-      case HAWQ_TYPE_TIMESTAMP:
-      case HAWQ_TYPE_TIMESTAMPTZ: {
-        values[i] = Int64GetDatum(*(int64_t *)(orcFormatData->colRawValues[i]));
-        break;
-      }
-      case HAWQ_TYPE_FLOAT4: {
-        values[i] = Float4GetDatum(*(float *)(orcFormatData->colRawValues[i]));
-        break;
-      }
-      case HAWQ_TYPE_FLOAT8: {
-        values[i] = Float8GetDatum(*(double *)(orcFormatData->colRawValues[i]));
-        break;
-      }
-      case HAWQ_TYPE_VARCHAR:
-      case HAWQ_TYPE_TEXT:
-      case HAWQ_TYPE_BPCHAR:
-      case HAWQ_TYPE_BYTE:
-      case HAWQ_TYPE_NUMERIC: {
-        SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[i]),
-                    orcFormatData->colValLength[i]);
-        values[i] = PointerGetDatum(orcFormatData->colRawValues[i]);
-        break;
-      }
-      case HAWQ_TYPE_DATE: {
-        values[i] = Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]) -
-                                  POSTGRES_EPOCH_JDATE + UNIX_EPOCH_JDATE);
-        break;
-      }
-      default: {
-        break;
-      }
+        case HAWQ_TYPE_BOOL: {
+          values[i] = BoolGetDatum(*(bool *)(orcFormatData->colRawValues[i]));
+          break;
+        }
+        case HAWQ_TYPE_INT2: {
+          values[i] =
+              Int16GetDatum(*(int16_t *)(orcFormatData->colRawValues[i]));
+          break;
+        }
+        case HAWQ_TYPE_INT4: {
+          values[i] =
+              Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]));
+          break;
+        }
+        case HAWQ_TYPE_INT8:
+        case HAWQ_TYPE_TIME:
+        case HAWQ_TYPE_TIMESTAMP:
+        case HAWQ_TYPE_TIMESTAMPTZ: {
+          values[i] =
+              Int64GetDatum(*(int64_t *)(orcFormatData->colRawValues[i]));
+          break;
+        }
+        case HAWQ_TYPE_FLOAT4: {
+          values[i] =
+              Float4GetDatum(*(float *)(orcFormatData->colRawValues[i]));
+          break;
+        }
+        case HAWQ_TYPE_FLOAT8: {
+          values[i] =
+              Float8GetDatum(*(double *)(orcFormatData->colRawValues[i]));
+          break;
+        }
+        case HAWQ_TYPE_DATE: {
+          values[i] =
+              Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[i]) -
+                            POSTGRES_EPOCH_JDATE + UNIX_EPOCH_JDATE);
+          break;
+        }
+        default: {
+          // Check whether value[i] is fixed length udt.
+          bool isFixedLengthType =
+              tupleDesc->attrs[i]->attlen > 0 ? true : false;
+          bool isPassByVal = tupleDesc->attrs[i]->attbyval;
+          if (isFixedLengthType) {
+            if (isPassByVal) {  // pass by val
+              struct varlena *var =
+                  (struct varlena *)(orcFormatData->colRawValues[i]);
+              uint32 valLen = *(uint32 *)(var->vl_len_);
+              memcpy((void *)&values[i], var->vl_dat, valLen);
+            } else {  // pass by pointer
+              SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[i]),
+                          orcFormatData->colValLength[i]);
+              values[i] = PointerGetDatum(orcFormatData->colRawValues[i] +
+                                          sizeof(uint32_t));
+            }
+          } else {
+            SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[i]),
+                        orcFormatData->colValLength[i]);
+            values[i] = PointerGetDatum(orcFormatData->colRawValues[i]);
+          }
+          break;
+        }
       }
     }
     TupSetVirtualTupleNValid(slot, slot->tts_tupleDescriptor->natts);

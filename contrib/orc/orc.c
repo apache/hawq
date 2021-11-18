@@ -337,36 +337,44 @@ Datum orc_validate_encodings(PG_FUNCTION_ARGS)
  * void
  * orc_validate_datatypes(TupleDesc tupDesc)
  */
-Datum orc_validate_datatypes(PG_FUNCTION_ARGS)
-{
-	PlugStorageValidator psv = (PlugStorageValidator) (fcinfo->context);
-	TupleDesc tup_desc = psv->tuple_desc;
+Datum orc_validate_datatypes(PG_FUNCTION_ARGS) {
+  PlugStorageValidator psv = (PlugStorageValidator)(fcinfo->context);
+  TupleDesc tup_desc = psv->tuple_desc;
 
-	for (int i = 0; i < tup_desc->natts; ++i)
-	{
-		int32_t datatype =
-				(int32_t) (((Form_pg_attribute) (tup_desc->attrs[i]))->atttypid);
-		int4 	typmod = ((Form_pg_attribute) (tup_desc->attrs[i]))->atttypmod;
+  for (int i = 0; i < tup_desc->natts; ++i) {
+    int32_t datatype =
+        (int32_t)(((Form_pg_attribute)(tup_desc->attrs[i]))->atttypid);
+    int4 typmod = ((Form_pg_attribute)(tup_desc->attrs[i]))->atttypmod;
 
-		if (checkORCUnsupportedDataType(datatype))
-		{
-			ereport(ERROR,
-					(errcode(ERRCODE_SYNTAX_ERROR), errmsg("unsupported data types %s for columns of external ORC table is specified.", TypeNameToString(makeTypeNameFromOid(datatype, -1))), errOmitLocation(true)));
-		}
-		if (HAWQ_TYPE_NUMERIC == datatype)
-		{
-			int4 tmp_typmod = typmod - VARHDRSZ;
-			int precision = (tmp_typmod >> 16) & 0xffff;
-			int scale = tmp_typmod & 0xffff;
-			if (precision < 1 || 38 < precision)
-				ereport(ERROR,
-						(errcode(ERRCODE_INVALID_PARAMETER_VALUE), errmsg("ORC DECIMAL precision must be between 1 and 38")));
-			if (scale == 0)
-				ereport(NOTICE, (errmsg("Using a scale of zero for ORC DECIMAL")));
-		}
-	}
+    if (checkORCUnsupportedDataType(datatype)) {
+      ereport(ERROR,
+              (errcode(ERRCODE_SYNTAX_ERROR),
+               errmsg("unsupported data types %s for columns of external ORC "
+                      "table is specified.",
+                      TypeNameToString(makeTypeNameFromOid(datatype, -1))),
+               errOmitLocation(true)));
+    }
+    if (HAWQ_TYPE_NUMERIC == datatype) {
+      int4 tmp_typmod = typmod - VARHDRSZ;
+      int precision = (tmp_typmod >> 16) & 0xffff;
+      int scale = tmp_typmod & 0xffff;
+      if (precision < 1 || 38 < precision)
+        ereport(ERROR,
+                (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+                 errmsg("ORC DECIMAL precision must be between 1 and 38")));
+      if (scale == 0)
+        ereport(NOTICE, (errmsg("Using a scale of zero for ORC DECIMAL")));
+    }
+    if (HAEQ_TYPE_UDT(datatype))
+      ereport(ERROR,
+              (errcode(ERRCODE_SYNTAX_ERROR),
+               errmsg("unsupported data types %s for columns of external ORC "
+                      "table is specified.",
+                      TypeNameToString(makeTypeNameFromOid(datatype, -1))),
+               errOmitLocation(true)));
+  }
 
-	PG_RETURN_VOID() ;
+  PG_RETURN_VOID();
 }
 
 /*
