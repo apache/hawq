@@ -59,6 +59,7 @@ extern void sendSegQEDetails(struct ProxyDispatchData *data);
 extern void proxyDispatchRun(struct ProxyDispatchData *data, char *connMsg);
 extern void proxyDispatchWait(struct ProxyDispatchData *data);
 extern void proxyDispatchCleanUp(struct ProxyDispatchData **data);
+extern bool proxyDispatchHasError(struct ProxyDispatchData *data);
 
 // dispatch statement
 extern void mainDispatchStmtNode(struct Node *node,

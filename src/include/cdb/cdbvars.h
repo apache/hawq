@@ -144,6 +144,8 @@ extern char *gp_role_string;	/* Use by guc.c as staging area for value. */
 extern const char *assign_gp_role(const char *newval, bool doit, GucSource source);
 extern const char *show_gp_role(void);
 
+extern bool proxy_dispatcher_prepare_error;
+
 extern bool gp_reraise_signal; /* try to force a core dump ?*/
 
 extern bool gp_version_mismatch_error;	/* Enforce same-version on QD&QE. */

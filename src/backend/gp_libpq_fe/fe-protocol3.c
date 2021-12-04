@@ -293,6 +293,7 @@ pqParseInput3(PGconn *conn)
 				}
 				break;
 				case 'E':		/* error return */
+				    conn->dispBuffer.len = 0;
 					if (pqGetErrorNotice3(conn, true))
 						return;
 					conn->asyncStatus = PGASYNC_READY;

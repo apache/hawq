@@ -3501,9 +3501,9 @@ PQoptions(const PGconn *conn)
 	return conn->pgoptions;
 }
 
-int PQgetQEsDetail(PGconn *conn, char *connMsg, int connMsgLen) {
+bool PQgetQEsDetail(PGconn *conn, char *connMsg, int connMsgLen) {
   if (!conn || (PQstatus(conn) == CONNECTION_BAD))
-      return -1;
+      return false;
   pqPacketSend(conn, 'V', connMsg, connMsgLen+1);
 
   resetPQExpBuffer(&conn->dispBuffer);
@@ -3512,21 +3512,21 @@ int PQgetQEsDetail(PGconn *conn, char *connMsg, int connMsgLen) {
   if (PG_PROTOCOL_MAJOR(conn->pversion) >= 3)
     pqParseInput3(conn);
   else
-    return -1;
+    return false;
 
   while (!conn->dispBuffer.len)
   {
     pqWait(TRUE, FALSE, conn);
     if (pqReadData(conn) < 0)
-      return -1;
+      return false;
 
     if (PG_PROTOCOL_MAJOR(conn->pversion) >= 3)
       pqParseInput3(conn);
     else
-      return -1;
+      return false;
   }
 
-  return 0;
+  return true;
 }
 
 /* GPDB function to retrieve QE-backend details (motion listener) */

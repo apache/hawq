@@ -91,7 +91,7 @@ void mainDispatchFuncConnect(struct MyQueryExecutorGroup *qeGrp,
   foreach (lc, qeGrp->qes) {
     myQe = lfirst(lc);
 
-    if (workermgr_should_query_stop(state)) break;
+    if (workermgr_should_query_stop(state)) goto error;
 
     if (!executormgr_main_doconnect(myQe)) goto error;
   }
@@ -201,7 +201,7 @@ void proxyDispatchFuncConnect(struct MyQueryExecutorGroup *qeGrp,
   foreach (lc, qeGrp->qes) {
     myQe = lfirst(lc);
 
-    if (workermgr_should_query_stop(state)) break;
+    if (workermgr_should_query_stop(state)) goto error;
 
     if (!executormgr_proxy_doconnect(myQe)) {
       write_log("%s: failed to startup new qe.", __func__);

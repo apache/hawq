@@ -445,8 +445,26 @@ cdbconn_main_doconnect(SegmentDatabaseDescriptor *segdbDesc,
    * Wait for it to respond giving us the TCP port number
    * where it listens for connections from the gang below.
    */
-  PQgetQEsDetail(segdbDesc->conn, connMsg->data, connMsg->len);
+  if(!PQgetQEsDetail(segdbDesc->conn, connMsg->data, connMsg->len)){
+    if (!segdbDesc->errcode)
+      segdbDesc->errcode = ERRCODE_GP_INTERCONNECTION_ERROR;
 
+    write_log("Master unable to getQEsDetail from %s : %s\nConnection option: %s",
+              segdbDesc->whoami, PQerrorMessage(segdbDesc->conn),
+              connection_string);
+
+    appendPQExpBuffer(&segdbDesc->error_message,
+                      "Master unable to getQEsDetail from %s: %s\n",
+                      segdbDesc->whoami, PQerrorMessage(segdbDesc->conn));
+
+    /* Don't use elog, it's not thread-safe */
+    if (gp_log_gang >= GPVARS_VERBOSITY_DEBUG)
+      write_log("%s\n", segdbDesc->error_message.data);
+
+    PQfinish(segdbDesc->conn);
+    segdbDesc->conn = NULL;
+    return false;
+  }
 
   /*
    * Check for connection reset.

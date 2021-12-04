@@ -316,15 +316,25 @@ bool executormgr_main_consumeData(struct MyQueryExecutor *qe) {
       done = true;
       break;
     }
-    int qeIndex;
-    cdbdisp_deserializeDispatchResult(NULL, &qeIndex, &conn->dispBuffer);
-    myQe = getTaskRefQE((struct MyDispatchTask *)(list_nth(
-        list_nth(getTaskPerSegmentList(qe->refTask), qe->execIndex), qeIndex)));
-    struct CdbDispatchResult *refResult = myQe->refResult;
-    cdbdisp_deserializeDispatchResult(refResult, &qeIndex, &conn->dispBuffer);
-    conn->asyncStatus = PGASYNC_BUSY;
-    if (refResult->errcode != 0) {
-      cdbdisp_seterrcode(refResult->errcode, -1, refResult);
+    if (PQstatus(conn) == CONNECTION_BAD) goto error;
+
+    if (conn->dispBuffer.len != 0) {
+      int qeIndex;
+      cdbdisp_deserializeDispatchResult(NULL, &qeIndex, &conn->dispBuffer);
+      myQe = getTaskRefQE((struct MyDispatchTask *)(list_nth(
+          list_nth(getTaskPerSegmentList(qe->refTask), qe->execIndex),
+          qeIndex)));
+      struct CdbDispatchResult *refResult = myQe->refResult;
+      cdbdisp_deserializeDispatchResult(refResult, &qeIndex, &conn->dispBuffer);
+      conn->asyncStatus = PGASYNC_BUSY;
+      if (refResult->errcode != 0) {
+        cdbdisp_seterrcode(refResult->errcode, -1, refResult);
+        goto error;
+      }
+    } else {
+      PQgetResult(conn);
+      write_log("main dispatcher got error msg from proxy dispatcher: %s",
+                conn->errorMessage.data);
       goto error;
     }
   }
@@ -467,7 +477,7 @@ bool executormgr_main_cancel(struct MyQueryExecutor *qe) {
   char errbuf[256];
   MemSet(errbuf, 0, sizeof(errbuf));
   bool success = (PQcancel(cn, errbuf, sizeof(errbuf)) != 0);
-  if(!success){
+  if (!success) {
     write_log("executormgr_main_cancel cancel failed, %s.", errbuf);
   }
   PQfreeCancel(cn);
@@ -488,7 +498,7 @@ bool executormgr_proxy_cancel(struct MyQueryExecutor *qe, bool cancelRequest) {
     char errbuf[256];
     MemSet(errbuf, 0, sizeof(errbuf));
     success = (PQcancel(cn, errbuf, sizeof(errbuf)) != 0);
-    if(!success){
+    if (!success) {
       write_log("executormgr_proxy_cancel cancel failed, %s.", errbuf);
     }
     PQfreeCancel(cn);

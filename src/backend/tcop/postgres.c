@@ -4784,6 +4784,10 @@ PostgresMain(int argc, char *argv[], const char *username)
 
 		/* Now we can allow interrupts again */
 		RESUME_INTERRUPTS();
+
+		if(proxy_dispatcher_prepare_error){
+		  exit(0);
+		}
 	}
 
 	/* We can now handle ereport(ERROR) */
@@ -5512,6 +5516,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 			  }
 			  PG_CATCH();
 			  {
+			    proxy_dispatcher_prepare_error = true;
 			    proxyDispatchCleanUp(&dispatchData);
 			    PG_RE_THROW();
 			  }

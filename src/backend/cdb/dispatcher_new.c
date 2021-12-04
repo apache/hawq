@@ -1383,6 +1383,12 @@ void proxyDispatchPrepare(struct ProxyDispatchData *data) {
     workermgr_wait_job(state);
   }
 
+  if(proxyDispatchHasError(data)){
+    MemoryContextSwitchTo(old);
+    ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+                    errmsg("proxy dispatcher failed to connect to segment")));
+  }
+
   MemoryContextSwitchTo(old);
 }
 
@@ -1449,6 +1455,10 @@ void proxyDispatchCleanUp(struct ProxyDispatchData **data) {
   proxyDispatchEndEnv(*data);
 
   *data = NULL;
+}
+
+bool proxyDispatchHasError(struct ProxyDispatchData *data) {
+  return data->cdata.results && data->cdata.results->errcode;
 }
 
 void mainDispatchStmtNode(struct Node *node, struct QueryContextInfo *ctx,
