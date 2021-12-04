@@ -24,6 +24,7 @@
 #include "funcapi.h"
 #include "c.h"
 #include "access/filesplit.h"
+#include "utils/builtins.h"
 #include "utils/uri.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbfilesystemcredential.h"
@@ -387,9 +388,13 @@ Datum extfmtcommon_out(PG_FUNCTION_ARGS)
 		{
 			continue;
 		}
+		/* workaround for preserving float precision */
+		int bak_extra_float_digits = extra_float_digits;
+		extra_float_digits = 3;
 		userData->colRawValues[i] = OutputFunctionCall(
 				&(FORMATTER_GET_CONVERSION_FUNCS(fcinfo)[i]),
 				userData->colValues[i]);
+		extra_float_digits = bak_extra_float_digits;
 		if (((FormatterData *) (fcinfo->context))->fmt_needs_transcoding)
 		{
 			char *cvt = NULL;

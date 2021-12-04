@@ -83,8 +83,8 @@ static Point *line_interpt_internal(LINE *l1, LINE *l2);
 #define RDELIM_C		'>'
 
 /* Maximum number of characters printed by pair_encode() */
-/* ...+2+7 : 2 accounts for extra_float_digits max value */
-#define P_MAXLEN (2*(DBL_DIG+2+7)+1)
+/* ...+3+7 : 3 accounts for extra_float_digits max value */
+#define P_MAXLEN (2*(DBL_DIG+3+7)+1)
 
 
 /*
