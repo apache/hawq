@@ -4935,13 +4935,21 @@ format_opt:
 			;
 
 format_opt_list:
-			format_opt_item2		
-			{ 
-				$$ = list_make1($1);
+			format_opt_item2
+			{
+				$$ = list_make1($1)
 			}
-			| format_opt_list format_opt_item2		
-			{ 
-				$$ = lappend($1, $2); 
+			| format_opt_item2 '=' format_opt_item2
+			{
+				$$ = list_make2($1,$3);
+			}
+			| format_opt_list format_opt_item2
+			{
+				$$ = lappend($1, $2);
+			}
+			| format_opt_list format_opt_item2 '=' format_opt_item2
+			{
+				$$ = lappend(lappend($1, $2),$4);
 			}
 			;
 
