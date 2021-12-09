@@ -4903,7 +4903,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 		/*
 		 * (3) read a command (loop blocks here)
 		 */
-		if (Gp_role == GP_ROLE_DISPATCH)
+		if (Gp_role == GP_ROLE_DISPATCH && !gp_is_proxy_dispatcher)
 		{
 			/*
 			 * We want to check to see if our session goes "idle" (nobody sending us work to do)
@@ -5504,6 +5504,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 			case 'V':  /* HAWQ proxy dispatcher startup info*/
 			{
 			  Gp_role = GP_ROLE_DISPATCH;  // I am proxy dispatcher
+			  gp_is_proxy_dispatcher = true;
 			  PG_TRY();
 			  {
 			    set_ps_display("proxy dispatcher", false);

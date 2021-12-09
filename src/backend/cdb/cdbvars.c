@@ -54,6 +54,7 @@
 GpRoleValue Gp_role;			/* Role paid by this Greenplum Database backend */
 char	   *gp_role_string;	/* Staging area for guc.c */
 bool		gp_set_read_only;	/* Staging area for guc.c */
+bool        gp_is_proxy_dispatcher = false;
 bool        proxy_dispatcher_prepare_error = false;
 
 GpRoleValue Gp_session_role;	/* Role paid by this Greenplum Database backend */
