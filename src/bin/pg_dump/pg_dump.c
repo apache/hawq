@@ -7851,7 +7851,7 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 
 		/* web table */
 		if ((command && strlen(command) > 0) ||
-			(strncmp(locations + 1, "http", strlen("http")) == 0))
+			(strncasecmp(locations + 1, "http", strlen("http")) == 0))
 		{
 			isexternal = true;
 			isweb = true;
@@ -7865,7 +7865,7 @@ dumpTableSchema(Archive *fout, TableInfo *tbinfo)
 					fmtId(tbinfo->dobj.name));
 		}
 		/* gpfdist table */
-		else if (strncmp(locations + 1, "gpfdist", strlen("gpfdist")) == 0)
+		else if (strncasecmp(locations + 1, "gpfdist", strlen("gpfdist")) == 0)
 		{
 			isexternal = true;
 			if (writable && writable[0] == 't')
