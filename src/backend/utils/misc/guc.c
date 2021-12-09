@@ -5269,7 +5269,7 @@ static struct config_int ConfigureNamesInt[] =
 		{"statement_timeout", PGC_USERSET, CLIENT_CONN_STATEMENT,
 			gettext_noop("Sets the maximum allowed duration (in milliseconds) of any statement."),
 			gettext_noop("A value of 0 turns off the timeout."),
-			GUC_UNIT_MS | GUC_GPDB_ADDOPT | GUC_NEW_DISP
+			GUC_UNIT_MS | GUC_GPDB_ADDOPT
 		},
 		&StatementTimeout,
 		0, 0, INT_MAX, NULL, NULL
@@ -5279,7 +5279,7 @@ static struct config_int ConfigureNamesInt[] =
 		{"gp_vmem_idle_resource_timeout", PGC_USERSET, CLIENT_CONN_OTHER,
 			gettext_noop("Sets the time a session can be idle (in milliseconds) before we release gangs on the segment DBs to free resources."),
 			gettext_noop("A value of 0 means closing idle gangs at once"),
-			GUC_UNIT_MS | GUC_GPDB_ADDOPT | GUC_NEW_DISP
+			GUC_UNIT_MS | GUC_GPDB_ADDOPT
 		},
 		&IdleSessionGangTimeout,
 #ifdef USE_ASSERT_CHECKING
