@@ -470,7 +470,7 @@ ExecInsert(TupleTableSlot *slot,
 															 formatterName,
 															 estate->es_plannedstmt,
 															 segfileinfo->segno,
-															 PlugStorageGetTransactionSnapshot());
+															 PlugStorageGetTransactionSnapshot(NULL));
 				}
 				else
 				{
@@ -723,7 +723,7 @@ ldelete:;
 	                    InvokeMagmaBeginDelete(&procInfo,
 	                                           resultRelationDesc,
 	                                           estate->es_plannedstmt,
-	                                           PlugStorageGetTransactionSnapshot());
+	                                           PlugStorageGetTransactionSnapshot(NULL));
 		    }
 	        else
 	        {
@@ -1043,7 +1043,7 @@ lreplace:;
 		                    InvokeMagmaBeginUpdate(&procInfo,
 		                                           resultRelationDesc,
 		                                           estate->es_plannedstmt,
-		                                           PlugStorageGetTransactionSnapshot());
+		                                           PlugStorageGetTransactionSnapshot(NULL));
 		            elog(LOG, "exec update begin update: %d", extUpdDescEntry->ext_ins_oid);
 		        }
 		        else

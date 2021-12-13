@@ -977,8 +977,9 @@ index_create(Oid heapRelationId,
 		// 2. start transaction in magma for CREATE INDEX
 		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
 		{
-			PlugStorageBeginTransaction(NULL);
+                  PlugStorageStartTransaction();
 		}
+                PlugStorageGetTransactionId(NULL);
 		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 
 		// 3. call InvokeMagmaCreateIndex
@@ -1006,7 +1007,7 @@ index_create(Oid heapRelationId,
 		InvokeMagmaCreateIndex(
 				&procInfo, database_name, schemaname,
 				tablename, &idxinfo,
-				PlugStorageGetTransactionSnapshot());
+				PlugStorageGetTransactionSnapshot(NULL));
 		// free memory
 		pfree(idxinfo.indkey);
 	}
@@ -1281,8 +1282,9 @@ index_drop(Oid indexId)
 		// 2. start transaction in magma for DROP INDEX
 		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
 		{
-			PlugStorageBeginTransaction(NULL);
+                  PlugStorageStartTransaction();
 		}
+                PlugStorageGetTransactionId(NULL);
 		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 
 		// 3. call InvokeMagmaDropIndex
@@ -1302,7 +1304,7 @@ index_drop(Oid indexId)
 		InvokeMagmaDropIndex(
 				&procInfo, database_name, schemaname,
 				tablename, indexName,
-				PlugStorageGetTransactionSnapshot());
+				PlugStorageGetTransactionSnapshot(NULL));
 	}
 
 	/*
@@ -1475,7 +1477,7 @@ index_update_stats(Relation rel, bool hasindex, bool isprimary,
 	 * this relpages are only needed by QE,
 	 * when this is a magma table, just ignore this info.
 	 */
-	if (!((RelationIsExternal(rel) && RelationIsMagmaTable(rel->rd_id))))
+	if (!RelationIsMagmaTable2(rel->rd_id))
 		relpages = RelationGetNumberOfBlocks(rel);
 	Oid			relid = RelationGetRelid(rel);
 	Relation	pg_class;
@@ -2846,8 +2848,9 @@ reindex_index(Oid indexId, Oid newrelfilenode, List **extra_oids)
 		// 2. start transaction in magma for REINDEX INDEX
 		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
 		{
-			PlugStorageBeginTransaction(NULL);
+                  PlugStorageStartTransaction();
 		}
+                PlugStorageGetTransactionId(NULL);
 		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 
 		// 3. call InvokeMagmaReindexIndex
@@ -2867,7 +2870,7 @@ reindex_index(Oid indexId, Oid newrelfilenode, List **extra_oids)
 		InvokeMagmaReindexIndex(
 				&procInfo, database_name, schemaname,
 				tablename, indexName,
-				PlugStorageGetTransactionSnapshot());
+				PlugStorageGetTransactionSnapshot(NULL));
 	}
 
 	/* Close rels, but keep locks */

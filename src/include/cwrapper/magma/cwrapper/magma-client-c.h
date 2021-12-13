@@ -127,6 +127,34 @@ __attribute__((weak)) typedef struct MagmaColumn {
   int32_t id;
 } MagmaColumn;
 
+__attribute__((weak)) typedef int BackendId;
+
+__attribute__((weak)) typedef uint32_t LocalTransactionId;
+
+__attribute__((weak)) typedef struct VirtualTransactionId {
+  BackendId backendId;
+  LocalTransactionId localTransactionId;
+} VirtualTransactionId;
+
+__attribute__((weak)) typedef uint64_t MagmaTransactionId;
+
+__attribute__((weak)) typedef uint8_t TransactionStatus;
+
+__attribute__((weak)) struct MagmaRgIds;
+
+__attribute__((weak)) typedef struct MagmaRgIds MagmaRgIds;
+
+__attribute__((weak)) typedef struct MagmaTransactionState {
+  VirtualTransactionId
+      virtualTransactionId;  // used for 'magma lock', generated on magma
+  // client startTransaction
+  MagmaTransactionId transactionId;  // useless for read only transaction
+  uint32_t commandId;                // useless for read only transaction
+  TransactionStatus state;
+  MagmaRgIds *relatedRgIds;
+  MagmaTxnAction currentTransaction;
+} MagmaTransactionState;
+
 __attribute__((weak)) typedef struct MagmaReplicaGroup {
   uint32_t id;
   uint16_t port;
@@ -143,8 +171,6 @@ __attribute__((weak)) typedef struct MagmaTableFullName {
 __attribute__((weak)) typedef void *MagmaTablePtr;
 __attribute__((weak)) typedef void *MagmaRangeDistPtr;
 __attribute__((weak)) typedef void *MagmaRangePtr;
-
-__attribute__((weak)) typedef struct MagmaTransactionState MagmaTransactionState;
 
 #ifdef __cplusplus
 }

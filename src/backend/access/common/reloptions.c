@@ -545,6 +545,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		        // XXX(changyong): The default zlib compression level of ORC table is Z_DEFAULT_COMPRESSION,
 		        // and this is different from hive of which default compression level is (Z_BEST_SPEED + 1).
 		        && (strcmp(compresstype, "zlib") != 0)
+		        && (strcmp(compresstype, "zstd") != 0)
 		        && (strcmp(compresstype, "none") != 0))
     {
       ereport(ERROR,

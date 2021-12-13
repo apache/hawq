@@ -17,6 +17,7 @@
  */
 
 #include "optimizer/newPlanner.h"
+#include "catalog/catalog.h"
 
 #include "access/aomd.h"
 #include "access/fileam.h"
@@ -54,6 +55,7 @@ char *new_executor_enable_partitioned_hashjoin_mode;
 char *new_executor_enable_external_sort_mode;
 int new_executor_partitioned_hash_recursive_depth_limit;
 int new_executor_ic_tcp_client_limit_per_query_per_segment;
+int new_executor_external_sort_memory_limit_size_mb;
 
 const char *new_executor_runtime_filter_mode;
 const char *new_executor_runtime_filter_mode_local = "local";
@@ -99,6 +101,8 @@ static void
 do_convert_magma_rangevseg_map_to_common_plan(CommonPlanContext *ctx);
 static void do_convert_rangetbl_to_common_plan(List *rtable,
                                                CommonPlanContext *ctx);
+static void do_convert_result_partitions_to_common_plan(
+    PartitionNode *partitionNode, CommonPlanContext *ctx);
 static void do_convert_token_map_to_common_plan(CommonPlanContext *ctx);
 static void do_convert_snapshot_to_common_plan(CommonPlanContext *ctx);
 static void do_convert_splits_list_to_common_plan(List *splits, Oid relOid,
@@ -132,6 +136,19 @@ static void checkReadStatsOnlyForAgg(Agg *node, CommonPlanContext *ctx);
 static bool checkSupportedSubLinkType(SubLinkType sublinkType);
 static bool checkInsertSupportTable(PlannedStmt *stmt);
 static bool checkIsPrepareQuery(QueryDesc *queryDesc);
+
+// @return format string whose life time goes along with current MemoryContext
+static const char *buildInternalTableFormatOptionStringInJson(Relation rel) {
+  AppendOnlyEntry *aoentry =
+      GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
+  StringInfoData option;
+  initStringInfo(&option);
+  appendStringInfoChar(&option, '{');
+  if (aoentry->compresstype)
+    appendStringInfo(&option, "%s", aoentry->compresstype);
+  appendStringInfoChar(&option, '}');
+  return option.data;
+}
 
 #define DIRECT_LEFT_CHILD_VAR 0
 #define INT64_MAX_LENGTH 20
@@ -313,6 +330,27 @@ void convert_to_common_plan(PlannedStmt *stmt, CommonPlanContext *ctx) {
         pfree(rgId);
         pfree(rgUrl);
       }
+      // For append-only internal table
+      if (get_relation_storage_type(oid) == RELSTORAGE_ORC) {
+        ListCell *lc;
+        foreach (lc, stmt->result_segfileinfos) {
+          ResultRelSegFileInfoMapNode *pRelSegFileInfoMapNode =
+              (ResultRelSegFileInfoMapNode *)lfirst(lc);
+          ListCell *lc;
+          foreach (lc, pRelSegFileInfoMapNode->segfileinfos) {
+            ResultRelSegFileInfo *pSegFileInfo = lfirst(lc);
+            if (pSegFileInfo->numfiles == 0) {
+              // detect mixed-up partition of external table
+              ctx->convertible = false;
+              return;
+            }
+            univPlanAddResultRelSegFileInfo(
+                ctx->univplan, pRelSegFileInfoMapNode->relid,
+                pSegFileInfo->segno, pSegFileInfo->eof[0],
+                pSegFileInfo->uncompressed_eof[0]);
+          }
+        }
+      }
       univPlanAddToPlanNode(ctx->univplan, true);
     }
     do_convert_plantree_to_common_plan(stmt->planTree, pid, true, false, NIL,
@@ -327,8 +365,9 @@ void convert_to_common_plan(PlannedStmt *stmt, CommonPlanContext *ctx) {
       do_convert_plantree_to_common_plan(subplan, -1, true, true, NIL, NULL,
                                          true, ctx);
   }
-  if (ctx->convertible)
-    do_convert_rangetbl_to_common_plan(stmt->rtable, ctx);
+  if (ctx->convertible) do_convert_rangetbl_to_common_plan(stmt->rtable, ctx);
+  if (ctx->convertible && stmt->result_partitions)
+    do_convert_result_partitions_to_common_plan(stmt->result_partitions, ctx);
   if (ctx->convertible && enable_secure_filesystem)
     do_convert_token_map_to_common_plan(ctx);
   if (ctx->convertible && ctx->isMagma)
@@ -1294,9 +1333,11 @@ void do_convert_onetbl_to_common_plan(Oid relid, CommonPlanContext *ctx) {
       columnDataTypeMod[i] = att->atttypmod;
     }
     FormatType fmttype = UnivPlanOrcFormat;
-    univPlanRangeTblEntryAddTable(ctx->univplan, relid, fmttype, "dummy", "{}",
-                                  attNum, (const char **)columnName,
-                                  columnDataType, columnDataTypeMod, NULL);
+    univPlanRangeTblEntryAddTable(
+        ctx->univplan, relid, fmttype, relpath(rel->rd_node),
+        buildInternalTableFormatOptionStringInJson(rel), attNum,
+        (const char **)columnName, columnDataType, columnDataTypeMod, NULL,
+        rel->rd_rel->relname.data);
   } else if (RelationIsExternal(rel)) {
     TupleDesc tableAttrs = rel->rd_att;
     attNum = tableAttrs->natts;
@@ -1394,7 +1435,7 @@ void do_convert_onetbl_to_common_plan(Oid relid, CommonPlanContext *ctx) {
     univPlanRangeTblEntryAddTable(ctx->univplan, relid, fmttype, location,
                                   fmtOptsJson, attNum,
                                   (const char **)columnName, columnDataType,
-                                  columnDataTypeMod, targetName);
+                                  columnDataTypeMod, targetName, NULL);
 
     if (fmtOptsJson != NULL)
       pfree(fmtOptsJson);
@@ -1417,6 +1458,53 @@ end:
   pfree(columnName);
   pfree(columnDataType);
   pfree(columnDataTypeMod);
+}
+
+static void do_convert_result_partition_rule_to_common_plan(
+    CommonPlanContext *ctx, PartitionRule *partitionRule,
+    bool isDefaultPartition) {
+  if (partitionRule->children) {
+    // TODO(chiyang): sub-partition
+    ctx->convertible = false;
+    return;
+  }
+  univPlanResultPartitionsAddPartitionRule(
+      ctx->univplan, partitionRule->parchildrelid, partitionRule->parname,
+      isDefaultPartition);
+
+  ListCell *lc;
+  foreach (lc, partitionRule->parlistvalues) {
+    univPlanPartitionRuleAddPartitionValue(ctx->univplan, isDefaultPartition);
+    List *partitionListValues = (List *)lfirst(lc);
+    ListCell *lc;
+    foreach (lc, partitionListValues) {
+      Const *val = (List *)lfirst(lc);
+      do_convert_expr_to_common_plan(-1, val, ctx);
+      univPlanPartitionValueAddConst(ctx->univplan, isDefaultPartition);
+    }
+  }
+}
+
+static void do_convert_result_partitions_to_common_plan(
+    PartitionNode *partitionNode, CommonPlanContext *ctx) {
+  if (partitionNode->part->parkind != 'l') {
+    // TODO(chiyang): range partition
+    ctx->convertible = false;
+    return;
+  }
+  univPlanAddResultPartitions(ctx->univplan, partitionNode->part->parrelid,
+                              partitionNode->part->parkind,
+                              partitionNode->part->paratts,
+                              partitionNode->part->parnatts);
+  ListCell *lc;
+  foreach (lc, partitionNode->rules) {
+    PartitionRule *partitionRule = (PartitionRule *)lfirst(lc);
+    do_convert_result_partition_rule_to_common_plan(ctx, partitionRule, false);
+  }
+  if (partitionNode->default_part) {
+    do_convert_result_partition_rule_to_common_plan(
+        ctx, partitionNode->default_part, true);
+  }
 }
 
 void do_convert_token_map_to_common_plan(CommonPlanContext *ctx) {
@@ -1453,14 +1541,14 @@ void do_convert_token_map_to_common_plan(CommonPlanContext *ctx) {
 // it's convertible and it's a magma scan
 void do_convert_snapshot_to_common_plan(CommonPlanContext *ctx) {
   // start transaction in magma for SELECT in new executor
-  if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT) {
-    PlugStorageBeginTransaction(NULL);
-  }
+  // if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT) {
+  //   PlugStorageStartTransaction(NULL);
+  // }
   Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
   int32_t size = 0;
   char *snapshot = NULL;
-  MagmaClientC_SerializeSnapshot(PlugStorageGetTransactionSnapshot(), &snapshot,
-                                 &size);
+  MagmaClientC_SerializeSnapshot(PlugStorageGetTransactionSnapshot(NULL),
+                                 &snapshot, &size);
   if (snapshot && size != 0) {
     univPlanAddSnapshot(ctx->univplan, snapshot, size);
   }
@@ -1959,15 +2047,14 @@ end:
 }
 
 bool checkInsertSupportTable(PlannedStmt *stmt) {
-  // disable partitioned result target
-  if (stmt->result_partitions)
-    return false;
-  if (list_length(stmt->resultRelations) > 1)
-    return false;
+  if (list_length(stmt->resultRelations) > 1) return false;
   int32_t index = list_nth_int(stmt->resultRelations, 0);
   RangeTblEntry *rte = (RangeTblEntry *)list_nth(stmt->rtable, index - 1);
 
-  // if (RELSTORAGE_ORC == get_rel_relstorage(rte->relid)) return true;
+  if (RELSTORAGE_ORC == get_rel_relstorage(rte->relid)) return true;
+
+  // disable partition table insert for external table
+  if (stmt->result_partitions) return false;
 
   Relation pgExtTableRel = heap_open(ExtTableRelationId, RowExclusiveLock);
   cqContext cqc;

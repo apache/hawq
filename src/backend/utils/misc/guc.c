@@ -4678,6 +4678,15 @@ static struct config_int ConfigureNamesInt[] =
 		10000, 0, 65535, NULL, NULL
 	},
 
+  {
+    {"new_executor_external_sort_memory_limit", PGC_USERSET, QUERY_TUNING_OTHER,
+      gettext_noop("Sets the memory usage (in MB) limit of external sort for new executor."),
+      NULL
+    },
+    &new_executor_external_sort_memory_limit_size_mb,
+    256, 0, 1024, NULL, NULL
+  },
+
 	{
 		{"default_magma_hash_table_nvseg_per_seg", PGC_USERSET, QUERY_TUNING_OTHER,
 			gettext_noop("Sets default vseg number per node for Magma hash table"),
@@ -7489,7 +7498,6 @@ static struct config_string ConfigureNamesString[] =
 		&new_executor_enable_external_sort_mode,
 		"AUTO", assign_new_executor_mode, NULL
 	},
-
 
 	{
 		{"new_scheduler", PGC_USERSET, EXTERNAL_TABLES,

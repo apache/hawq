@@ -188,10 +188,15 @@ typedef enum PlugStorageTransactionStatus
 
 typedef enum PlugStorageTransactionCommand
 {
-	PS_TXN_CMD_BEGIN   = 0,
-	PS_TXN_CMD_COMMIT  = 1,
-	PS_TXN_CMD_ABORT   = 2,
-	PS_TXN_CMD_INVALID = 3
+    PS_TXN_CMD_START_TRANSACTION        = 0,
+    PS_TXN_CMD_COMMIT_TRANSACTION       = 1,
+    PS_TXN_CMD_ABORT_TRANSACTION        = 2,
+    PS_TXN_CMD_START_SUB_TRANSACTION    = 3,
+    PS_TXN_CMD_COMMIT_SUB_TRANSACTION   = 4,
+    PS_TXN_CMD_ABORT_SUB_TRANSACTION    = 5,
+    PS_TXN_CMD_GET_SNAPSHOT             = 6,
+    PS_TXN_CMD_GET_TRANSACTIONID        = 7,
+    PS_TXN_CMD_INVALID                  = 8
 } PlugStorageTransactionCommand;
 
 typedef struct PlugStorageTransactionData
@@ -202,7 +207,8 @@ typedef struct PlugStorageTransactionData
 	TransactionId                  pst_transaction_id;
 	PlugStorageTransactionStatus   pst_transaction_status;
 	PlugStorageTransactionCommand  pst_transaction_command;
-	MagmaSnapshot                 *pst_transaction_dist;     /* magma format */
+	MagmaSnapshot                 *pst_transaction_snapshot;     /* magma format */
+	MagmaTransactionState         *pst_transaction_state;        /* magma format */
 } PlugStorageTransactionData;
 
 typedef PlugStorageTransactionData *PlugStorageTransaction;
@@ -217,9 +223,10 @@ extern bool isCleanupAbortTransaction;
  */
 extern PlugStorageTransaction PlugStorageGetTransaction(void);
 extern PlugStorageTransactionStatus PlugStorageGetTransactionStatus(void);
-extern MagmaSnapshot *PlugStorageGetTransactionSnapshot(void);
 extern void PlugStorageSetTransactionSnapshot(MagmaSnapshot *snapshot);
-extern void PlugStorageBeginTransaction(List* magmaTableFullNames);
+extern void PlugStorageStartTransaction();
+extern MagmaSnapshot *PlugStorageGetTransactionSnapshot(List* magmaTableFullNames);
+extern void PlugStorageGetTransactionId(List* magmaTableFullNames);
 extern void PlugStorageCommitTransaction(void);
 extern void PlugStorageAbortTransaction(void);
 extern void PlugStorageSetIsCleanupAbort(bool isCleanup);

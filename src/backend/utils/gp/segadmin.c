@@ -309,13 +309,16 @@ Datum hawq_magma_status(PG_FUNCTION_ARGS)
 	  }
 	  tuple = heap_form_tuple(funcctx->tuple_desc, values, nulls);
 	  // free memory
-	  free(data->magmaNodes[funcctx->call_cntr].node);
-	  free(data->magmaNodes[funcctx->call_cntr].dirs);
+	  if (data->magmaNodes[funcctx->call_cntr].node)
+	    free(data->magmaNodes[funcctx->call_cntr].node);
+	  if (data->magmaNodes[funcctx->call_cntr].dirs)
+	    free(data->magmaNodes[funcctx->call_cntr].dirs);
 	  result = HeapTupleGetDatum(tuple);
 	  SRF_RETURN_NEXT(funcctx, result);
 	} else {
 	  // free memory
-	  free(data->magmaNodes);
+	  if (data->magmaNodes)
+	    free(data->magmaNodes);
 	  SRF_RETURN_DONE(funcctx);
 	}
 }

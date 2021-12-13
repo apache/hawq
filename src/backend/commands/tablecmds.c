@@ -1833,14 +1833,15 @@ DefineExternalRelation(CreateExternalStmt *createExtStmt)
 		// start transaction in magma for CREATE TABLE
 		if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
 		{
-		    PlugStorageBeginTransaction(NULL);
+		    PlugStorageStartTransaction();
 		}
+                PlugStorageGetTransactionId(NULL);
 		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 		InvokeMagmaCreateTable(&procInfo,
 		                       database_name,
 		                       schema_name,
 		                       table_name,
-		                       PlugStorageGetTransactionSnapshot(),
+		                       PlugStorageGetTransactionSnapshot(NULL),
 		                       createExtStmt->base.tableElts,
 		                       createExtStmt->pkey,
 		                       createExtStmt->base.distributedBy,

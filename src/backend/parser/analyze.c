@@ -8112,6 +8112,11 @@ static Query *transformIndexStmt(ParseState *pstate, IndexStmt *stmt,
 
     if (RelationBuildPartitionDesc(rel, false)) stmt->do_part = true;
 
+    /* native orc can't create index in parent relation */
+    if (RelationIsOrc(rel) && stmt->do_part)
+  		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+  				errmsg("Cannot support create index statement in native orc parent relation yet")));
+
     if (stmt->do_part && Gp_role != GP_ROLE_EXECUTE) {
       List *children;
       struct HTAB *nameCache;

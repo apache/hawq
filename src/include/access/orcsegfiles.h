@@ -30,6 +30,11 @@
 #define Anum_pg_orcseg_tupcount 3
 #define Anum_pg_orcseg_eofuncompressed 4
 
+#define Natts_pg_orcseg_idx 3
+#define Anum_pg_orcseg_idx_idxoid 1
+#define Anum_pg_orcseg_idx_segno 2
+#define Anum_pg_orcseg_idx_eof 3
+
 extern void insertInitialOrcSegnoEntry(AppendOnlyEntry *aoEntry, int segNo);
 extern void insertOrcSegnoEntry(AppendOnlyEntry *aoEntry, int segNo,
                                 float8 tupleCount, float8 eof,

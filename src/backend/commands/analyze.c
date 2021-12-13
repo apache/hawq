@@ -3872,7 +3872,7 @@ int64 GetExternalTotalBytesMAGMA(Relation relation){
 
     Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
     InvokeMagmaProtocolTableSize(ext_entry, procOid, dbname, schemaname, tablename,
-                                 PlugStorageGetTransactionSnapshot(), &ts);
+                                 PlugStorageGetTransactionSnapshot(NULL), &ts);
 
     pfree(dbname);
     pfree(schemaname);
@@ -3899,7 +3899,7 @@ int64 GetDatabaseTotalBytesMAGMA(Oid dbOid){
 
 		Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 		InvokeMagmaProtocolDatabaseSize(procOid, dbname,
-		                                PlugStorageGetTransactionSnapshot(),
+		                                PlugStorageGetTransactionSnapshot(NULL),
 		                                &dbs);
 
 		pfree(dbname);
@@ -4099,7 +4099,7 @@ uint64 GetExternalTotalBytes(Relation rel)
 			/* start transaction for magma table */
       if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
       {
-        PlugStorageBeginTransaction(NULL);
+        PlugStorageStartTransaction();
       }
 			Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 

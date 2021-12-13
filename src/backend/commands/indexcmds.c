@@ -34,6 +34,7 @@
 
 #include "postgres.h"
 
+#include "access/aosegfiles.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/fileam.h"
@@ -423,10 +424,11 @@ DefineIndex(Oid relationId,
 				 errmsg("access method \"%s\" does not support multicolumn indexes",
 						accessMethodName)));
 
-    if  (unique && RelationIsAo(rel))
-        ereport(ERROR,
-                (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
-                 errmsg("append-only tables do not support unique indexes")));
+
+	/* native orc can't support unique/primary index */
+	if (unique && RelationIsOrc(rel))
+		ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				errmsg("native orc do not support unique indexes")));
 
 	amoptions = accessMethodForm->amoptions;
 
@@ -752,24 +754,14 @@ DefineIndex(Oid relationId,
 							   errOmitLocation(true)));
         }
         else
-		    {
-          char *formatOpt = caql_getcstring(
-                  NULL,
-                  cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
-                  ObjectIdGetDatum(relationId)));
-          if (!formatOpt) {
-            ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-                    errmsg("Cannot support DefineIndex")));
-          }
-          else {
-            char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
-            if (!formatName ||
-                (!(pg_strncasecmp(formatName, "magma", strlen("magma")) == 0))) {
-              ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-                      errmsg("Cannot support DefineIndex")));
-            }
-          }
-		    }
+        {
+        	/* magma and native orc support index */
+        	if (!(RelationIsOrc(rel) || RelationIsMagmaTable2(relationId)))
+        	{
+        		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support DefineIndex")));
+        	}
+        	// dispatch_statement_node((Node *)stmt, NULL, NULL, NULL);
+        }
 	}
 
 	/* save lockrelid for below, then close rel */

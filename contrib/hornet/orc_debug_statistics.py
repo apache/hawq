@@ -81,10 +81,15 @@ col_l = len(col_name)
 for i in range(0,col_l):
     str_ans = str_ans.replace(' Column ' + str(i+1) + ' ',col_name[i])
 
-str_ans = str_ans.replace(',}}}',"}}]}")
+if stripe_num == 0:
+    str_ans = str_ans.replace(',}}}',"}}]}")
+else:
+    str_ans = str_ans.replace(',}}}',"}}}]}")
 str_ans = str_ans.replace('" Stripe 0 ":','"Stripes":[')
-for i in range(1,stripe_num):
-    str_ans = str_ans.replace('" Stripe {} "'.format(i),'},{"Stripe {}"'.format(i))
+for i in range(1,2):
+    str_ans = str_ans.replace('" Stripe {} "'.format(i),'}},{{"Stripe {}"'.format(i))
+for i in range(2,stripe_num+1):
+    str_ans = str_ans.replace('" Stripe {} "'.format(i),'}}}},{{"Stripe {}"'.format(i))
 file_path = '"File_path":"' + sys.argv[2] + '",'
 pre_json = str_ans[0] + file_path + str_ans[1:len(str_ans)]
 print(sys.argv[1] + '|' + pre_json.replace(',}','}'))

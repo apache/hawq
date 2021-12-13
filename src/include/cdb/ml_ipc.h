@@ -354,4 +354,6 @@ extern void CleanUpNewInterconnect();
 
 extern void ResetRpcClientInstance();
 
+extern void checkQDConnectionAlive(void);
+
 #endif   /* ML_IPC_H */

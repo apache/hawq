@@ -1073,8 +1073,15 @@ int64 get_block_locations_and_calculate_table_size(split_to_segment_mapping_cont
           // start transaction in magma for SELECT/INSERT/UPDATE/DELETE/ANALYZE
           if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
           {
-                  PlugStorageBeginTransaction(magmaTableFullNames);
+            PlugStorageStartTransaction();
                   useClientCacheDirectly = true;
+          }
+          if (((PlannedStmt *)context->srtc_context.base.node)->commandType ==
+                  CMD_SELECT ||
+              context->isTargetNoMagma) {
+            PlugStorageGetTransactionSnapshot(magmaTableFullNames);
+          } else {
+            PlugStorageGetTransactionId(magmaTableFullNames);
           }
           Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
   }
@@ -2886,7 +2893,7 @@ static void ExternalGetMagmaRangeDataLocation(
 			// get range location from magma now
 			Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 			InvokeMagmaProtocolBlockLocation(ext_entry, procOid, dbname, schemaname,
-			                                 tablename, PlugStorageGetTransactionSnapshot(),
+			                                 tablename, PlugStorageGetTransactionSnapshot(NULL),
 			                                 useClientCacheDirectly,
 			                                 &bldata);
 		}
@@ -6698,14 +6705,15 @@ void build_magma_scansplits_for_result_relations(List **alloc_result, List *relO
     // start transaction in magma for SELECT/INSERT/UPDATE/DELETE/ANALYZE
     if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
     {
-      PlugStorageBeginTransaction(NULL);
+      PlugStorageStartTransaction();
     }
+    PlugStorageGetTransactionId(NULL);
     Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 
     ExtProtocolBlockLocationData *bldata = NULL;
     InvokeMagmaProtocolBlockLocation(
         ext_entry, procOid, dbname, schemaname, tablename,
-        PlugStorageGetTransactionSnapshot(), false, &bldata);
+        PlugStorageGetTransactionSnapshot(NULL), false, &bldata);
 
     pfree(dbname);
     pfree(schemaname);

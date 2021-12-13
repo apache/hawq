@@ -17,6 +17,7 @@
 #include "postgres.h"
 #include "port.h"
 
+#include "access/aosegfiles.h"
 #include "access/twophase.h"
 #include "access/xact.h"
 #include "access/fileam.h"
@@ -412,6 +413,72 @@ QueryIsReadOnly(Query *parsetree)
 			break;
 	}
 	return false;
+}
+
+/*
+ * CanCreateIndex: can support create index
+ * So far, magma table and native orc could support index
+ */
+void CanSupportIndex(IndexStmt *stmt, Oid relid)
+{
+	/* 1. upgrade mode should support index operation */
+	if (gp_upgrade_mode) return;
+
+	bool supportIndex = false;
+	Relation rel = heap_open(relid, AccessShareLock);
+	bool nativeOrc = RelationIsOrc(rel);
+	heap_close(rel, AccessShareLock);
+
+	/*
+	 * 2. deal magma table and native orc
+	 * for "stmt->magma", deal with special partition situation, oushu issue #1049
+	 * its ugly, but there is no elegant way now
+	 */
+	if (RelationIsMagmaTable2(relid) || stmt->magma || nativeOrc)
+	{
+			supportIndex = true;
+			if (nativeOrc)
+			{
+				/* add pg_aoseg.pg_orcseg_idx_xxx and its index pg_aoseg.pg_orcseg_idx_xxx_index */
+				AlterTableCreateAoSegIndexTableWithOid(relid, stmt->is_part_child);
+			}
+	}
+	if (supportIndex)
+	{
+		/*
+		 * 3. magma/native orc index cant support the accessory conditions
+		 */
+		if (stmt->options) {
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+									errmsg("magma/native orc Index cannot support create index with clause")));
+		}
+		if (stmt->whereClause) {
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+									errmsg("magma/native orc Index cannot support create index where predicate")));
+		}
+		if (stmt->tableSpace) {
+			ereport(ERROR,
+							(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+									errmsg("magma/native orc Index cannot support create index with tableSpace")));
+		}
+		ListCell   *cell;
+		foreach(cell, stmt->indexParams)
+		{
+			IndexElem *elem = (IndexElem *) lfirst(cell);
+			if (elem->expr || elem->opclass)
+			{
+				ereport(ERROR,
+								(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
+										errmsg("magma/native orc Index cannot support create index with expr or opclass")));
+			}
+		}
+	}
+	else
+	{
+		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet")));
+	}
 }
 
 /*
@@ -1349,82 +1416,12 @@ ProcessUtility(Node *parsetree,
 				lockmode = stmt->concurrent ? ShareUpdateExclusiveLock
 						: ShareLock;
 				relid = RangeVarGetRelid(stmt->relation, false, false/*allowHcatalog*/);
-
-				/* Only create index for external table with magma */
 				Assert(OidIsValid(relid));
-				char *formatOpt = caql_getcstring(
-				        NULL,
-				        cql("SELECT fmtopts FROM pg_exttable WHERE reloid = :1",
-				        ObjectIdGetDatum(relid)));
-
-				if (!formatOpt)
-				{
-				  if (stmt->magma) {}
-				  else if (!gp_upgrade_mode)
-					{
-						ereport(ERROR,
-						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
-					}
-				}
-				else
-				{
-					char *formatName = getExtTblFormatterTypeInFmtOptsStr(formatOpt);
-					if (!formatName)
-					{
-						if (!gp_upgrade_mode)
-						{
-							ereport(ERROR,
-											(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
-						}
-					}
-					/* in order to support magmatp/magmaap */
-					else if ((pg_strncasecmp(formatName, FORMAT_MAGMA_TP_STR,
-																	 sizeof(FORMAT_MAGMA_TP_STR)-1) == 0) ||
-							(pg_strncasecmp(formatName, FORMAT_MAGMA_AP_STR,
-															sizeof(FORMAT_MAGMA_AP_STR)-1) == 0))
-					{
-						if (stmt->options) {
-							ereport(ERROR,
-											(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-													errmsg("magma Index cannot support create index with clause")));
-						}
-						if (stmt->whereClause) {
-							ereport(ERROR,
-											(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-													errmsg("magma Index cannot support create index where predicate")));
-						}
-						if (stmt->tableSpace) {
-							ereport(ERROR,
-											(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-													errmsg("magma Index cannot support create index with tableSpace")));
-						}
-						ListCell   *cell;
-						foreach(cell, stmt->indexParams)
-						{
-							IndexElem *elem = (IndexElem *) lfirst(cell);
-							if (elem->expr || elem->opclass)
-							{
-								ereport(ERROR,
-												(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
-														errmsg("magma Index cannot support create index with expr or opclass")));
-							}
-						}
-						pfree(formatName);
-						// break;
-					}
-					else
-					{
-						pfree(formatName);
-						if (!gp_upgrade_mode)
-						{
-							ereport(ERROR,
-							        (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support create index statement yet") ));
-						}
-					}
-				}
-
 				LockRelationOid(relid, lockmode);
 				CheckRelationOwnership(relid, true);
+
+				// check whether can support index
+				CanSupportIndex(stmt, relid);
 
 				DefineIndex(relid,		/* relation */
 							stmt->idxname,		/* index name */

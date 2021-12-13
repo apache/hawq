@@ -1530,8 +1530,9 @@ dropdb(const char *dbname, bool missing_ok)
 						// start transaction in magma for DROP TABLE
 						if (PlugStorageGetTransactionStatus()
 								== PS_TXN_STS_DEFAULT) {
-							PlugStorageBeginTransaction(NULL);
+                                                  PlugStorageStartTransaction();
 						}
+                                                PlugStorageGetTransactionId(NULL);
 						Assert(
 								PlugStorageGetTransactionStatus()
 										== PS_TXN_STS_STARTED);
@@ -1539,7 +1540,7 @@ dropdb(const char *dbname, bool missing_ok)
 						// drop table in magma now
 						InvokeMagmaDropTable(&procInfo, dbInfoRel->exttable, database_name,
 								schema_name, table_name,
-								PlugStorageGetTransactionSnapshot());
+								PlugStorageGetTransactionSnapshot(NULL));
 						ReadCacheHashEntryReviseOnCommit(dbInfoRel->relationOid, true);
 					}
 				}

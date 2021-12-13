@@ -41,6 +41,7 @@ extern char *new_executor_enable_partitioned_hashjoin_mode;
 extern char *new_executor_enable_external_sort_mode;
 extern int new_executor_partitioned_hash_recursive_depth_limit;
 extern int new_executor_ic_tcp_client_limit_per_query_per_segment;
+extern int new_executor_external_sort_memory_limit_size_mb;
 
 extern const char *new_executor_runtime_filter_mode;
 extern const char *new_executor_runtime_filter_mode_local;

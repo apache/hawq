@@ -67,6 +67,7 @@
 #include "cdb/cdbpersistentrelfile.h"
 
 #include "access/aosegfiles.h"
+#include "access/orcsegfiles.h"
 #include "access/parquetsegfiles.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbvars.h"

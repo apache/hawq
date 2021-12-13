@@ -778,8 +778,6 @@ static bool SendChunkUDP(MotionLayerState *mlStates, ChunkTransportState *transp
 
 static void doSendStopMessageUDP(ChunkTransportState *transportStates, int16 motNodeID);
 static bool dispatcherAYT(void);
-static void checkQDConnectionAlive(void);
-
 
 static void *rxThreadFunc(void *arg);
 
@@ -5923,24 +5921,6 @@ formatSockAddr(struct sockaddr *sa, char* buf, int bufsize)
 }								/* formatSockAddr */
 
 /*
- * checkQDConnectionAlive
- * 		Check whether QD connection is still alive. If not, report error.
- */
-static void
-checkQDConnectionAlive(void)
-{
-	if (!dispatch_validate_conn(MyProcPort->sock))
-	{
-		if (Gp_role == GP_ROLE_EXECUTE)
-			ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
-							errmsg("Interconnect error segment lost contact with master (recv)")));
-		else
-			ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
-							errmsg("Interconnect error master lost contact with client (recv)")));
-	}
-}
-
-/*
  * getCurrentTime
  * 		get current time
  *
@@ -6966,4 +6946,23 @@ WaitInterconnectQuitUDP(void)
 		pthread_join(ic_control_info.threadHandle, NULL);
 	}
 	ic_control_info.threadCreated = false;
+}
+
+
+/*
+ * checkQDConnectionAlive
+ *    Check whether QD connection is still alive. If not, report error.
+ */
+void
+checkQDConnectionAlive(void)
+{
+  if (!dispatch_validate_conn(MyProcPort->sock))
+  {
+    if (Gp_role == GP_ROLE_EXECUTE)
+      ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+              errmsg("Interconnect error segment lost contact with master (recv)")));
+    else
+      ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+              errmsg("Interconnect error master lost contact with client (recv)")));
+  }
 }

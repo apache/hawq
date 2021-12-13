@@ -709,6 +709,9 @@ static void dispatcher_serialize_common_plan(MainDispatchData *data,
             new_executor_partitioned_hash_recursive_depth_limit);
     univPlanAddGuc(ctx->univplan, "partitioned_hash_recursive_depth_limit",
                    numberStrBuf);
+    sprintf(numberStrBuf, "%d", new_executor_external_sort_memory_limit_size_mb);
+    univPlanAddGuc(ctx->univplan, "external_sort_memory_limit_size_mb",
+                   numberStrBuf);
 
     univPlanAddGuc(ctx->univplan, "new_interconnect_type",
                    show_new_interconnect_type());

@@ -43,4 +43,6 @@ extern void CheckRelationOwnership(Oid relOid, bool noCatalogs);
 
 extern void DropErrorMsgNonExistent(const RangeVar *rel, char rightkind, bool missing_ok);
 
+extern void CanSupportIndex(IndexStmt *stmt, Oid relid);
+
 #endif   /* UTILITY_H */

@@ -1290,8 +1290,9 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		{
 			if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
 			{
-				PlugStorageBeginTransaction(NULL);
+                          PlugStorageStartTransaction();
 			}
+                        PlugStorageGetTransactionId(NULL);
 			Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 		}
 
@@ -2574,7 +2575,7 @@ CopyTo(CopyState cstate)
 					currentScanDesc = InvokePlugStorageFormatBeginScan(
 							&beginScanFunc, cstate->planstmt, node, &(externalstate.ss),
 							serializeSchema, serializeSchemaLen, rel,
-							formatterType, formatterName, PlugStorageGetTransactionSnapshot());
+							formatterType, formatterName, PlugStorageGetTransactionSnapshot(NULL));
 				}
 				else
 				{
@@ -4562,7 +4563,7 @@ CopyFrom(CopyState cstate)
 							                                          formatterName,
 							                                          plannedstmt,
 							                                          segfileinfo->segno,
-							                                          PlugStorageGetTransactionSnapshot());
+							                                          PlugStorageGetTransactionSnapshot(NULL));
 
 							pfree(insertInitFunc);
 							pfree(plannedstmt);

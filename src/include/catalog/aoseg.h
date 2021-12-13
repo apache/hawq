@@ -34,6 +34,7 @@ extern void AlterTableCreateAoSegTableWithOid(Oid relOid, Oid newOid,
 											  Oid newIndexOid,
 											  Oid *comptypeOid,
 											  bool is_part_child);
+extern void AlterTableCreateAoSegIndexTableWithOid(Oid relOid, bool is_part_child);
 
 extern void gpsql_appendonly_segfile_create(PG_FUNCTION_ARGS);
 

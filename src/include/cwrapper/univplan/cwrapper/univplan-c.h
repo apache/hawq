@@ -72,7 +72,8 @@ __attribute__((weak)) void univPlanRangeTblEntryAddTable(UnivPlanC *up, uint64_t
                                    const char **columnName,
                                    int32_t *columnDataType,
                                    int64_t *columnDataTypeMod,
-                                   const char *targetName) {}
+                                   const char *targetName,
+                                   const char *tableName) {}
 __attribute__((weak)) void univPlanRangeTblEntryAddDummy(UnivPlanC *up) {}
 
 // construct interconnect info

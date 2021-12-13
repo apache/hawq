@@ -222,7 +222,7 @@ calculate_database_size(Oid dbOid)
     /* start transaction for magma table */
     if (PlugStorageGetTransactionStatus() == PS_TXN_STS_DEFAULT)
     {
-      PlugStorageBeginTransaction(NULL);
+      PlugStorageStartTransaction();
     }
     Assert(PlugStorageGetTransactionStatus() == PS_TXN_STS_STARTED);
 

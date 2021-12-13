@@ -355,7 +355,7 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
                                        currentRelation,
                                        formatterType,
                                        formatterName,
-                                       PlugStorageGetTransactionSnapshot());
+                                       PlugStorageGetTransactionSnapshot(NULL));
 		}
 		else
 		{

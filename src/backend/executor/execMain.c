@@ -5084,7 +5084,7 @@ intorel_receive(TupleTableSlot *slot, DestReceiver *self)
 	                               formatterName,
 	                               estate->es_plannedstmt,
 	                               segfileinfo->segno,
-	                               PlugStorageGetTransactionSnapshot());
+	                               PlugStorageGetTransactionSnapshot(NULL));
 	        }
 	        else
 	        {

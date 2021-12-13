@@ -405,7 +405,8 @@ Datum magma_protocol_blocklocation(PG_FUNCTION_ARGS) {
          fmt_name);
   }
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
-  MagmaTablePtr table = MagmaClientC_FetchTable(client, snapshot, useClientCacheDirectly);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  MagmaTablePtr table = MagmaClientC_FetchTable(client, useClientCacheDirectly);
   magma_check_result(&client);
 
   elog(LOG, "magma_protocol_blocklocation pass fetch table");
@@ -527,10 +528,11 @@ Datum magma_protocol_tablesize(PG_FUNCTION_ARGS) {
          fmt_name);
   }
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
+  MagmaClientC_SetupSnapshot(client, snapshot);
 
   // set size of table in tp type to zero.
   if (tableType == MAGMACLIENTC_TABLETYPE_AP) {
-    tsdata->tablesize = MagmaClientC_GetTableSize(client, snapshot);
+    tsdata->tablesize = MagmaClientC_GetTableSize(client);
   } else {
     tsdata->tablesize = 0;
   }
@@ -583,7 +585,8 @@ Datum magma_protocol_databasesize(PG_FUNCTION_ARGS) {
   }
 
   MagmaClientC_SetupDatabaseInfo(client, dbname);
-  dbsdata->dbsize = MagmaClientC_GetDatabaseSize(client, snapshot);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  dbsdata->dbsize = MagmaClientC_GetDatabaseSize(client);
   elog(LOG,"dbsize in magma.c is %llu", dbsdata->dbsize);
   magma_check_result(&client);
 
@@ -837,7 +840,8 @@ Datum magma_createindex(PG_FUNCTION_ARGS) {
 
   int16_t tableType = 0;
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
-  MagmaClientC_CreateIndex(client, snapshot, magmaidx);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  MagmaClientC_CreateIndex(client, magmaidx);
   magma_check_result(&client);
   PG_RETURN_VOID();
 }
@@ -861,7 +865,8 @@ Datum magma_dropindex(PG_FUNCTION_ARGS) {
 
   int16_t tableType = 0;
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
-  MagmaClientC_DropIndex(client, snapshot, indexname);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  MagmaClientC_DropIndex(client, indexname);
   magma_check_result(&client);
   PG_RETURN_VOID();
 }
@@ -885,7 +890,8 @@ Datum magma_reindex_index(PG_FUNCTION_ARGS) {
 
   int16_t tableType = 0;
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
-  MagmaClientC_Reindex(client, snapshot, indexname);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  MagmaClientC_Reindex(client, indexname);
   magma_check_result(&client);
   PG_RETURN_VOID();
 }
@@ -1029,7 +1035,8 @@ Datum magma_createtable(PG_FUNCTION_ARGS) {
   }
 
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
-  MagmaClientC_CreateTable(client, snapshot, ncols, cols);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  MagmaClientC_CreateTable(client, ncols, cols);
   magma_check_result(&client);
   pfree(cols);
   list_free(pk_names);
@@ -1061,7 +1068,8 @@ Datum magma_droptable(PG_FUNCTION_ARGS) {
   int16_t tableType = 0;
   // for drop table, tableType won't be used in the process, set it as default
   MagmaClientC_SetupTableInfo(client, dbname, schemaname, tablename, tableType);
-  MagmaClientC_DropTable(client, snapshot);
+  MagmaClientC_SetupSnapshot(client, snapshot);
+  MagmaClientC_DropTable(client);
   magma_check_result(&client);
 
   PG_RETURN_VOID();
@@ -3099,80 +3107,111 @@ Datum magma_transaction(PG_FUNCTION_ARGS) {
     elog(ERROR, "failed to connect to magma service");
   }
 
+  MagmaClientC_SetupSnapshot(client, pst->pst_transaction_snapshot);
+
   switch (txn_command) {
-    case PS_TXN_CMD_BEGIN: {
-      int magmaTableFullNamesSize = list_length(ps->magma_talbe_full_names);
-      MagmaTableFullName *magmaTableFullNames = (MagmaTableFullName *) palloc0(magmaTableFullNamesSize * sizeof(MagmaTableFullName));
-      int i = 0;
-      ListCell *lc;
-      foreach (lc, ps->magma_talbe_full_names) {
-        MagmaTableFullName* mtfn = lfirst(lc);
-        magmaTableFullNames[i].databaseName = pstrdup(mtfn->databaseName);
-        magmaTableFullNames[i].schemaName = pstrdup(mtfn->schemaName);
-        magmaTableFullNames[i].tableName = pstrdup(mtfn->tableName);
-        ++i;
-      }
-      pst->pst_transaction_dist =
-          MagmaClientC_BeginTransaction(client, magmaTableFullNames, magmaTableFullNamesSize);
-      for (int i = 0; i < magmaTableFullNamesSize; ++i) {
-        pfree(magmaTableFullNames[i].databaseName);
-        pfree(magmaTableFullNames[i].schemaName);
-        pfree(magmaTableFullNames[i].tableName);
-      }
-      pfree(magmaTableFullNames);
-      if (pst->pst_transaction_dist == NULL) {
-        pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
-        pst->pst_transaction_id = InvalidTransactionId;
-        pst->pst_transaction_dist = NULL;
-        elog(DEBUG1, "magma_transaction: begin snapshot: NULL");
-      } else {
-        elog(DEBUG1, "magma_transaction: begin snapshot: (%llu, %u, %llu, %u)",
-             pst->pst_transaction_dist->currentTransaction.txnId,
-             pst->pst_transaction_dist->currentTransaction.txnStatus,
-             pst->pst_transaction_dist->txnActions.txnActionStartOffset,
-             pst->pst_transaction_dist->txnActions.txnActionSize);
-      }
+    case PS_TXN_CMD_START_TRANSACTION: {
+      pst->pst_transaction_state = MagmaClientC_StartTransaction(client);
+      pst->pst_transaction_snapshot = NULL;
+      pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
+      pst->pst_transaction_id = InvalidTransactionId;
+      pst->pst_transaction_snapshot = NULL;
+      elog(DEBUG1, "magma_transaction: start transaction");
       magma_check_result(&client);
       break;
     }
-    case PS_TXN_CMD_COMMIT:
-      if (pst->pst_transaction_dist == NULL) {
+    case PS_TXN_CMD_COMMIT_TRANSACTION:
+      if (pst->pst_transaction_snapshot == NULL) {
         elog(DEBUG1, "magma_transaction: commit snapshot: NULL");
       } else {
         elog(DEBUG1,
              "magma_transaction: commit snapshot: (%llu, %u, %llu, %u)",
-             pst->pst_transaction_dist->currentTransaction.txnId,
-             pst->pst_transaction_dist->currentTransaction.txnStatus,
-             pst->pst_transaction_dist->txnActions.txnActionStartOffset,
-             pst->pst_transaction_dist->txnActions.txnActionSize);
+             pst->pst_transaction_snapshot->currentTransaction.txnId,
+             pst->pst_transaction_snapshot->currentTransaction.txnStatus,
+             pst->pst_transaction_snapshot->txnActions.txnActionStartOffset,
+             pst->pst_transaction_snapshot->txnActions.txnActionSize);
       }
 
-      MagmaClientC_CommitTransaction(client, pst->pst_transaction_dist);
+      MagmaClientC_CommitTransaction(client);
       magma_check_result(&client);
       break;
-    case PS_TXN_CMD_ABORT:
-      if (pst->pst_transaction_dist == NULL) {
+    case PS_TXN_CMD_ABORT_TRANSACTION:
+      if (pst->pst_transaction_snapshot == NULL) {
         elog(DEBUG1, "magma_transaction: abort snapshot: NULL");
       } else {
         elog(DEBUG1,
              "magma_transaction: abort snapshot: (%llu, %u, %llu, %u)",
-             pst->pst_transaction_dist->currentTransaction.txnId,
-             pst->pst_transaction_dist->currentTransaction.txnStatus,
-             pst->pst_transaction_dist->txnActions.txnActionStartOffset,
-             pst->pst_transaction_dist->txnActions.txnActionSize);
+             pst->pst_transaction_snapshot->currentTransaction.txnId,
+             pst->pst_transaction_snapshot->currentTransaction.txnStatus,
+             pst->pst_transaction_snapshot->txnActions.txnActionStartOffset,
+             pst->pst_transaction_snapshot->txnActions.txnActionSize);
       }
 
       if (pst->pst_transaction_status != PS_TXN_STS_DEFAULT &&
           pst->pst_transaction_id != InvalidTransactionId &&
-          pst->pst_transaction_dist != NULL) {
-        MagmaClientC_AbortTransaction(client, pst->pst_transaction_dist,
-                                      PlugStorageGetIsCleanupAbort());
-        pst->pst_transaction_dist = NULL;
+          pst->pst_transaction_snapshot != NULL) {
+        MagmaClientC_AbortTransaction(client, PlugStorageGetIsCleanupAbort());
+        pst->pst_transaction_snapshot = NULL;
         pst->pst_transaction_id = InvalidTransactionId;
         pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
         magma_check_result(&client);
       }
       break;
+    case PS_TXN_CMD_GET_SNAPSHOT: {
+      MagmaClientC_CleanupTableInfo(client);
+      int magmaTableFullNamesSize = list_length(ps->magma_talbe_full_names);
+      int i = 0;
+      ListCell *lc;
+      foreach (lc, ps->magma_talbe_full_names) {
+        MagmaTableFullName* mtfn = lfirst(lc);
+        MagmaClientC_AddTableInfo(client, mtfn->databaseName, mtfn->schemaName,
+                                  mtfn->tableName, 0);
+        ++i;
+      }
+      pst->pst_transaction_snapshot = MagmaClientC_GetSnapshot(client);
+      if (pst->pst_transaction_snapshot == NULL) {
+        pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
+        pst->pst_transaction_id = InvalidTransactionId;
+        pst->pst_transaction_snapshot = NULL;
+        elog(DEBUG1, "magma_transaction: get snapshot: NULL");
+      } else {
+        elog(DEBUG1, "magma_transaction: get snapshot: (%llu, %u, %llu, %u)",
+             pst->pst_transaction_snapshot->currentTransaction.txnId,
+             pst->pst_transaction_snapshot->currentTransaction.txnStatus,
+             pst->pst_transaction_snapshot->txnActions.txnActionStartOffset,
+             pst->pst_transaction_snapshot->txnActions.txnActionSize);
+      }
+      magma_check_result(&client);
+      break;
+    }
+    case PS_TXN_CMD_GET_TRANSACTIONID: {
+      MagmaClientC_CleanupTableInfo(client);
+      int magmaTableFullNamesSize = list_length(ps->magma_talbe_full_names);
+      int i = 0;
+      ListCell *lc;
+      foreach (lc, ps->magma_talbe_full_names) {
+        MagmaTableFullName* mtfn = lfirst(lc);
+        MagmaClientC_AddTableInfo(client, mtfn->databaseName, mtfn->schemaName,
+                                  mtfn->tableName, 0);
+        ++i;
+      }
+      pst->pst_transaction_state = MagmaClientC_GetTransctionId(client);
+      pst->pst_transaction_snapshot = MagmaClientC_GetSnapshot(client);
+      if (pst->pst_transaction_snapshot == NULL) {
+        pst->pst_transaction_status = PS_TXN_STS_DEFAULT;
+        pst->pst_transaction_id = InvalidTransactionId;
+        pst->pst_transaction_snapshot = NULL;
+        elog(DEBUG1, "magma_transaction: get transaction state: NULL");
+      } else {
+        elog(DEBUG1, "magma_transaction: get transaction state: (%llu, %u, %llu, %u)",
+             pst->pst_transaction_snapshot->currentTransaction.txnId,
+             pst->pst_transaction_snapshot->currentTransaction.txnStatus,
+             pst->pst_transaction_snapshot->txnActions.txnActionStartOffset,
+             pst->pst_transaction_snapshot->txnActions.txnActionSize);
+      }
+      magma_check_result(&client);
+      break;
+    }
     default:
       elog(ERROR, "Transaction command for magma is invalid %d", txn_command);
       break;

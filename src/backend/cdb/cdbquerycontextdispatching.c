@@ -868,7 +868,7 @@ RebuildPlugStorageSnapshot(QueryContextInfo *cxt)
 
 	pfree(snapshot.txnActions.txnActions);
 
-	MagmaSnapshot *s = PlugStorageGetTransactionSnapshot();
+	MagmaSnapshot *s = PlugStorageGetTransactionSnapshot(NULL);
 
 	elog(LOG, "SNAPSHOT DEBUG: GET TOP (%llu, %u, %llu, %u, %d)",
 	     s->currentTransaction.txnId,
@@ -1703,7 +1703,7 @@ prepareDispatchedCatalogSingleRelation(QueryContextInfo *cxt, Oid relid,
 			pfree(formatterName);
 	}
 	/* The pluggable storage snapshot must be dispatched */
-	prepareDispatchedPlugStorageSnapshot(cxt, PlugStorageGetTransactionSnapshot());
+	prepareDispatchedPlugStorageSnapshot(cxt, PlugStorageGetTransactionSnapshot(NULL));
 
 	/* The distribution policy for table */
 	prepareDispatchedCatalogDistributionPolicy(cxt, relid);

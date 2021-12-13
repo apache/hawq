@@ -56,7 +56,9 @@
 #include "cdb/cdbvars.h"
 
 static bool create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptypeOid);
+static bool create_aoseg_index_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptypeOid);
 static bool needs_aoseg_table(Relation rel);
+static bool needs_aoseg_index_table(Relation rel);
 
 /*
  * AlterTableCreateAoSegTable
@@ -104,6 +106,19 @@ AlterTableCreateAoSegTableWithOid(Oid relOid, Oid newOid, Oid newIndexOid,
 	(void) create_aoseg_table(rel, newOid, newIndexOid, comptypeOid);
 
 	heap_close(rel, NoLock);
+}
+
+void
+AlterTableCreateAoSegIndexTableWithOid(Oid relOid, bool is_part_child)
+{
+	Relation	rel;
+	Assert(!is_part_child);
+	rel = heap_open(relOid, AccessShareLock);
+
+	/* create_aoseg_index_table does all the work */
+	(void) create_aoseg_index_table(rel, InvalidOid, InvalidOid, NULL);
+
+	heap_close(rel, AccessShareLock);
 }
 
 /*
@@ -310,6 +325,139 @@ create_aoseg_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptype
 	return true;
 }
 
+static bool
+create_aoseg_index_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * comptypeOid)
+{
+	Oid			relOid = RelationGetRelid(rel);
+	TupleDesc	tupdesc;
+	bool		shared_relation;
+	Oid		  blkdirrelid;
+	Oid		  blkdiridxid;
+	char		aoseg_relname[NAMEDATALEN];
+	char		aoseg_idxname[NAMEDATALEN];
+	IndexInfo  *indexInfo;
+	Oid			classObjectId[2];
+	ObjectAddress baseobject,
+				aosegobject;
+	Oid			tablespaceOid = ChooseTablespaceForLimitedObject(rel->rd_rel->reltablespace);
+
+	/*
+	 * Check to see whether the table actually needs an aoseg index table.
+	 */
+	if (!needs_aoseg_index_table(rel))
+		return false;
+
+	shared_relation = rel->rd_rel->relisshared;
+
+	/* can't have shared AO tables after initdb */
+	/* TODO: disallow it at CREATE TABLE time */
+	Assert(!(shared_relation && !IsBootstrapProcessingMode()) );
+
+	GetAppendOnlyEntryAuxOids(relOid, SnapshotNow, NULL, NULL, &blkdirrelid, &blkdiridxid);
+
+	/*
+	 * Was a aoseg index table already created?
+	 */
+	if (blkdirrelid != InvalidOid)
+	{
+		return false;
+	}
+
+	snprintf(aoseg_relname, sizeof(aoseg_relname), "pg_orcseg_idx_%u",
+					 relOid);
+	snprintf(aoseg_idxname, sizeof(aoseg_idxname), "pg_orcseg_idx_%u_index",
+					 relOid);
+
+	tupdesc = CreateTemplateTupleDesc(Natts_pg_orcseg_idx, false);
+
+	TupleDescInitEntry(tupdesc, (AttrNumber)Anum_pg_orcseg_idx_idxoid, "idxoid",
+										 INT4OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber)Anum_pg_orcseg_idx_segno, "segno",
+										 INT4OID, -1, 0);
+	TupleDescInitEntry(tupdesc, (AttrNumber)Anum_pg_orcseg_idx_eof, "eof",
+										 FLOAT8OID, -1, 0);
+
+	blkdirrelid = heap_create_with_catalog(aoseg_relname,
+										   PG_AOSEGMENT_NAMESPACE,
+										   tablespaceOid,
+										   aosegOid,
+										   rel->rd_rel->relowner,
+										   tupdesc,
+										   /* relam */ InvalidOid,
+										   RELKIND_AOSEGMENTS,
+										   RELSTORAGE_HEAP,
+										   shared_relation,
+										   true,
+										   /* bufferPoolBulkLoad */ false,
+										   0,
+										   ONCOMMIT_NOOP,
+										   NULL, /* CDB POLICY */
+										   (Datum) 0,
+										   true,
+										   comptypeOid,
+						 				   /* persistentTid */ NULL,
+						 				   /* persistentSerialNum */ NULL,
+						 				   /* formattername */ NULL);
+
+	/* make the toast relation visible, else index creation will fail */
+	CommandCounterIncrement();
+
+	/*
+	 * Create unique index on index oid.
+	 */
+	indexInfo = makeNode(IndexInfo);
+	indexInfo->ii_NumIndexAttrs = 1;
+	indexInfo->ii_NumIndexKeyAttrs = 1;
+	indexInfo->ii_KeyAttrNumbers[0] = 1;
+	indexInfo->ii_Expressions = NIL;
+	indexInfo->ii_ExpressionsState = NIL;
+	indexInfo->ii_Predicate = NIL;
+	indexInfo->ii_PredicateState = NIL;
+	indexInfo->ii_Unique = true;
+	indexInfo->ii_Concurrent = false;
+
+	classObjectId[0] = INT4_BTREE_OPS_OID;
+	classObjectId[1] = INT4_BTREE_OPS_OID;
+
+	blkdiridxid = index_create(blkdirrelid, aoseg_idxname, aosegIndexOid,
+							   indexInfo,
+							   BTREE_AM_OID,
+							   tablespaceOid,
+							   classObjectId, (Datum) 0,
+							   true, false, (Oid *) NULL, true, false, false, NULL);
+
+	/* Unlock target table -- no one can see it */
+	UnlockRelationOid(blkdirrelid, ShareLock);
+	/* Unlock the index -- no one can see it anyway */
+	UnlockRelationOid(blkdiridxid, AccessExclusiveLock);
+
+	/*
+	 * Store the aoseg table's OID in the parent relation's pg_appendonly row
+	 */
+	UpdateAppendOnlyEntryAuxOids(relOid, InvalidOid, InvalidOid, blkdirrelid, blkdiridxid);
+
+	/*
+	 * Register dependency from the aoseg table to the master, so that the
+	 * aoseg table will be deleted if the master is.
+	 */
+	baseobject.classId = RelationRelationId;
+	baseobject.objectId = relOid;
+	baseobject.objectSubId = 0;
+	aosegobject.classId = RelationRelationId;
+	aosegobject.objectId = blkdirrelid;
+	aosegobject.objectSubId = 0;
+
+	recordDependencyOn(&aosegobject, &baseobject, DEPENDENCY_INTERNAL);
+
+	/*
+	 * Make changes visible
+	 */
+	CommandCounterIncrement();
+
+	return true;
+}
+
+
 /*
  * Check to see whether the table needs an aoseg table.	It does only if it is
  * an append-only relation.
@@ -320,4 +468,12 @@ needs_aoseg_table(Relation rel)
 	return RelationIsAo(rel);
 }
 
-
+/*
+ * Check to see whether the table needs an aoseg index table.	It does only if it is
+ * an append-only orc relation.
+ */
+static bool
+needs_aoseg_index_table(Relation rel)
+{
+	return RelationIsOrc(rel);
+}

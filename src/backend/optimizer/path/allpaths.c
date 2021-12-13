@@ -386,8 +386,11 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
         pathlist = lappend(pathlist, seqpath);
 
 	/* Consider index and bitmap scans */
-	create_index_paths(root, rel, relstorage, 
-					   &indexpathlist, &bitmappathlist);
+  if (!relstorage_is_ao(relstorage))
+  {
+  	/* Temporarily disable index for ao table */
+  	create_index_paths(root, rel, relstorage, &indexpathlist, &bitmappathlist);
+  }
 
 	/* deal with magma index scan */
 	if (relstorage == RELSTORAGE_EXTERNAL)
