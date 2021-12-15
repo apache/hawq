@@ -3138,7 +3138,20 @@ static void transformDistributedBy(ParseState *pstate, CreateStmtContext *cxt,
     *policyp = NULL;
     return;
   }
-
+  
+  /*
+   * Currently heap table only exists in hawq's master, so there is no
+   * policy information.
+   */
+  if (enable_heap_table_on_master) {
+    bool appendonly;
+    bool hasAppendOnly = GetRelOpt_appendonly_fromOptions(options, &appendonly);
+    if (hasAppendOnly && !appendonly) {
+      *policyp = NULL;
+      return;
+    }
+  }
+  
   policy = (GpPolicy *)palloc(sizeof(GpPolicy) +
                               maxattrs * sizeof(policy->attrs[0]));
   policy->ptype = POLICYTYPE_PARTITIONED;

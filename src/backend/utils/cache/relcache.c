@@ -1301,9 +1301,10 @@ RelationBuildDesc(Oid targetRelId, bool insertIt)
 
     /*
      * initialize Greenplum Database partitioning info
+     * currently heap table only exists in hawq's master, so there is no rd_cdbpolicy.
      */
     if (relation->rd_rel->relkind == RELKIND_RELATION &&
-        !IsSystemRelation(relation))
+        !IsSystemRelation(relation) && !RelationIsHeap(relation))
         relation->rd_cdbpolicy = GpPolicyFetch(CacheMemoryContext, targetRelId);
 
     relation->rd_cdbDefaultStatsWarningIssued = false;

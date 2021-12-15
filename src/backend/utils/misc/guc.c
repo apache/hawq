@@ -773,6 +773,8 @@ int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+bool enable_heap_table_on_master;
+bool enable_pg_default_for_non_system_table;
 double	  optimizer_cost_threshold;
 double  optimizer_nestloop_factor;
 double  locality_upper_bound;
@@ -4581,6 +4583,25 @@ static struct config_bool ConfigureNamesBool[] =
     &hawq_init_with_hdfs,
     true, NULL, NULL
   },
+  
+        {
+                {"enable_heap_table_on_master", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable heap tables on the master."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &enable_heap_table_on_master,
+                false, NULL, NULL
+        },
+        {
+	        {"enable_pg_default_for_non_system_table", PGC_USERSET, DEVELOPER_OPTIONS,
+                        gettext_noop("Enable pg_default for non-system tables."),
+                        NULL,
+                        GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
+                },
+                &enable_pg_default_for_non_system_table,
+                false, NULL, NULL
+        },
 
 	/* End-of-list marker */
 	{

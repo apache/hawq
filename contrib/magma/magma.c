@@ -409,7 +409,7 @@ Datum magma_protocol_blocklocation(PG_FUNCTION_ARGS) {
   MagmaTablePtr table = MagmaClientC_FetchTable(client, useClientCacheDirectly);
   magma_check_result(&client);
 
-  elog(LOG, "magma_protocol_blocklocation pass fetch table");
+  elog(DEBUG3, "magma_protocol_blocklocation pass fetch table");
 
   /*
    * Step 3. map ranges to block locations

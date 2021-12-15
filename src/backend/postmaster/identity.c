@@ -535,6 +535,29 @@ int GetRelOpt_bucket_num_fromOptions(List *options, int default_val)
 		}
 	return ((bucketnum>0)?bucketnum : (default_val));
 }
+
+/*
+ * If appendonly is set, return true, otherwise return false.
+ */
+bool GetRelOpt_appendonly_fromOptions(List *options, bool *appendonly)
+{
+  ListCell   *cell;
+  /* Scan list to see if "appendonly" was included */
+  if(options)
+    foreach(cell, options)
+    {
+      DefElem    *def = (DefElem *) lfirst(cell);
+
+      if (pg_strcasecmp(def->defname, "appendonly") == 0)
+      {
+        bool need_free_arg = false;
+        *appendonly = defGetString(def, &need_free_arg) == "true";
+        return true;
+      }
+    }
+  return false;
+}
+
 /** 
   *	Read Relation Option from catalog Relation
   */

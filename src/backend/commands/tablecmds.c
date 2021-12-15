@@ -499,8 +499,8 @@ DefineRelation(CreateStmt *stmt, char relkind, char relstorage,
     Oid reloid = 0;
     Assert(stmt->base.relation->schemaname == NULL || strlen(stmt->base.relation->schemaname)>0);
 
-    /* forbid create non-system table on tablespace pg_default */
-    if((!IsBootstrapProcessingMode()) && (isPgDefaultTablespace(stmt->base.tablespacename)))
+    /* forbid create non-system table on tablespace pg_default when enable_pg_default_for_non_system_table is not true */
+    if(!enable_pg_default_for_non_system_table && (!IsBootstrapProcessingMode()) && (isPgDefaultTablespace(stmt->base.tablespacename)))
     {
     	ereport(ERROR,
     					(errcode(ERRCODE_CDB_FEATURE_NOT_YET),
@@ -605,11 +605,13 @@ DefineRelation_int(CreateStmt *stmt,
 		 * dispatch.
 		 */
 	  if (pg_strcasecmp("pg_default", stmt->base.tablespacename) == 0)
-	        ereport(ERROR,
-	            (errcode(ERRCODE_UNDEFINED_OBJECT),
-	             errmsg("can not create ao format table on tablespace \"%s\" ",
-	                stmt->base.tablespacename),
-	             errOmitLocation(true)));
+	        if (!enable_pg_default_for_non_system_table) {  
+                        ereport(ERROR,
+                            (errcode(ERRCODE_UNDEFINED_OBJECT),
+                             errmsg("can not create ao format table on tablespace \"%s\" ",
+                                stmt->base.tablespacename),
+                             errOmitLocation(true)));
+                }
 
 		tablespaceId = get_tablespace_oid(stmt->base.tablespacename);
 		if (!OidIsValid(tablespaceId))

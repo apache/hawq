@@ -322,6 +322,15 @@ extern int hawq_rm_nvseg_for_analyze_nopart_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_limit;
+
+/////////////////////////////////////////////////////////////////////////
+/*
+ * These guc and related code are temporary, maybe will be delete afterwords.
+ */
+extern bool enable_heap_table_on_master;
+extern bool enable_pg_default_for_non_system_table;
+/////////////////////////////////////////////////////////////////////////
+
 extern bool allow_file_count_bucket_num_mismatch;
 extern bool enable_pg_stat_activity_history;
 

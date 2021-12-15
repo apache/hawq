@@ -417,20 +417,24 @@ QueryIsReadOnly(Query *parsetree)
 
 /*
  * CanCreateIndex: can support create index
- * So far, magma table and native orc could support index
+ * So far, magma table, native orc and heap table could support index
  */
 void CanSupportIndex(IndexStmt *stmt, Oid relid)
 {
 	/* 1. upgrade mode should support index operation */
 	if (gp_upgrade_mode) return;
-
+	
 	bool supportIndex = false;
 	Relation rel = heap_open(relid, AccessShareLock);
 	bool nativeOrc = RelationIsOrc(rel);
+	bool isHeap = RelationIsHeap(rel);
 	heap_close(rel, AccessShareLock);
+	
+	/* 2. heap table supports index */
+	if (isHeap) return;
 
 	/*
-	 * 2. deal magma table and native orc
+	 * 3. deal magma table and native orc
 	 * for "stmt->magma", deal with special partition situation, oushu issue #1049
 	 * its ugly, but there is no elegant way now
 	 */
@@ -446,7 +450,7 @@ void CanSupportIndex(IndexStmt *stmt, Oid relid)
 	if (supportIndex)
 	{
 		/*
-		 * 3. magma/native orc index cant support the accessory conditions
+		 * 4. magma/native orc index cant support the accessory conditions
 		 */
 		if (stmt->options) {
 			ereport(ERROR,

@@ -94,6 +94,7 @@ extern int GetUserDefinedFunctionVsegNum(void);
 extern int GetAnalyzeVSegNum(void);
 extern int	 GetCopyFromVSegNum(void);
 extern int GetRelOpt_bucket_num_fromOptions(List *options, int default_val);
+extern bool GetRelOpt_appendonly_fromOptions(List *options, bool *appendonly);
 extern int GetRelOpt_bucket_num_fromRel(Relation relation, int default_val);
 extern int GetRelOpt_bucket_num_fromRangeVar(const RangeVar* rel_rv, int default_val);
 extern int GetDefaultPartitionNum(void);

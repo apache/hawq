@@ -755,8 +755,8 @@ DefineIndex(Oid relationId,
         }
         else
         {
-        	/* magma and native orc support index */
-        	if (!(RelationIsOrc(rel) || RelationIsMagmaTable2(relationId)))
+                /* Native orc, heap table and magma support index */
+                if (!RelationIsOrc(rel) && !RelationIsHeap(rel) && !RelationIsMagmaTable(relationId))
         	{
         		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support DefineIndex")));
         	}
