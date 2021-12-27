@@ -4385,8 +4385,8 @@ void buildAcquireResourceResponseMessage(ConnectionTrack conn)
 	conn->MessageID    = RESPONSE_QD_ACQUIRE_RESOURCE;
 	conn->ResAllocTime = gettime_microsec();
 
-	elog(LOG, "latency of getting resource allocated is "UINT64_FORMAT "us",
-			  conn->ResAllocTime - conn->ResRequestTime);
+	elog(LOG, "ConnID %d latency of getting resource allocated is "UINT64_FORMAT "us",
+			  conn->ConnID, conn->ResAllocTime - conn->ResRequestTime);
 
 	MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
 	PCONTRACK->ConnToSend = lappend(PCONTRACK->ConnToSend, conn);

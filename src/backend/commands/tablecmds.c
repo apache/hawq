@@ -7219,8 +7219,12 @@ ATRewriteTable(AlteredTableInfo *tab, Oid OIDNewHeap)
       }
 		}
 
-	  resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num,NULL,0);
-	  savedResource = GetActiveQueryResource();
+		savedResource = GetActiveQueryResource();
+		if (!savedResource) {
+		  resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num,NULL,0);
+		} else {
+		  resource = AllocateResource(QRL_INHERIT, 0, 0, 0, 0, NULL, 0);
+		}
 	  SetActiveQueryResource(resource);
 
 	  segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, true, false);
@@ -17578,8 +17582,12 @@ ATPExecPartSplit(Relation rel,
 
     }
 
-    resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
     savedResource = GetActiveQueryResource();
+    if (!savedResource) {
+      resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
+    } else {
+      resource = AllocateResource(QRL_INHERIT, 0, 0, 0, 0, NULL, 0);
+    }
     SetActiveQueryResource(resource);
     segment_segnos = SetSegnoForWrite(NIL, 0, target_segment_num, true, true, false);
     scantable_splits = NIL;

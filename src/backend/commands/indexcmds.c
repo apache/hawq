@@ -147,7 +147,15 @@ bool CDBCreateIndex(IndexStmt *stmt, Oid relationOid, Oid indexOid)
 
 	elog(DEBUG1, "CDBCreateIndex virtual segment number is: %d\n", target_segment_num);
 
-	QueryResource *resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
+	QueryResource *resource = NULL;
+	QueryResource *savedResource = NULL;
+	savedResource = GetActiveQueryResource();
+	if (!savedResource) {
+	  resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
+	} else {
+	  resource = AllocateResource(QRL_INHERIT, 0, 0, 0, 0, NULL, 0);
+	}
+	SetActiveQueryResource(resource);
 
 	/* 4.bind SegNO to Vseg */
 	int total_segfiles = 0;
