@@ -37,6 +37,7 @@
 #include "cdb/workermgr.h"
 #include "libpq/libpq-be.h"
 #include "miscadmin.h"
+#include "utils/faultinjector.h"
 
 #include "magma/cwrapper/magma-client-c.h"
 
@@ -91,6 +92,16 @@ void mainDispatchFuncConnect(struct MyQueryExecutorGroup *qeGrp,
   foreach (lc, qeGrp->qes) {
     myQe = lfirst(lc);
 
+#ifdef FAULT_INJECTOR
+    // expect FaultInjectorType: FaultInjectorTypeDispatchError
+    FaultInjectorType_e ret = FaultInjector_InjectFaultIfSet(
+                                  MainDispatchConnect,
+                                  DDLNotSpecified,
+                                  "",  // databaseName
+                                  ""); // tableName
+    if(ret == FaultInjectorTypeDispatchError) goto error;
+#endif
+
     if (workermgr_should_query_stop(state)) goto error;
 
     if (!executormgr_main_doconnect(myQe)) goto error;
@@ -106,6 +117,16 @@ void mainDispatchFuncRun(struct MyQueryExecutorGroup *qeGrp,
                          struct WorkerMgrState *state) {
   struct MyQueryExecutor *myQe = NULL;
   bool catchProxyErr = true;
+
+#ifdef FAULT_INJECTOR
+    // expect FaultInjectorType: FaultInjectorTypeDispatchError
+    FaultInjectorType_e ret = FaultInjector_InjectFaultIfSet(
+                                  MainDispatchSendPlan,
+                                  DDLNotSpecified,
+                                  "",  // databaseName
+                                  ""); // tableName
+    if(ret == FaultInjectorTypeDispatchError) goto error;
+#endif
 
   ListCell *lc;
   foreach (lc, qeGrp->qes) {
@@ -225,6 +246,16 @@ void proxyDispatchFuncRun(struct MyQueryExecutorGroup *qeGrp,
   int32 len;
   foreach (lc, qeGrp->qes) {
     myQe = lfirst(lc);
+
+#ifdef FAULT_INJECTOR
+    // expect FaultInjectorType: FaultInjectorTypeDispatchError
+    FaultInjectorType_e ret = FaultInjector_InjectFaultIfSet(
+                                  ProxyDispatchSendPlan,
+                                  DDLNotSpecified,
+                                  "",  // databaseName
+                                  ""); // tableName
+    if(ret == FaultInjectorTypeDispatchError) goto error;
+#endif
 
     if (workermgr_should_query_stop(state)) {
       write_log("%s: query is canceled prior to dispatched.", __func__);

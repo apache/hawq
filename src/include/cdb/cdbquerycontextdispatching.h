@@ -103,6 +103,9 @@ CreateQueryContextDispatchingSendBack(int nfile);
 extern void
 UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback);
 
+extern void
+UpdateCatalogOrcIndexModifiedOnSegments(QueryContextDispatchingSendBack sendback, List **segnoToVseg);
+
 extern void UpdateCatalogModifiedOnSegmentsForUD(
     QueryContextDispatchingSendBack sendback, List **relFileNodeInfo,
     List **indexList);

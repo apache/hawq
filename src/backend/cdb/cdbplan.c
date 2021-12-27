@@ -367,6 +367,8 @@ plan_tree_mutator(Node *node,
 			break;
 			
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 			{
 				IndexScan  *idxscan = (IndexScan *) node;
 				IndexScan  *newidxscan;

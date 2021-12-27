@@ -406,9 +406,10 @@ create_aoseg_index_table(Relation rel, Oid aosegOid, Oid aosegIndexOid, Oid * co
 	 * Create unique index on index oid.
 	 */
 	indexInfo = makeNode(IndexInfo);
-	indexInfo->ii_NumIndexAttrs = 1;
-	indexInfo->ii_NumIndexKeyAttrs = 1;
+	indexInfo->ii_NumIndexAttrs = 2;
+	indexInfo->ii_NumIndexKeyAttrs = 2;
 	indexInfo->ii_KeyAttrNumbers[0] = 1;
+	indexInfo->ii_KeyAttrNumbers[1] = 2;
 	indexInfo->ii_Expressions = NIL;
 	indexInfo->ii_ExpressionsState = NIL;
 	indexInfo->ii_Predicate = NIL;

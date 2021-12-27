@@ -189,3 +189,8 @@ BEGIN
     return contents_command;
 END;
 $$ LANGUAGE PLPGSQL;
+
+
+drop function if exists is_supported_proc_in_NewQE(oid);
+
+create function is_supported_proc_in_NewQE(oid) returns boolean as '$libdir/hornet','is_supported_proc_in_NewQE'language c immutable;

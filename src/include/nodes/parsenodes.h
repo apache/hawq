@@ -2162,6 +2162,12 @@ typedef struct IndexStmt {
                                        * bitmap index needs 3 additional oids. */
   bool do_part;       /* build indexes for child partitions */
   bool magma;
+
+  /* cdb create index */
+  Oid relationOid;
+  List *allidxinfos;    /* list of NativeOrcIndexFile */
+  List *columnsToRead;  /* all indexs of key and include columns */
+  QueryContextInfo *contextdisp; /* native orc need to dispatch relation */
 } IndexStmt;
 
 /* ----------------------

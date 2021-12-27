@@ -806,11 +806,11 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
 
 	}
 
-	if (newExecutorMode) {
-		appendStringInfo(buf, "New executor mode: ON\n");
-		if (pg_strcasecmp(new_scheduler_mode, new_scheduler_mode_on) == 0)
-			appendStringInfo(buf, "New scheduler mode: ON\n");
-	}
+  if (newExecutorMode) {
+    appendStringInfo(buf, "New executor mode: ON\n");
+    appendStringInfo(buf, "New interconnect type: %s\n",
+                     show_new_interconnect_type());
+  }
 
   if (Debug_print_execution_detail) {
     instr_time  endtime;
@@ -1162,6 +1162,12 @@ explain_outNode(StringInfo str,
 		case T_IndexScan:
 			pname = "Index Scan";
 			break;
+		case T_OrcIndexScan:
+			pname = "Orc Index Scan";
+			break;
+		case T_OrcIndexOnlyScan:
+			pname = "Orc Index Only Scan";
+			break;
 		case T_DynamicIndexScan:
 			pname = "Dynamic Index Scan";
 			break;
@@ -1340,6 +1346,8 @@ explain_outNode(StringInfo str,
 	switch (nodeTag(plan))
 	{
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 			if (ScanDirectionIsBackward(((IndexScan *) plan)->indexorderdir))
 				appendStringInfoString(str, " Backward");
 			appendStringInfo(str, " using %s",
@@ -1347,7 +1355,7 @@ explain_outNode(StringInfo str,
 			/* FALL THRU */
 		case T_MagmaIndexScan:
 		case T_MagmaIndexOnlyScan:
-			if (nodeTag(plan) != T_IndexScan)
+			if (nodeTag(plan) != T_IndexScan && nodeTag(plan) != T_OrcIndexScan && nodeTag(plan) != T_OrcIndexOnlyScan)
 				appendStringInfo(str, " using index : %s",
 				  quote_identifier(((ExternalScan *) plan)->indexname));
 		case T_SeqScan:
@@ -1520,6 +1528,8 @@ explain_outNode(StringInfo str,
 	switch (nodeTag(plan))
 	{
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		case T_DynamicIndexScan:
 			show_scan_qual(((IndexScan *) plan)->indexqualorig,
 						   "Index Cond",

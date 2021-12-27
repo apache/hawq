@@ -558,6 +558,32 @@ _copyIndexScan(IndexScan *from)
 	return newnode;
 }
 
+/*
+ * _copyOrcIndexScan
+ */
+static OrcIndexScan *
+_copyOrcIndexScan(OrcIndexScan *from)
+{
+	OrcIndexScan  *newnode = makeNode(OrcIndexScan);
+
+	copyIndexScanFields(from, newnode);
+
+	return newnode;
+}
+
+/*
+ * _copyOrcIndexOnlyScan
+ */
+static OrcIndexOnlyScan *
+_copyOrcIndexOnlyScan(OrcIndexOnlyScan *from)
+{
+	OrcIndexOnlyScan  *newnode = makeNode(OrcIndexOnlyScan);
+
+	copyIndexScanFields(from, newnode);
+
+	return newnode;
+}
+
 static MagmaIndexScan *
 _copyMagmaIndexScan(MagmaIndexScan *from)
 {
@@ -4516,6 +4542,12 @@ copyObject(void *from)
 			break;
 		case T_IndexScan:
 			retval = _copyIndexScan(from);
+			break;
+		case T_OrcIndexScan:
+			retval = _copyOrcIndexScan(from);
+			break;
+		case T_OrcIndexOnlyScan:
+			retval = _copyOrcIndexOnlyScan(from);
 			break;
 		case T_DynamicIndexScan:
 			retval = _copyDynamicIndexScan(from);

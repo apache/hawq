@@ -33,14 +33,18 @@
  */
 
 #include "postgres.h"
+#include "postmaster/identity.h"
 
 #include "access/aosegfiles.h"
 #include "access/genam.h"
 #include "access/heapam.h"
 #include "access/fileam.h"
+#include "access/orcam.h"
+#include "access/orcsegfiles.h"
 #include "access/reloptions.h"
 #include "access/transam.h"
 #include "access/xact.h"
+#include "catalog/pg_appendonly.h"
 #include "catalog/catalog.h"
 #include "catalog/catquery.h"
 #include "catalog/dependency.h"
@@ -81,6 +85,7 @@
 #include "cdb/cdbsrlz.h"
 #include "cdb/cdbvars.h"
 #include "cdb/cdbcat.h"
+#include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/cdbrelsize.h"
 #include "cdb/cdboidsync.h"
 #include "cdb/dispatcher.h"
@@ -98,7 +103,153 @@ static Oid GetIndexOpClass(List *opclass, Oid attrType,
 static bool relationHasPrimaryKey(Relation rel);
 static bool relationHasUniqueIndex(Relation rel);
 
+static bool CDBCreateIndex(IndexStmt *stmt, Oid relationOid, Oid indexOid);
+
 bool gp_hash_index = false; /* hash index phase out. */
+
+/* dispatch index info to qe for native orc */
+bool CDBCreateIndex(IndexStmt *stmt, Oid relationOid, Oid indexOid)
+{
+	int target_segment_num = 0;
+	Relation rel = relation_open(relationOid, AccessShareLock);
+
+	/*
+	 * 1. calculate orc file num
+	 * 2. calculate vseg num by rm_nvseg_perquery_perseg_limit * slaveHostNumber
+	 * 3. take the smaller of the above as the vseg num
+	 * 4. bind SegNO to Vseg
+	 */
+	if (relationOid > 0 )
+	{
+		/* 1.calculate file segno */
+		FileSegTotals *fstotal = getOrcSegFileStats(rel, SnapshotNow);
+		if (fstotal)
+		{
+			target_segment_num = fstotal->totalfilesegs;
+			if (target_segment_num == 0)
+			{
+				elog(LOG, "CDBCreateIndex need not to dispatch create index statement, for not data in orc files.\n");
+				relation_close(rel, AccessShareLock);
+				return false;
+			}
+			pfree(fstotal);
+		}
+	}
+	relation_close(rel, AccessShareLock);
+
+	/* 2.judge by guc value */
+	int vsegNum = GetQueryVsegNum();
+	/* 3. get the smaller */
+	if (target_segment_num > vsegNum)
+	{
+		target_segment_num = vsegNum;
+	}
+
+	elog(DEBUG1, "CDBCreateIndex virtual segment number is: %d\n", target_segment_num);
+
+	QueryResource *resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num, NULL, 0);
+
+	/* 4.bind SegNO to Vseg */
+	int total_segfiles = 0;
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(relationOid, SnapshotNow);
+	FileSegInfo	**allfsinfo = getAllOrcFileSegInfo(aoEntry, SnapshotNow, &total_segfiles);
+
+	for (int i = 0; i < total_segfiles; ++i)
+	{
+		int vseg = (allfsinfo[i]->segno - 1) % target_segment_num;
+
+		insertInitialOrcIndexEntry(aoEntry, indexOid, allfsinfo[i]->segno);
+
+		/* One VSEG may process more than one ORC file, so use list to save segno and eof */
+		if (stmt->allidxinfos != NULL && stmt->allidxinfos->length > vseg)
+		{
+			NativeOrcIndexFile *idxs = lfirst(list_nth_cell(stmt->allidxinfos, vseg));
+			idxs->segno = lappend_int(idxs->segno, allfsinfo[i]->segno);
+			int len = length(idxs->segno);
+			idxs->eof = repalloc(idxs->eof, len * sizeof(int64));
+			idxs->eof[len - 1] = 0;
+		}
+		else
+		{
+			NativeOrcIndexFile *idxs = makeNode(NativeOrcIndexFile);
+			idxs->indexOid = indexOid;
+			idxs->segno = lappend_int(idxs->segno, allfsinfo[i]->segno);
+			idxs->eof = palloc0(sizeof(int64));
+			idxs->eof[0] = 0;
+			/*
+			 * save all file infos in indexstmt and dispatch to qes
+			 * qe use list_nth_cell(allidxinfos, GetQEIndex()) get the file informations it needs to process
+			 */
+			stmt->allidxinfos = lappend(stmt->allidxinfos, idxs);
+		}
+	}
+
+	/* qe has no metadata information, get columns info in qd */
+	ListCell *cell;
+	cqContext *attcqCtx;
+	foreach(cell, stmt->indexParams)
+	{
+		IndexElem *idx = (IndexElem *) lfirst(cell);
+		HeapTuple	atttuple;
+		attcqCtx = caql_getattname_scan(NULL, relationOid, idx->name);
+		atttuple = caql_get_current(attcqCtx);
+		if (HeapTupleIsValid(atttuple))
+		{
+			Form_pg_attribute tuple = (Form_pg_attribute) GETSTRUCT(atttuple);
+			if (!tuple->attnotnull)
+			{
+				stmt->columnsToRead = lappend_int(stmt->columnsToRead, tuple->attnum);
+			}
+		}
+		caql_endscan(attcqCtx);
+	}
+
+	stmt->relationOid = relationOid;
+
+	/* native orc need to dispatch relation info */
+	stmt->contextdisp = CreateQueryContextInfo();
+	prepareDispatchedCatalogRelation(stmt->contextdisp, relationOid, FALSE, NULL, TRUE);
+	TupleDesc tupDesc = RelationGetDescr(rel);
+	Form_pg_attribute *attr = tupDesc->attrs;
+	for (int attnum = 1; attnum <= tupDesc->natts; ++attnum)
+	{
+		if (attr[attnum - 1]->attisdropped) continue;
+		prepareDispatchedCatalogType(stmt->contextdisp, attr[attnum - 1]->atttypid);
+	}
+	FinalizeQueryContextInfo(stmt->contextdisp);
+
+	DispatchDataResult result;
+	mainDispatchStmtNode(stmt, NULL, resource, &result);
+	DropQueryContextInfo(stmt->contextdisp);
+	return true;
+}
+
+void CDBDefineIndex(IndexStmt *stmt)
+{
+	Relation rel = relation_open(stmt->relationOid, NoLock);
+	/* 1. get orc file infos belong to this qe */
+	NativeOrcIndexFile *idxs = (NativeOrcIndexFile *)(list_nth(stmt->allidxinfos, GetQEIndex()));
+	/* 2. call native orc index interface to build index data */
+	int keyCount = list_length(stmt->indexParams) - list_length(stmt->indexIncludingParams);
+	int64 *eof = orcCreateIndex(rel, idxs->indexOid, idxs->segno, idxs->eof, stmt->columnsToRead, keyCount);
+
+	/* 3. callback to qd to update eof info */
+	QueryContextDispatchingSendBack sendback = CreateQueryContextDispatchingSendBack(length(idxs->segno));
+	sendback->relid = stmt->relationOid;
+	sendback->varblock = GetQEIndex();
+	sendback->numfiles = length(idxs->segno);
+	for (int i = 0; i < sendback->numfiles; ++i)
+	{
+		sendback->eof[i] = eof[i];
+	}
+	StringInfo buf = PreSendbackChangedCatalog(1);
+	AddSendbackChangedCatalogContent(buf, sendback);
+
+	DropQueryContextDispatchingSendBack(sendback);
+	FinishSendbackChangedCatalog(buf);
+	relation_close(rel, NoLock);
+	return;
+}
 
 /*
  * DefineIndex
@@ -401,6 +552,11 @@ DefineIndex(Oid relationId,
 		ereport(ERROR,
 				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				 errmsg("hash indexes are not supported")));
+
+	if (accessMethodId == BITMAP_AM_OID)
+		ereport(ERROR,
+				(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+				 errmsg("bitmap indexes are not supported")));
 
 	/* MPP-9329: disable creation of GIN indexes */
 	if (accessMethodId == GIN_AM_OID)
@@ -760,7 +916,9 @@ DefineIndex(Oid relationId,
         	{
         		ereport(ERROR, (errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support DefineIndex")));
         	}
-        	// dispatch_statement_node((Node *)stmt, NULL, NULL, NULL);
+        	/* native orc need to dispatch index info to qe */
+        	if (RelationIsOrc(rel))
+        		CDBCreateIndex(stmt, relationId, indexRelationId);
         }
 	}
 

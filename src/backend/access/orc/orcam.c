@@ -176,6 +176,9 @@ OrcInsertDescData *orcBeginInsert(Relation rel,
   appendStringInfo(&option, "\"logicEof\": %" PRId64, segfileinfo->eof[0]);
   appendStringInfo(&option, ", \"uncompressedEof\": %" PRId64,
                    segfileinfo->uncompressed_eof[0]);
+  appendStringInfo(
+      &option, ", \"stripeSize\": %" PRId64,
+      ((StdRdOptions *)(rel->rd_options))->stripesize * 1024 * 1024);
   if (aoentry->compresstype)
     appendStringInfo(&option, ", %s", aoentry->compresstype);
   appendStringInfoChar(&option, '}');
@@ -909,6 +912,49 @@ uint64 orcEndUpdate(OrcUpdateDescData *updateDesc) {
   pfree(orcFormatData);
   pfree(updateDesc);
   return callback.processedTupleCount;
+}
+
+int64_t *orcCreateIndex(Relation rel, int idxId, List *segno, int64 *eof,
+                        List *columnsToRead, int sortIdx) {
+  checkOushuDbExtensiveFeatureSupport("ORC INDEX");
+  OrcScanDescData *scanDesc = palloc0(sizeof(OrcScanDescData));
+  OrcFormatData *orcFormatData = scanDesc->orcFormatData =
+      palloc0(sizeof(OrcFormatData));
+
+  RelationIncrementReferenceCount(rel);
+
+  TupleDesc desc = RelationGetDescr(rel);
+
+  scanDesc->rel = rel;
+  orcFormatData->fmt = ORCFormatNewORCFormatC("{}", 0);
+  initOrcFormatUserData(desc, orcFormatData);
+
+  int32 splitCount = list_length(segno);
+  int *columnsToReadList =
+      palloc0(sizeof(int) * orcFormatData->numberOfColumns);
+  for (int i = 0; i < list_length(columnsToRead); i++) {
+    columnsToReadList[list_nth_int(columnsToRead, i) - 1] = 1;
+  }
+  int *sortIdxList = palloc0(sizeof(int) * orcFormatData->numberOfColumns);
+  for (int i = 0; i < sortIdx; i++) {
+    sortIdxList[i] = list_nth_int(columnsToRead, i) - 1;
+  }
+
+  ORCFormatFileSplit *splits = palloc0(sizeof(ORCFormatFileSplit) * splitCount);
+  int32 filePathMaxLen = AOSegmentFilePathNameLen(rel) + 1;
+  for (int32 i = 0; i < splitCount; ++i) {
+    splits[i].fileName = palloc0(filePathMaxLen);
+    MakeAOSegmentFileName(rel, list_nth_int(segno, i), -1, dummyPlaceholder,
+                          splits[i].fileName);
+  }
+
+  if (splitCount > 0) addFilesystemCredential(splits[0].fileName);
+  RelationDecrementReferenceCount(rel);
+  return ORCFormatCreateIndex(
+      idxId, splits, splitCount, eof, columnsToReadList, sortIdxList, sortIdx,
+      orcFormatData->colNames, orcFormatData->colDatatypes,
+      orcFormatData->colDatatypeMods, orcFormatData->numberOfColumns,
+      gp_session_id, rm_seg_tmp_dirs);
 }
 
 bool isDirectDispatch(Plan *plan) {

@@ -327,7 +327,7 @@ Datum orc_validate_encodings(PG_FUNCTION_ARGS)
 	if (strncasecmp(encoding_name, "utf8", strlen("utf8")))
 	{
 		ereport(ERROR,
-				(errcode(ERRCODE_SYNTAX_ERROR), errmsg("\"%s\" is not a valid encoding for ORC external table. ", encoding_name), errOmitLocation(true)));
+				(errcode(ERRCODE_SYNTAX_ERROR), errmsg("\"%s\" is not a valid encoding for ORC external table. Encoding for ORC external table must be UTF8.", encoding_name), errOmitLocation(true)));
 	}
 
 	PG_RETURN_VOID() ;
@@ -358,6 +358,9 @@ Datum orc_validate_datatypes(PG_FUNCTION_ARGS) {
       int4 tmp_typmod = typmod - VARHDRSZ;
       int precision = (tmp_typmod >> 16) & 0xffff;
       int scale = tmp_typmod & 0xffff;
+
+      if (typmod == -1 && strcasecmp(orc_enable_no_limit_numeric, "ON") == 0) continue;  // for numeric without precision and scale.
+
       if (precision < 1 || 38 < precision)
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),

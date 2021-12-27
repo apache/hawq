@@ -288,7 +288,9 @@ create_index_paths(PlannerInfo *root, RelOptInfo *rel,
 		Path       *path = NULL;
 
 		bitmapqual = choose_bitmap_and(root, rel, bitindexpaths, NULL);
-		path = create_bitmap_scan_path(relstorage, root, rel, bitmapqual, NULL);
+		/* so far, native orc can't support bitmap scan */
+		if (relstorage != RELSTORAGE_ORC)
+			path = create_bitmap_scan_path(relstorage, root, rel, bitmapqual, NULL);
 		*pbitmappathlist = lappend(*pbitmappathlist, path);
 	}
 }
@@ -487,7 +489,8 @@ find_usable_indexes(PlannerInfo *root, RelOptInfo *rel,
 		 * plain indexscans, this isn't relevant since bitmap scans don't support
 		 * index data retrieval anyway.
 		 */
-		if (rel->ext == RELSTORAGE_EXTERNAL)
+		/* so far, magma and native orc can support index only scan */
+		if (rel->ext == RELSTORAGE_EXTERNAL || rel->ext == RELSTORAGE_ORC)
 		{
 			index_only_scan = check_index_only(rel, index);
 		}
@@ -1807,7 +1810,7 @@ best_inner_indexscan(PlannerInfo *root, RelOptInfo *rel,
       /* disable magma bitmap scan for inner join
        * because magma index scan cant support dynamic filter
        */
-      && (relstorage != RELSTORAGE_EXTERNAL))
+      && (relstorage != RELSTORAGE_EXTERNAL) && (relstorage != RELSTORAGE_ORC))
 	{
 		Path *bitmapqual;
 		Path *bpath;
@@ -2672,7 +2675,9 @@ check_index_only(RelOptInfo *rel, IndexOptInfo *index)
 	int			i;
 
 	/* Index-only scans must be enabled */
-	if (!enable_magma_indexonlyscan)
+	if (rel->ext == RELSTORAGE_EXTERNAL && (!enable_magma_indexonlyscan))
+		return false;
+	if (rel->ext == RELSTORAGE_ORC && (!enable_orc_indexonlyscan))
 		return false;
 
 	/*

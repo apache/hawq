@@ -285,6 +285,7 @@ typedef struct StdRdOptions
 	int			blocksize;		/* max varblock size (AO rels only) */
 	int			pagesize;		/* page size(Parquet rels only) */
 	int			rowgroupsize;	/* row group size (Parquet rels only)*/
+	int     stripesize;  /* stripe size (ORC rels only) */
 	int			compresslevel;  /* compression level (AO rels only) */
 	char*		compresstype;   /* compression type (AO rels only) */
 	bool		checksum;		/* checksum (AO rels only) */

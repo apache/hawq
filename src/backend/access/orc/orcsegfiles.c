@@ -55,6 +55,32 @@ void insertInitialOrcSegnoEntry(AppendOnlyEntry *aoEntry, int segNo) {
   heap_close(segRel, RowExclusiveLock);
 }
 
+void insertInitialOrcIndexEntry(AppendOnlyEntry *aoEntry, int idxOid, int segNo)
+{
+  if (idxOid == 0 || segNo == 0) return;
+
+  Relation segRel = heap_open(aoEntry->blkdirrelid, RowExclusiveLock);
+  TupleDesc desc = RelationGetDescr(segRel);
+  int natts = desc->natts;
+  bool *nulls = palloc(sizeof(bool) * natts);
+  Datum *values = palloc0(sizeof(Datum) * natts);
+  MemSet(nulls, 0, sizeof(char) * natts);
+
+  values[Anum_pg_orcseg_idx_idxoid - 1] = Int32GetDatum(idxOid);
+  values[Anum_pg_orcseg_idx_segno - 1] = Int32GetDatum(segNo);
+  values[Anum_pg_orcseg_idx_eof - 1] = Float8GetDatum(0);
+  HeapTuple tuple = heap_form_tuple(desc, values, nulls);
+  if (!HeapTupleIsValid(tuple))
+    elog(ERROR, "failed to build orc index file segment tuple");
+
+  frozen_heap_insert(segRel, tuple);
+
+  if (Gp_role == GP_ROLE_DISPATCH) CatalogUpdateIndexes(segRel, tuple);
+
+  heap_freetuple(tuple);
+  heap_close(segRel, RowExclusiveLock);
+}
+
 void insertOrcSegnoEntry(AppendOnlyEntry *aoEntry, int segNo, float8 tupleCount,
                          float8 eof, float8 uncompressedEof) {
   Relation segRel = heap_open(aoEntry->segrelid, RowExclusiveLock);
@@ -77,6 +103,59 @@ void insertOrcSegnoEntry(AppendOnlyEntry *aoEntry, int segNo, float8 tupleCount,
   heap_freetuple(tuple);
 
   heap_close(segRel, RowExclusiveLock);
+}
+
+void deleteOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid)
+{
+  if (aoEntry->blkdirrelid == 0) return;
+  Relation segRel = heap_open(aoEntry->blkdirrelid, RowExclusiveLock);
+  TupleDesc desc = RelationGetDescr(segRel);
+  ScanKeyData key[1];
+  ScanKeyInit(&key[0], (AttrNumber)Anum_pg_orcseg_idx_idxoid, BTEqualStrategyNumber,
+              F_INT4EQ, Int32GetDatum(idxOid));
+  SysScanDesc scan = systable_beginscan(segRel, aoEntry->blkdiridxid, TRUE,
+                                        SnapshotNow, 1, &key[0]);
+  HeapTuple tuple;
+  while ((tuple = systable_getnext(scan)))
+  {
+    simple_heap_delete(segRel, &tuple->t_self);
+  }
+
+  systable_endscan(scan);
+  heap_close(segRel, RowExclusiveLock);
+}
+
+void updateOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid, int segNo, int64 eof)
+{
+  Relation segRel = heap_open(aoEntry->blkdirrelid, RowExclusiveLock);
+  TupleDesc desc = RelationGetDescr(segRel);
+  /* both idxoid and segno needed to scan tuple */
+  ScanKeyData key[2];
+  ScanKeyInit(&key[0], (AttrNumber)Anum_pg_orcseg_idx_idxoid, BTEqualStrategyNumber,
+              F_INT4EQ, Int32GetDatum(idxOid));
+  ScanKeyInit(&key[1], (AttrNumber)Anum_pg_orcseg_idx_segno, BTEqualStrategyNumber,
+              F_INT4EQ, Int32GetDatum(segNo));
+  SysScanDesc scan = systable_beginscan(segRel, aoEntry->blkdiridxid, TRUE,
+                                        SnapshotNow, 2, &key[0]);
+  HeapTuple tuple = systable_getnext(scan);
+
+  Datum *record = palloc0(sizeof(Datum) * desc->natts);
+  bool *nulls = palloc0(sizeof(bool) * desc->natts);
+  bool *repl = palloc0(sizeof(bool) * desc->natts);
+
+  record[Anum_pg_orcseg_idx_eof - 1] = Float8GetDatum((float8)eof);
+  repl[Anum_pg_orcseg_idx_eof - 1] = true;
+
+  HeapTuple newTuple = heap_modify_tuple(tuple, desc, record, nulls, repl);
+  simple_heap_update(segRel, &tuple->t_self, newTuple);
+  CatalogUpdateIndexes(segRel, newTuple);
+  heap_freetuple(newTuple);
+
+  systable_endscan(scan);
+  heap_close(segRel, RowExclusiveLock);
+  pfree(record);
+  pfree(nulls);
+  pfree(repl);
 }
 
 void updateOrcFileSegInfo(Relation rel, AppendOnlyEntry *aoEntry, int segNo,

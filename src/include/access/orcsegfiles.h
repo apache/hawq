@@ -44,6 +44,10 @@ extern void updateOrcFileSegInfo(Relation rel, AppendOnlyEntry *aoEntry,
                                  int segNo, int64 eof, int64 uncompressedEof,
                                  int64 tupCountAdded, bool forInsert);
 
+extern void insertInitialOrcIndexEntry(AppendOnlyEntry *aoEntry, int idxOid, int segNo);
+extern void updateOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid, int segNo, int64 eof);
+extern void deleteOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid);
+
 extern List *orcGetAllSegFileSplits(AppendOnlyEntry *aoEntry,
                                     Snapshot snapshot);
 

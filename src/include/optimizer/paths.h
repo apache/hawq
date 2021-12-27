@@ -46,6 +46,8 @@ extern bool enable_magma_indexscan;
 extern bool enable_magma_bitmapscan;
 extern bool enable_magma_indexonlyscan;
 extern bool enable_magma_seqscan;
+extern bool enable_orc_indexscan;
+extern bool enable_orc_indexonlyscan;
 extern bool enable_tidscan;
 extern bool enable_sort;
 extern bool enable_hashagg;

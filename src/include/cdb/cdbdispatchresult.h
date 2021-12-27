@@ -284,6 +284,10 @@ void
 cdbdisp_handleModifiedCatalogOnSegments(CdbDispatchResults *results,
 		void (*handler)(QueryContextDispatchingSendBack sendback));
 
+void
+cdbdisp_handleModifiedOrcIndexCatalogOnSegments(List **segnoToVseg, CdbDispatchResults *results,
+		void (*handler)(QueryContextDispatchingSendBack sendback, List **l1));
+
 extern void cdbdisp_handleModifiedCatalogOnSegmentsForUD(
     CdbDispatchResults *results, List **relFileNodeInfo,
     void (*handler1)(QueryContextDispatchingSendBack sendback, List **l1,

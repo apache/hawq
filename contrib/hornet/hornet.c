@@ -25,6 +25,7 @@
 #include "storage/fd.h"
 #include "storage/filesystem.h"
 #include "utils/builtins.h"
+#include "utils/hawq_funcoid_mapping.h"
 
 Datum ls_hdfs_dir(PG_FUNCTION_ARGS);
 
@@ -130,4 +131,11 @@ Datum ls_hdfs_dir(PG_FUNCTION_ARGS) {
     pfree(info);
     SRF_RETURN_DONE(funcctx);
   }
+}
+
+PG_FUNCTION_INFO_V1(is_supported_proc_in_NewQE);
+Datum is_supported_proc_in_NewQE(PG_FUNCTION_ARGS) {
+  Oid a = PG_GETARG_OID(0);
+  int32_t mappingFuncId = HAWQ_FUNCOID_MAPPING(a);
+  PG_RETURN_BOOL(!(IS_HAWQ_MAPPING_FUNCID_INVALID(mappingFuncId)));
 }

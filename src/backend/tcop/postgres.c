@@ -103,6 +103,7 @@
 #include "cdb/cdbquerycontextdispatching.h"
 #include "cdb/ml_ipc.h"
 #include "utils/guc.h"
+#include "utils/faultinjector.h"
 #include "access/twophase.h"
 #include <pthread.h>
 #include "utils/resscheduler.h"
@@ -1135,6 +1136,17 @@ exec_mpp_query(const char *query_string,
 			RebuildQueryContext(query->contextdisp, &currentFilesystemCredentials,
 			        &currentFilesystemCredentialsMemoryContext);
 			FinalizeQueryContextInfo(query->contextdisp);
+		}
+		/* rebuild relation info for native orc index */
+		if (utilityStmt->type == T_IndexStmt)
+		{
+			IndexStmt *stmt = (IndexStmt*)utilityStmt;
+			if (stmt->contextdisp)
+			{
+				RebuildQueryContext(stmt->contextdisp, &currentFilesystemCredentials,
+								&currentFilesystemCredentialsMemoryContext);
+				FinalizeQueryContextInfo(stmt->contextdisp);
+			}
 		}
 	}
 
@@ -5424,6 +5436,15 @@ PostgresMain(int argc, char *argv[], const char *username)
                     }
                   }
                   else {
+                  #ifdef FAULT_INJECTOR
+                    // expect FaultInjectorType: FaultInjectorTypeError, FaultInjectorTypeFatal
+                    FaultInjectorType_e ret = FaultInjector_InjectFaultIfSet(
+                                                  QEQueryError,
+                                                  DDLNotSpecified,
+                                                  "",  // databaseName
+                                                  ""); // tableName
+                  #endif
+
                     if (serializedCommonPlanLen > 0) {
                       exec_mpp_query_new(
                           serializedCommonPlan,

@@ -185,4 +185,7 @@ extern Oid transformFkeyCheckAttrs(Relation pkrel,
 
 extern void buildExternalTableFormatOptionStringInJson(const char *fmtOptsStr,
                                                        char **fmtOptsJson);
+
+extern void buildDefaultFormatterOptionsInJson(
+    int encoding, char externalFmtType, struct json_object *optJsonObject);
 #endif   /* TABLECMDS_H */

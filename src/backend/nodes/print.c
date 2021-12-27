@@ -517,6 +517,10 @@ char * plannode_type(Plan *p)
 			return "EXTERNALSCAN";
 		case T_IndexScan:
 			return "INDEXSCAN";
+		case T_OrcIndexScan:
+			return "ORCINDEXSCAN";
+		case T_OrcIndexOnlyScan:
+			return "ORCINDEXONLYSCAN";
 		case T_MagmaIndexScan:
 			return "MAGMAINDEXSCAN";
 		case T_MagmaIndexOnlyScan:

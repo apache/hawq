@@ -497,6 +497,8 @@ AssignContentIdsToPlanData_Walker(Node *node, void *context)
 				break;
 
 			case T_IndexScan:
+			case T_OrcIndexScan:
+			case T_OrcIndexOnlyScan:
 				{
 					IndexScan *indexScan = (IndexScan*)node;
 

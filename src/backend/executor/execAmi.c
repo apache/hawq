@@ -136,6 +136,8 @@ ExecReScan(PlanState *node, ExprContext *exprCtxt)
 			break;
 
 		case T_IndexScanState:
+		case T_OrcIndexScanState:
+		case T_OrcIndexOnlyScanState:
 			ExecIndexReScan((IndexScanState *) node, exprCtxt);
 			break;
 			
@@ -633,6 +635,8 @@ ExecEagerFree(PlanState *node)
 			break;
 
 		case T_IndexScanState:
+		case T_OrcIndexScanState:
+		case T_OrcIndexOnlyScanState:
 			ExecEagerFreeIndexScan((IndexScanState *)node);
 			break;
 			

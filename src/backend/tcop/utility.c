@@ -1401,6 +1401,13 @@ ProcessUtility(Node *parsetree,
 
 		case T_IndexStmt:		/* CREATE INDEX */
 			{
+				/* So far, only native orc support create index in qe */
+				if (Gp_role == GP_ROLE_EXECUTE)
+				{
+					IndexStmt  *stmt = (IndexStmt *) parsetree;
+					CDBDefineIndex(stmt);
+					return;
+				}
 				IndexStmt  *stmt = (IndexStmt *) parsetree;
 				Oid			relid;
 				LOCKMODE	lockmode;

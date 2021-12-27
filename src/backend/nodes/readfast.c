@@ -776,6 +776,10 @@ _readIndexStmt(const char ** str)
 	READ_OID_FIELD(constrOid);
 	READ_BOOL_FIELD(concurrent);
 	READ_NODE_FIELD(idxOids);
+	READ_OID_FIELD(relationOid);
+	READ_NODE_FIELD(allidxinfos);
+	READ_NODE_FIELD(columnsToRead);
+	READ_NODE_FIELD(contextdisp);
 
 	READ_DONE();
 }
@@ -2301,6 +2305,29 @@ _readSegFileSplitMapNode(const char **str)
 	READ_DONE();
 }
 
+static NativeOrcIndexFile *
+_readNativeOrcIndexFile(const char **str)
+{
+	READ_LOCALS(NativeOrcIndexFile);
+
+	READ_OID_FIELD(indexOid);
+	READ_NODE_FIELD(segno);
+
+	int len = length(local_node->segno);
+
+	if (len > 0)
+	{
+		local_node->eof = palloc(sizeof(int64) * len);
+
+		for(int i = 0; i < len; i++)
+		{
+			READ_UINT64_FIELD(eof[i]);
+		}
+	}
+
+	READ_DONE();
+}
+
 static FileSplitNode *
 _readFileSplitNode(const char **str)
 {
@@ -3190,6 +3217,32 @@ static IndexScan *
 _readIndexScan(const char ** str)
 {
 	READ_LOCALS(IndexScan);
+
+	readIndexScanFields(str, local_node);
+
+	READ_DONE();
+}
+
+/*
+ * _readOrcIndexScan
+ */
+static OrcIndexScan *
+_readOrcIndexScan(const char ** str)
+{
+	READ_LOCALS(OrcIndexScan);
+
+	readIndexScanFields(str, local_node);
+
+	READ_DONE();
+}
+
+/*
+ * _readOrcIndexOnlyScan
+ */
+static OrcIndexOnlyScan *
+_readOrcIndexOnlyScan(const char ** str)
+{
+	READ_LOCALS(OrcIndexOnlyScan);
 
 	readIndexScanFields(str, local_node);
 
@@ -4326,6 +4379,12 @@ readNodeBinary(const char ** str)
 			case T_IndexScan:
 				return_value = _readIndexScan(str);
 				break;
+			case T_OrcIndexScan:
+				return_value = _readOrcIndexScan(str);
+				break;
+			case T_OrcIndexOnlyScan:
+				return_value = _readOrcIndexOnlyScan(str);
+				break;
 			case T_MagmaIndexScan:
 				return_value = _readMagmaIndexScan(str);
 				break;
@@ -4602,6 +4661,9 @@ readNodeBinary(const char ** str)
 				break;
 			case T_SegFileSplitMapNode:
 				return_value = _readSegFileSplitMapNode(str);
+				break;
+			case T_NativeOrcIndexFile:
+				return_value = _readNativeOrcIndexFile(str);
 				break;
 			case T_FileSplitNode:
 				return_value = _readFileSplitNode(str);

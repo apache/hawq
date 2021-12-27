@@ -551,7 +551,7 @@ bool GetRelOpt_appendonly_fromOptions(List *options, bool *appendonly)
       if (pg_strcasecmp(def->defname, "appendonly") == 0)
       {
         bool need_free_arg = false;
-        *appendonly = defGetString(def, &need_free_arg) == "true";
+        *appendonly = pg_strcasecmp(defGetString(def, &need_free_arg), "true") == 0;
         return true;
       }
     }

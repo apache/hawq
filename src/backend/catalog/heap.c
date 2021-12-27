@@ -798,6 +798,7 @@ void CheckAttributeForOrc(TupleDesc desc) {
       int4 tmp_typmod = typmod - VARHDRSZ;
       int precision = (tmp_typmod >> 16) & 0xffff;
       int scale = tmp_typmod & 0xffff;
+      if(typmod == -1 && strcasecmp(orc_enable_no_limit_numeric, "ON") == 0)continue;
       if (precision < 1 || 38 < precision)
         ereport(ERROR,
                 (errcode(ERRCODE_INVALID_PARAMETER_VALUE),

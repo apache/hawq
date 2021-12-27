@@ -16,6 +16,7 @@
 #include "postgres.h"
 
 #include "access/reloptions.h"
+#include "access/orcam.h"
 #include "catalog/pg_type.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbparquetstoragewrite.h"
@@ -321,6 +322,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 		"bucketnum",
 		"dicthreshold",
 		"bloomfilter",
+		"stripesize",
 	};
 
 	char	   *values[ARRAY_SIZE(default_keywords)];
@@ -328,6 +330,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	int32		blocksize = DEFAULT_APPENDONLY_BLOCK_SIZE;
 	int32		pagesize = DEFAULT_PARQUET_PAGE_SIZE;
 	int32		rowgroupsize = DEFAULT_PARQUET_ROWGROUP_SIZE;
+	int32   stripesize = DEFAULT_ORC_STRIPE_SIZE;
 	bool		appendonly = false;
 	bool		checksum = false;
 	char*		compresstype = NULL;
@@ -808,6 +811,30 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 					 errOmitLocation(true)));
 	}
 
+  /* stripesize */
+  if (values[13] != NULL)
+  {
+    if(!(columnstore == RELSTORAGE_ORC)){
+      ereport(ERROR,
+          (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+           errmsg("invalid option \'stripesize\' for non-orc table"),
+           errOmitLocation(true)));
+    }
+
+    stripesize = pg_atoi(values[13], sizeof(int32), 0);
+
+    if ((stripesize < MIN_ORC_STRIPE_SIZE) || (stripesize > MAX_ORC_STRIPE_SIZE))
+    {
+      if (validate)
+        ereport(ERROR,
+            (errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+             errmsg("stripe size for orc table should between 1MB and 1GB and should be specified in MBytes. "
+                 "Got %d MB", stripesize), errOmitLocation(true)));
+
+      stripesize = DEFAULT_ORC_STRIPE_SIZE;
+    }
+  }
+
 	// dicthreshold
 	if (values[11] != NULL) {
 	  if(!(columnstore == RELSTORAGE_ORC)){
@@ -861,6 +888,7 @@ default_reloptions(Datum reloptions, bool validate, char relkind,
 	result->blocksize = blocksize;
 	result->pagesize = pagesize;
 	result->rowgroupsize = rowgroupsize;
+	result->stripesize = stripesize;
 	result->compresslevel = compresslevel;
 	if (compresstype != NULL)
 		for (j = 0;j < strlen(compresstype); j++)

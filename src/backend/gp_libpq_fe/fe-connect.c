@@ -47,6 +47,7 @@
 #include "pg_config_paths.h"
 
 #include "cdb/cdbvars.h"
+#include "utils/faultinjector.h"
 
 #ifdef WIN32
 #include "win32.h"
@@ -3525,6 +3526,15 @@ bool PQgetQEsDetail(PGconn *conn, char *connMsg, int connMsgLen) {
     else
       return false;
   }
+#ifdef FAULT_INJECTOR
+    // expect FaultInjectorType: FaultInjectorTypeDispatchError
+    FaultInjectorType_e ret = FaultInjector_InjectFaultIfSet(
+                                  MainDispatchGetQEsDetail,
+                                  DDLNotSpecified,
+                                  "",  // databaseName
+                                  ""); // tableName
+    if(ret == FaultInjectorTypeDispatchError) return false;
+#endif
 
   return true;
 }

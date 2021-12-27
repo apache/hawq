@@ -323,13 +323,22 @@ extern int hawq_rm_nvseg_for_analyze_part_perquery_perseg_limit;
 extern int hawq_rm_nvseg_for_analyze_nopart_perquery_limit;
 extern int hawq_rm_nvseg_for_analyze_part_perquery_limit;
 
-/////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 /*
- * These guc and related code are temporary, maybe will be delete afterwords.
+ * Creating heap table on HAWQ's master node is not supported by default. 
+ * To do this, you need to turn on the following two GUCs.
+ * 
+ * enable_heap_table_on_master: Allow creating heap table.
+ * 
+ * enable_pg_default_for_non_system_table: Allow putting non-system table(e.g., heap table) 
+ * into pg_default. HAWQ does not support creating tablespace on its master node, 
+ * so we use pg_default as a workaround.
+ * 
+ * Using: CREATE TABLE t(id int) WITH(appendonly = false) TABLESPACE pg_default;
  */
 extern bool enable_heap_table_on_master;
 extern bool enable_pg_default_for_non_system_table;
-/////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 extern bool allow_file_count_bucket_num_mismatch;
 extern bool enable_pg_stat_activity_history;
@@ -568,6 +577,7 @@ extern char *enable_alpha_newqe_str;
 
 extern char *orc_enable_filter_pushdown;
 extern int orc_update_delete_work_mem;
+extern char *orc_enable_no_limit_numeric;
 
 extern bool magma_cache_read;
 extern char *magma_enable_shm;

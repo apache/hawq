@@ -37,6 +37,8 @@ typedef struct PlannerConfig
 	bool		enable_magma_bitmapscan;
 	bool		enable_magma_seqscan;
 	bool		enable_magma_indexonlyscan;
+	bool		enable_orc_indexonlyscan;
+	bool		enable_orc_indexscan;
 	bool		enable_tidscan;
 	bool		enable_sort;
 	bool		enable_hashagg;

@@ -643,17 +643,26 @@ static int check_response(URL_FILE *file, int *rc, char **response_string) {
           snprintf(connmsg, sizeof connmsg, "error code = %d (%s)",
                    (int)oserrno, strerror((int)oserrno));
       }
-
-      ereport(
-          ERROR,
-          (errcode(ERRCODE_CONNECTION_FAILURE),
-           errmsg("connection with gpfdist failed for \"%s\", effective url: "
-                  "\"%s\". %s",
-                  file->url, effective_url, (oserrno != 0 ? connmsg : ""))));
+      // When still_running == 0 and os level err = "time out", we will not
+      // report error.
+      if (!(file->u.curl.still_running == 0 && oserrno == 110)) {
+        ereport(
+            ERROR,
+            (errcode(ERRCODE_CONNECTION_FAILURE),
+             errmsg("connection with gpfdist failed for \"%s\", effective url: "
+                    "\"%s\". %s",
+                    file->url, effective_url, (oserrno != 0 ? connmsg : ""))));
+      }
     } else if (response_code ==
                FDIST_TIMEOUT)  // gpfdist server return timeout code
     {
-      return FDIST_TIMEOUT;
+      // When still_running == 0 and gpfdist return err = "time out", we will
+      // not report error.
+      if (file->u.curl.still_running == 0) {
+        return 0;
+      } else {
+        return FDIST_TIMEOUT;
+      }
     } else {
       /* we need to sleep 1 sec to avoid this condition:
          1- seg X gets an error message from gpfdist
@@ -1228,7 +1237,6 @@ URL_FILE *url_curl_fopen(char *url, bool forwrite, extvar_t *ev,
         elog(ERROR, "internal error: curl_multi_add_handle failed (%d - %s)", e,
              curl_easy_strerror(e));
     }
-
     while (CURLM_CALL_MULTI_PERFORM ==
            (e = curl_multi_perform(multi_handle, &file->u.curl.still_running)))
       ;
@@ -1241,15 +1249,16 @@ URL_FILE *url_curl_fopen(char *url, bool forwrite, extvar_t *ev,
     fill_buffer(file, 1);
 
     /* check the connection for GET request */
-    // if connection is established, http_response should not be null
-    if (file->u.curl.still_running > 0 || file->u.curl.http_response == 0) {
-      if (check_response(file, &response_code, &response_string))
-        ereport(ERROR,
-                (errcode(ERRCODE_CONNECTION_FAILURE),
-                 errmsg("could not open \"%s\" for reading", file->url),
-                 errdetail("Unexpected response from gpfdist server: %d - %s",
-                           response_code, response_string)));
-    }
+    // When other vseg has read all data and this vseg attend to read 1 byte to
+    // check connection, it may get error "timed out".
+    // If error is not "timed out", we will still report error.
+    if (check_response(file, &response_code, &response_string))
+      ereport(ERROR,
+              (errcode(ERRCODE_CONNECTION_FAILURE),
+               errmsg("could not open \"%s\" for reading", file->url),
+               errdetail("Unexpected response from gpfdist server: %d - %s",
+                         response_code, response_string)));
+
     if (file->u.curl.still_running == 0) {
       elog(LOG,
            "session closed when checking the connection in url_curl_fopen, "

@@ -2456,6 +2456,8 @@ sendInitGpmonPkts(Plan *node, EState *estate)
 		case T_ParquetScan:
 		case T_ExternalScan:
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		case T_BitmapIndexScan:
 		case T_TidScan:
 		case T_FunctionScan:

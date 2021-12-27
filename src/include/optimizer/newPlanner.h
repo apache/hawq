@@ -56,6 +56,8 @@ extern const char *show_new_interconnect_type();
 
 #define MAGMATYPE "magma"
 #define ORCTYPE "orc"
+#define TEXTTYPE "text"
+#define CSVTYPE "csv"
 
 typedef struct CommonPlanContext {
   plan_tree_base_prefix base;

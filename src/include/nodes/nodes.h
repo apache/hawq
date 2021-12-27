@@ -118,6 +118,8 @@ typedef enum NodeTag
 	T_MagmaIndexScan,
 	T_MagmaIndexOnlyScan,
 	T_MagmaBitmapScan,
+	T_OrcIndexScan,
+	T_OrcIndexOnlyScan,
 	T_Plan_End,
 	/* this one isn't a subclass of Plan: */
 	T_PlanInvalItem,
@@ -178,6 +180,8 @@ typedef enum NodeTag
 	T_MagmaIndexScanState,
 	T_MagmaIndexOnlyScanState,
 	T_MagmaBitmapScanState,
+	T_OrcIndexScanState,
+	T_OrcIndexOnlyScanState,
 	T_PlanState_End,
 
 	/*
@@ -320,6 +324,7 @@ typedef enum NodeTag
 	T_ResultRelSegFileInfoMapNode,
 	T_VirtualSegmentNode,
 	T_PlannerParamItem,
+	T_NativeOrcIndexFile,
 
     /* Tags for MPP planner nodes (relation.h) */
     T_CdbMotionPath = 580,

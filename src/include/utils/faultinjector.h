@@ -217,9 +217,19 @@ typedef enum FaultInjectorIdentifier_e {
 
 	InterconnectStopAckIsLost,
 
-	/* INSERT has to be done before that line */
+	/*new dispatcher*/
+	MainDispatchConnect,
+	MainDispatchGetQEsDetail,
+	ProxyDispatcherConnect,
+	MainDispatchSendPlan,
+	ProxyDispatchSendPlan,
+	QEQueryError,
+	ProxyDispatchConsumeData,
+	MainDispatchConsumeData,
+
+  /* INSERT has to be done before that line */
 	FaultInjectorIdMax,
-	
+
 } FaultInjectorIdentifier_e;
 
 /*
@@ -272,7 +282,8 @@ typedef enum FaultInjectorType_e {
 
 	FaultInjectorTypeProcDie,
 	FaultInjectorTypeInterrupt,
-
+	/* for exit at where can not call ereport */
+	FaultInjectorQuietExit,
 	/* INSERT has to be done before that line */
 	FaultInjectorTypeMax,
 	

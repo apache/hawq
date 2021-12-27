@@ -26,6 +26,11 @@
 #include "cdb/cdbquerycontextdispatching.h"
 #include "nodes/relation.h"
 
+// here we use orc stripe size in MBytes
+#define DEFAULT_ORC_STRIPE_SIZE 64
+#define MIN_ORC_STRIPE_SIZE 1
+#define MAX_ORC_STRIPE_SIZE 1024
+
 struct ScanState;
 
 typedef struct OrcFormatData OrcFormatData;
@@ -104,5 +109,9 @@ extern uint64 orcEndUpdate(OrcUpdateDescData *updateDesc);
 
 // utils
 extern bool isDirectDispatch(Plan *plan);
+
+// index
+extern int64_t* orcCreateIndex(Relation rel, int idxId, List* segno, int64* eof,
+                               List* columnsToRead, int sortIdx);
 
 #endif /* ORCAM_H_ */

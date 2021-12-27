@@ -534,6 +534,8 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 			break;
 
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		{
 			IndexScan  *splan = (IndexScan *) plan;
 			
@@ -545,7 +547,7 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 #ifdef USE_ASSERT_CHECKING
 			RangeTblEntry *rte = rt_fetch(splan->scan.scanrelid, glob->finalrtable);
 			char relstorage = get_rel_relstorage(rte->relid);
-			Assert(!relstorage_is_ao(relstorage));
+			Assert(!((relstorage_is_ao(relstorage) && (relstorage != RELSTORAGE_ORC))));
 #endif
 
 			splan->scan.plan.targetlist =

@@ -404,6 +404,16 @@ Datum hdfsprotocol_validate(PG_FUNCTION_ARGS)
 						(errcode(ERRCODE_SYNTAX_ERROR), errmsg("hdfsprotocol_validate : " "'force_quote' option is only available in 'csv' formatter")));
 			}
 		}
+
+		if (strcasecmp(de->defname, "header") == 0)
+		{
+		  /* this is allowed only for readable table */
+		  if (pvalidator_data->direction != EXT_VALIDATE_READ)
+		  {
+		    ereport(ERROR,
+		        (errcode(ERRCODE_SYNTAX_ERROR), errmsg("hdfsprotocol_validate : " "'header' option is only available in readable external table")));
+		  }
+		}
 	}
 
 	/* All urls should

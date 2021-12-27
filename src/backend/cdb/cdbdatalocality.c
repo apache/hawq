@@ -679,6 +679,8 @@ bool collect_scan_rangetable(Node *node,
 	case T_ExternalScan:
 	case T_MagmaIndexScan:
 	case T_MagmaIndexOnlyScan:
+	case T_OrcIndexScan:
+	case T_OrcIndexOnlyScan:
 	case T_AppendOnlyScan:
 	case T_ParquetScan: {
 		RangeTblEntry  *rte = rt_fetch(((Scan *)node)->scanrelid,

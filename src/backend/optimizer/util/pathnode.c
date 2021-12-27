@@ -248,6 +248,8 @@ pathnode_walk_kids(Path            *path,
             case T_AppendOnlyScan:
             case T_ParquetScan:
             case T_IndexScan:
+            case T_OrcIndexScan:
+            case T_OrcIndexOnlyScan:
             case T_TidScan:
             case T_SubqueryScan:
             case T_FunctionScan:
@@ -1248,6 +1250,11 @@ create_index_path(PlannerInfo *root,
 	if (index->rel->ext == RELSTORAGE_EXTERNAL)
 		pathnode->path.pathtype = index->indexonly ?
 				T_MagmaIndexOnlyScan : T_MagmaIndexScan;
+	else if (index->rel->ext == RELSTORAGE_ORC)
+	{
+		pathnode->path.pathtype = index->indexonly ?
+				T_OrcIndexOnlyScan : T_OrcIndexScan;
+	}
 	else
 		pathnode->path.pathtype = T_IndexScan;
 	pathnode->path.parent = rel;
@@ -1332,17 +1339,17 @@ create_bitmap_heap_path(PlannerInfo *root,
 	BitmapHeapPath *pathnode = makeNode(BitmapHeapPath);
 
 	if (rel->ext == RELSTORAGE_EXTERNAL)
-			pathnode->path.pathtype = T_MagmaBitmapScan;
+		pathnode->path.pathtype = T_MagmaBitmapScan;
 	else
-			pathnode->path.pathtype = T_BitmapHeapScan;
+		pathnode->path.pathtype = T_BitmapHeapScan;
 
 	pathnode->path.parent = rel;
 	pathnode->path.pathkeys = NIL;		/* always unordered */
 
-    /* Distribution is same as the base table. */
-    pathnode->path.locus = cdbpathlocus_from_baserel(root, rel);
-    pathnode->path.motionHazard = false;
-    pathnode->path.rescannable = true;
+	/* Distribution is same as the base table. */
+	pathnode->path.locus = cdbpathlocus_from_baserel(root, rel);
+	pathnode->path.motionHazard = false;
+	pathnode->path.rescannable = true;
 
 	pathnode->bitmapqual = bitmapqual;
 	pathnode->isjoininner = (outer_rel != NULL);

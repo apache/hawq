@@ -46,6 +46,7 @@
 #include "access/genam.h"
 #include "access/fileam.h"
 #include "access/heapam.h"
+#include "access/orcsegfiles.h"
 #include "access/relscan.h"
 #include "access/sysattr.h"
 #include "access/transam.h"
@@ -58,6 +59,7 @@
 #include "catalog/index.h"
 #include "catalog/indexing.h"
 #include "catalog/namespace.h"
+#include "catalog/pg_appendonly.h"
 #include "catalog/pg_constraint.h"
 #include "catalog/pg_exttable.h"
 #include "catalog/pg_namespace.h"
@@ -1240,6 +1242,23 @@ index_drop(Oid indexId)
 	 */
 	if (hasexprs)
 		RemoveStatistics(indexId, 0);
+
+	/* native orc need to delete pg_aoseg.pg_orcseg_idx_xxx rows */
+	if (RelationIsOrc(userHeapRelation))
+	{
+		AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(heapId, SnapshotNow);
+		if (0 != caql_getcount(
+					NULL,
+					cql("SELECT COUNT(*) FROM pg_class "
+						" WHERE oid = :1 ",
+						ObjectIdGetDatum(aoEntry->blkdirrelid))))
+		{
+			Assert(aoEntry != NULL);
+			deleteOrcIndexFileInfo(aoEntry, indexId);
+			pfree(aoEntry);
+		}
+		/* todo: need to dispatch drop index to clean index data */
+	}
 
 	/*
 	 * fix ATTRIBUTE relation

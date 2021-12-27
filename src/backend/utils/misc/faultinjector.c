@@ -117,6 +117,7 @@ FaultInjectorTypeEnumToString[] = {
 	_("user_cancel"),
 	_("proc_die"),
 	_("interrupt"),
+	_("quiet_exit"),
 	_("not recognized"),
 };
 
@@ -327,6 +328,22 @@ FaultInjectorIdentifierEnumToString[] = {
 		/* inject fault before cleaning up a runaway query */	
 	_("interconnect_stop_ack_is_lost"),
 		/* inject fault in interconnect to skip sending the stop ack */	
+  _("main_dispatch_connect"),
+  /* inject fault in main dispatcher connect, set error   */
+  _("main_dispatch_get_qes_detail"),
+  /* inject fault in main dispatch get qe detail, set error   */
+  _("proxy_dispatcher_connect"),
+  /* inject fault in proxy dispatcher connect, set error   */
+  _("main_dispatch_send_plan"),
+  /* inject fault in main dispatch send plan, set error   */
+  _("proxy_dispatch_send_plan"),
+  /* inject fault in proxy dispatch send plan, set error   */
+  _("qe_query_error"),
+  /* inject fault in qe query error, set error or fatal   */
+  _("proxy_dispatch_consume_data"),
+  /* inject fault in proxy dispatch consume data, set error or quiet_exit*/
+  _("main_dispatch_consume_data"),
+  /* inject fault in main dispatch consume data, set error  */
 	_("not recognized"),
 };
 
@@ -819,7 +836,8 @@ FaultInjector_InjectFaultIfSet(
 			break;
 			}
 
-
+		case FaultInjectorQuietExit:
+		  exit(0);
 		default:
 			
 			ereport(LOG, 

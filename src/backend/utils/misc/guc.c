@@ -641,6 +641,7 @@ char *enable_alpha_newqe_str = "ON";
 // filter push down for orc scan
 char *orc_enable_filter_pushdown = "ON";
 int orc_update_delete_work_mem;
+char *orc_enable_no_limit_numeric = "OFF";
 
 // enable magma in hawq
 bool hawq_init_with_magma = false;
@@ -673,6 +674,8 @@ bool		enable_magma_indexscan = false;
 bool		enable_magma_seqscan = true;
 bool		enable_magma_bitmapscan = false;
 bool		enable_magma_indexonlyscan = false;
+bool		enable_orc_indexscan = false;
+bool		enable_orc_indexonlyscan = false;
 bool		force_bitmap_table_scan = false;
 bool		enable_tidscan = true;
 bool		enable_sort = true;
@@ -1149,6 +1152,22 @@ static struct config_bool ConfigureNamesBool[] =
 		},
 		&enable_magma_indexonlyscan,
 		true, NULL, NULL
+	},
+	{
+		{"enable_orc_indexonlyscan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of orc-indexonly-scan plans."),
+			NULL
+		},
+		&enable_orc_indexonlyscan,
+		false, NULL, NULL
+	},
+	{
+		{"enable_orc_indexscan", PGC_USERSET, QUERY_TUNING_METHOD,
+			gettext_noop("Enables the planner's use of orc-index-scan plans."),
+			NULL
+		},
+		&enable_orc_indexscan,
+		false, NULL, NULL
 	},
 	{
 		{"enable_bitmapscan", PGC_USERSET, QUERY_TUNING_METHOD,
@@ -7568,6 +7587,16 @@ static struct config_string ConfigureNamesString[] =
     },
     &orc_enable_filter_pushdown,
     "ON", assign_switch_mode, NULL
+  },
+
+  {
+    {"orc_enable_no_limit_numeric", PGC_USERSET, EXTERNAL_TABLES,
+      gettext_noop("Enable no limit numeric"),
+      gettext_noop("Valid values are \"OFF\" and \"ON\"."),
+      GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+    },
+    &orc_enable_no_limit_numeric,
+    "OFF", assign_switch_mode, NULL
   },
 
   {

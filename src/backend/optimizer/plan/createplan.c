@@ -162,7 +162,7 @@ static ExternalScan *make_externalscan(List *qptlist,
 static IndexScan *make_indexscan(List *qptlist, List *qpqual, Index scanrelid,
 			   Oid indexid, List *indexqual, List *indexqualorig,
 			   List *indexstrategy, List *indexsubtype,
-			   ScanDirection indexscandir);
+			   ScanDirection indexscandir, bool indexonly, NodeTag pathtype);
 static MagmaIndexScan *make_magma_indexscan(List *qptlist,
 			   List *qpqual,
 			   Index scanrelid,
@@ -284,6 +284,8 @@ create_subplan(CreatePlanContext *ctx, Path *best_path)
 		case T_MagmaIndexScan:
 		case T_MagmaIndexOnlyScan:
 		case T_MagmaBitmapScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		case T_CteScan:
 			plan = create_scan_plan(ctx, best_path);
 			break;
@@ -350,7 +352,8 @@ create_scan_plan(CreatePlanContext *ctx, Path *best_path)
 	 */
 	if (use_physical_tlist(ctx, rel))
 	{
-		if (best_path->pathtype == T_MagmaIndexOnlyScan)
+		if (best_path->pathtype == T_MagmaIndexOnlyScan || best_path->pathtype == T_OrcIndexOnlyScan ||
+				best_path->pathtype == T_OrcIndexScan)
 		{
 			/* For index-only scan, the preferred tlist is the index's */
 			tlist = copyObject(((IndexPath *) best_path)->indexinfo->indextlist);
@@ -416,6 +419,12 @@ create_scan_plan(CreatePlanContext *ctx, Path *best_path)
 												(BitmapHeapPath *) best_path,
 													tlist,
 													scan_clauses);
+			break;
+
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
+			plan = (Plan *) create_indexscan_plan(
+					ctx, (IndexPath *) best_path, tlist, scan_clauses, NULL);
 			break;
 
 		case T_MagmaBitmapScan:
@@ -606,6 +615,8 @@ disuse_physical_tlist(Plan *plan, Path *path)
 		case T_ParquetScan:
 		case T_ExternalScan:
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		case T_BitmapHeapScan:
 		case T_BitmapTableScan:
 		case T_TidScan:
@@ -2133,7 +2144,9 @@ create_indexscan_plan(CreatePlanContext *ctx,
 							   stripped_indexquals,
 							   indexstrategy,
 							   indexsubtype,
-							   best_path->indexscandir);
+							   best_path->indexscandir,
+								 best_path->indexonly,
+								 best_path->path.pathtype);
 
 	copy_path_costsize(ctx->root, &scan_plan->scan.plan, &best_path->path);
 
@@ -3814,9 +3827,12 @@ make_indexscan(List *qptlist,
 			   List *indexqualorig,
 			   List *indexstrategy,
 			   List *indexsubtype,
-			   ScanDirection indexscandir)
+			   ScanDirection indexscandir,
+				 bool indexonly,
+				 NodeTag pathtype)
 {
 	IndexScan  *node = makeNode(IndexScan);
+	node->scan.plan.type = pathtype;
 	Plan	   *plan = &node->scan.plan;
 
 	/* cost should be inserted by caller */
@@ -3826,6 +3842,7 @@ make_indexscan(List *qptlist,
 	plan->righttree = NULL;
 	node->scan.scanrelid = scanrelid;
 
+	node->indexonly = indexonly;
 	node->indexid = indexid;
 	node->indexqual = indexqual;
 	node->indexqualorig = indexqualorig;

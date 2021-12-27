@@ -1405,6 +1405,8 @@ motion_sanity_walker(Node *node, sanity_result_t *result)
 		case T_ExternalScan:
 		case T_MagmaIndexScan:
 		case T_MagmaIndexOnlyScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		case T_AppendOnlyScan:
 		case T_ParquetScan:
 		case T_IndexScan:

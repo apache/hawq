@@ -39,6 +39,7 @@ extern void DefineIndex(Oid relationId,
 			bool concurrent,
 			bool part_expanded, /* MPP */
 			IndexStmt *stmt /* MPP */);
+extern void CDBDefineIndex(IndexStmt *stmt);
 extern void RemoveIndex(RangeVar *relation, DropBehavior behavior);
 extern void ReindexIndex(ReindexStmt *stmt);
 extern void ReindexTable(ReindexStmt *stmt);

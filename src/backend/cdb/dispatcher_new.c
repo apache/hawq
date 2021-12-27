@@ -848,6 +848,13 @@ static void dispatchStmt(MyDispStmt *stmt, QueryResource *resource,
     bool newPlanner = can_convert_common_plan(data->queryDesc, &ctx);
     mainDispatchRun(data, &ctx, newPlanner);
     mainDispatchWait(data, false);
+    /* index stmt need to update catalog */
+    if (stmt->node != NULL && IsA(stmt->node, IndexStmt))
+    {
+      IndexStmt *idxStmt = (IndexStmt *)(stmt->node);
+      CdbDispatchResults *pr = mainDispatchGetResults((DispatchDataResult *) data);
+      cdbdisp_handleModifiedOrcIndexCatalogOnSegments(&(idxStmt->allidxinfos), pr, UpdateCatalogOrcIndexModifiedOnSegments);
+    }
     if (result && !mainDispatchHasError(data)) {
       int entryDBSegNum = 0;
       int segNum = list_length(resource->segments) + entryDBSegNum;

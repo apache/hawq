@@ -35,6 +35,7 @@
 #include "libpq/libpq-be.h"
 #include "miscadmin.h"
 #include "utils/lsyscache.h"
+#include "utils/faultinjector.h"
 
 typedef enum MyQueryExecutorState {
   MYQES_UNINIT,  /* Uninit state */
@@ -309,6 +310,15 @@ bool executormgr_main_consumeData(struct MyQueryExecutor *qe) {
   bool done = false;
   struct MyQueryExecutor *myQe = qe;
 
+#ifdef FAULT_INJECTOR
+  // expect FaultInjectorType: FaultInjectorTypeDispatchError,
+  FaultInjectorType_e ret =
+      FaultInjector_InjectFaultIfSet(MainDispatchConsumeData, DDLNotSpecified,
+                                     "",   // databaseName
+                                     "");  // tableName
+  if (ret == FaultInjectorTypeDispatchError) goto error;
+#endif
+
   if ((rc = PQconsumeInput(conn)) == 0) goto error;
   while (!PQisBusy(conn)) {
     /* Normal command finished */
@@ -352,6 +362,16 @@ bool executormgr_proxy_consumeData(struct MyQueryExecutor *qe) {
   PGconn *conn = qe->desc->conn;
   bool done = false;
   CdbDispatchResult *resultSlot = qe->refResult;
+
+#ifdef FAULT_INJECTOR
+  // expect FaultInjectorType: FaultInjectorTypeDispatchError,
+  // FaultInjectorQuietExit
+  FaultInjectorType_e ret =
+      FaultInjector_InjectFaultIfSet(ProxyDispatchConsumeData, DDLNotSpecified,
+                                     "",   // databaseName
+                                     "");  // tableName
+  if (ret == FaultInjectorTypeDispatchError) goto error;
+#endif
 
   if (!PQconsumeInput(conn)) goto error;
 
@@ -401,6 +421,15 @@ error:
 }
 
 bool executormgr_proxy_doconnect(struct MyQueryExecutor *qe) {
+#ifdef FAULT_INJECTOR
+  // expect FaultInjectorType: FaultInjectorTypeDispatchError
+  FaultInjectorType_e ret =
+      FaultInjector_InjectFaultIfSet(ProxyDispatcherConnect, DDLNotSpecified,
+                                     "",   // databaseName
+                                     "");  // tableName
+  if (ret == FaultInjectorTypeDispatchError) goto error;
+#endif
+
   if (!cdbconn_proxy_doconnect(qe->desc, getTaskConnMsg(qe->refTask)))
     goto error;
 

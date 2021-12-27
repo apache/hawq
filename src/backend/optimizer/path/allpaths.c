@@ -382,15 +382,11 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 	}
 
 	/* Consider sequential scan. */
-    if ((root->config->enable_seqscan) && (relstorage != RELSTORAGE_EXTERNAL))
-        pathlist = lappend(pathlist, seqpath);
+	if ((root->config->enable_seqscan) && (relstorage != RELSTORAGE_EXTERNAL))
+		pathlist = lappend(pathlist, seqpath);
 
 	/* Consider index and bitmap scans */
-  if (!relstorage_is_ao(relstorage))
-  {
-  	/* Temporarily disable index for ao table */
-  	create_index_paths(root, rel, relstorage, &indexpathlist, &bitmappathlist);
-  }
+	create_index_paths(root, rel, relstorage, &indexpathlist, &bitmappathlist);
 
 	/* deal with magma index scan */
 	if (relstorage == RELSTORAGE_EXTERNAL)
@@ -416,6 +412,48 @@ set_plain_rel_pathlist(PlannerInfo *root, RelOptInfo *rel, RangeTblEntry *rte)
 		}
 		if (bitmappathlist && root->config->enable_magma_bitmapscan)
 			pathlist = list_concat(pathlist, bitmappathlist);
+		/* If no enabled path was found, consider seq path. */
+		if (!pathlist)
+		{
+			pathlist = lappend(pathlist, seqpath);
+		}
+
+		foreach(cell, pathlist)
+			add_path(root, rel, (Path *)lfirst(cell));
+
+		/* Now find the cheapest of the paths for this rel */
+		set_cheapest(root, rel);
+		return;
+	}
+
+	/* deal with native orc index scan */
+	if (relstorage == RELSTORAGE_ORC)
+	{
+		if (indexpathlist && ((root->config->enable_orc_indexscan)
+				|| (root->config->enable_orc_indexonlyscan)))
+		{
+			ListCell   *l;
+			foreach(l, indexpathlist)
+			{
+				IndexPath  *ipath = (IndexPath *) lfirst(l);
+				if ((root->config->enable_orc_indexscan) &&
+						(!ipath->indexonly))
+				{
+					pathlist = lappend(pathlist, ipath);
+				}
+				else if ((root->config->enable_orc_indexonlyscan) &&
+						(ipath->indexonly))
+				{
+					pathlist = lappend(pathlist, ipath);
+				}
+			}
+		}
+
+		/* If no enabled path was found, consider seq path. */
+		if (!pathlist)
+		{
+			pathlist = lappend(pathlist, seqpath);
+		}
 		/* Add them, now that we know whether the quals specify a unique key. */
 		foreach(cell, pathlist)
 			add_path(root, rel, (Path *)lfirst(cell));

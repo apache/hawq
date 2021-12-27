@@ -564,7 +564,11 @@ typedef struct IndexScan
 
 	/* logical index to use */
 	LogicalIndexInfo *logicalIndexInfo;
+	bool		indexonly;		/* attempt to skip user data fetches */
 } IndexScan;
+
+typedef IndexScan OrcIndexScan;
+typedef IndexScan OrcIndexOnlyScan;
 
 /*
  * DynamicIndexScan

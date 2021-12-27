@@ -674,6 +674,22 @@ _outIndexScan(StringInfo str, IndexScan *node)
 }
 
 static void
+_outOrcIndexScan(StringInfo str, OrcIndexScan *node)
+{
+	WRITE_NODE_TYPE("ORCINDEXSCAN");
+
+	outIndexScanFields(str, node);
+}
+
+static void
+_outOrcIndexOnlyScan(StringInfo str, OrcIndexOnlyScan *node)
+{
+	WRITE_NODE_TYPE("ORCINDEXONLYSCAN");
+
+	outIndexScanFields(str, node);
+}
+
+static void
 _outDynamicIndexScan(StringInfo str, DynamicIndexScan *node)
 {
 	WRITE_NODE_TYPE("DYNAMICINDEXSCAN");
@@ -2276,6 +2292,10 @@ _outIndexStmt(StringInfo str, IndexStmt *node)
 	WRITE_OID_FIELD(constrOid);
 	WRITE_BOOL_FIELD(concurrent);
 	WRITE_NODE_FIELD(idxOids);
+	WRITE_OID_FIELD(relationOid);
+	WRITE_NODE_FIELD(allidxinfos);
+	WRITE_NODE_FIELD(columnsToRead);
+	WRITE_NODE_FIELD(contextdisp);
 }
 
 static void
@@ -2924,6 +2944,18 @@ _outResultRelSegFileInfoMapNode(StringInfo str, ResultRelSegFileInfoMapNode *nod
 
 	WRITE_OID_FIELD(relid);
 	WRITE_NODE_FIELD(segfileinfos);
+}
+
+static void
+_outNativeOrcIndexFile(StringInfo str, NativeOrcIndexFile *node)
+{
+	WRITE_NODE_TYPE("NATIVEORCINDEXFILE");
+
+	WRITE_OID_FIELD(indexOid);
+	WRITE_NODE_FIELD(segno);
+	int len = length(node->segno);
+	for(int i = 0; i < len; i++)
+		WRITE_UINT64_FIELD(eof[i]);
 }
 
 static void
@@ -4240,6 +4272,12 @@ _outNode(StringInfo str, void *obj)
 			case T_IndexScan:
 				_outIndexScan(str, obj);
 				break;
+			case T_OrcIndexScan:
+				_outOrcIndexScan(str, obj);
+				break;
+			case T_OrcIndexOnlyScan:
+				_outOrcIndexOnlyScan(str, obj);
+				break;
 			case T_MagmaIndexScan:
 				_outMagmaIndexScan(str, obj);
 				break;
@@ -4609,6 +4647,9 @@ _outNode(StringInfo str, void *obj)
 				break;
 			case T_ResultRelSegFileInfoMapNode:
 				_outResultRelSegFileInfoMapNode(str, obj);
+				break;
+			case T_NativeOrcIndexFile:
+				_outNativeOrcIndexFile(str, obj);
 				break;
 			case T_ExtTableTypeDesc:
 				_outExtTableTypeDesc(str, obj);

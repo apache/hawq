@@ -781,6 +781,8 @@ AdjustVarnoWalker(Node *node, AdjustVarnoContext *ctx)
 		case T_MagmaIndexScan:
 		case T_MagmaIndexOnlyScan:
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 		case T_BitmapIndexScan:
 		case T_BitmapHeapScan:
 		case T_BitmapTableScan:

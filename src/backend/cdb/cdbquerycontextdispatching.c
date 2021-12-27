@@ -3058,6 +3058,27 @@ DropQueryContextDispatchingSendBack(QueryContextDispatchingSendBack sendback)
 }
 
 
+void UpdateCatalogOrcIndexModifiedOnSegments(QueryContextDispatchingSendBack sendback, List **segnoToVseg)
+{
+	Assert(NULL != sendback);
+
+	NativeOrcIndexFile *idxs = (NativeOrcIndexFile *)(list_nth(*segnoToVseg, sendback->varblock));
+	AppendOnlyEntry *aoEntry = GetAppendOnlyEntry(sendback->relid, SnapshotNow);
+	Assert(aoEntry != NULL);
+
+	for (int i = 0; i < sendback->numfiles; ++i)
+	{
+		updateOrcIndexFileInfo(aoEntry, idxs->indexOid, list_nth_int(idxs->segno, i), sendback->eof[i]);
+	}
+
+	pfree(aoEntry);
+
+	/*
+	 * make the change available
+	 */
+	CommandCounterIncrement();
+}
+
 void
 UpdateCatalogModifiedOnSegments(QueryContextDispatchingSendBack sendback)
 {

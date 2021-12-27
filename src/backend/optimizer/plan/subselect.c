@@ -1172,6 +1172,8 @@ finalize_plan(PlannerInfo *root, Plan *plan, List *rtable,
 			break;
 
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 			finalize_primnode((Node *) ((IndexScan *) plan)->indexqual,
 							  &context);
 			/*

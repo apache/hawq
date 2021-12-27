@@ -1580,4 +1580,13 @@ typedef struct ResultRelSegFileInfoMapNode
 	List *segfileinfos;
 } ResultRelSegFileInfoMapNode;
 
+/* Native Orc index file info */
+typedef struct NativeOrcIndexFile
+{
+	NodeTag type;
+	Oid   indexOid;
+	List  *segno;
+	int64 *eof;
+} NativeOrcIndexFile;
+
 #endif   /* RELATION_H */

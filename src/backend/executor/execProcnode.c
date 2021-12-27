@@ -374,6 +374,8 @@ ExecInitNode(Plan *node, EState *estate, int eflags)
 			break;
 
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 			curMemoryAccount = CREATE_EXECUTOR_MEMORY_ACCOUNT(isAlienPlanNode, node, IndexScan);
 
 			START_MEMORY_ACCOUNT(curMemoryAccount);
@@ -859,6 +861,8 @@ ExecProcNode(PlanState *node)
 		&&Exec_Jmp_MagmaIndexScan,
 		&&Exec_Jmp_MagmaIndexOnlyScan,
 		&&Exec_Jmp_MagmaBitmapScan,
+		&&Exec_Jmp_OrcIndexScan,
+		&&Exec_Jmp_OrcIndexOnlyScan,
 	};
 
 	COMPILE_ASSERT((T_Plan_End - T_Plan_Start) == (T_PlanState_End - T_PlanState_Start));
@@ -1045,6 +1049,14 @@ Exec_Jmp_MagmaIndexOnlyScan:
 
 Exec_Jmp_MagmaBitmapScan:
 	/* Todo: should to create magmabitmapscannode */
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_OrcIndexScan:
+	result = ExecIndexScan((IndexScanState *) node);
+	goto Exec_Jmp_Done;
+
+Exec_Jmp_OrcIndexOnlyScan:
+	result = ExecIndexScan((IndexScanState *) node);
 	goto Exec_Jmp_Done;
 
 Exec_Jmp_Done:
@@ -1360,6 +1372,8 @@ ExecCountSlotsNode(Plan *node)
 			return ExecCountSlotsExternalScan((ExternalScan *) node);
 
 		case T_IndexScan:
+		case T_OrcIndexScan:
+		case T_OrcIndexOnlyScan:
 			return ExecCountSlotsIndexScan((IndexScan *) node);
 
 		case T_DynamicIndexScan:
@@ -1628,6 +1642,8 @@ ExecEndNode(PlanState *node)
 			break;
 
 		case T_IndexScanState:
+		case T_OrcIndexScanState:
+		case T_OrcIndexOnlyScanState:
 			ExecEndIndexScan((IndexScanState *) node);
 			break;
 
