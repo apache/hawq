@@ -1499,6 +1499,7 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		initStringInfo(&(cstate->executor_err_context));
 	}
 
+	QueryResource *savedResource = NULL;
 	if (is_from)				/* copy from file to database */
 	{
 		bool		pipe = (cstate->filename == NULL);
@@ -1590,7 +1591,6 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			GpPolicy *target_policy = NULL;
 			int min_target_segment_num = 0;
 			int max_target_segment_num = 0;
-			QueryResource *savedResource = NULL;
 			bool isMagmaHashTable = false;
 
 			target_policy = GpPolicyFetch(CurrentMemoryContext, relid);
@@ -1613,8 +1613,12 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 			}
 			pfree(target_policy);
 
-			cstate->resource = AllocateResource(QRL_ONCE, 1, 1, max_target_segment_num, min_target_segment_num,NULL,0);
 			savedResource = GetActiveQueryResource();
+			if (!savedResource) {
+			  cstate->resource = AllocateResource(QRL_ONCE, 1, 1, max_target_segment_num, min_target_segment_num,NULL,0);
+			} else {
+			  cstate->resource = AllocateResource(QRL_INHERIT, 0, 0, 0, 0, NULL, 0);
+			}
 			SetActiveQueryResource(cstate->resource);
 			all_relids = lappend_oid(all_relids, relid);
 
@@ -1653,7 +1657,6 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 							cstate->cdbsreh->errtbl,
 							err_segnos);
 			}
-			SetActiveQueryResource(savedResource);
 		}
 		else
 		{
@@ -1780,6 +1783,18 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 		FreeResource(cstate->resource);
 		cstate->resource = NULL;
 	}
+	/**
+	 * copy from:
+	 * if 'copy from' allocate resource with QRL_ONCE, reset ActiveQueryResource
+	 * back to NULL then analyze will allocate resource with QRL_ONCE.
+	 * if 'copy from' inherit resource with QRL_INHERIT from UDF, reset
+	 * ActiveQueryResource to original resource from UDF which will be inherited
+	 * by analyze.
+	 *
+	 * copy to:
+	 * 'copy to' has already done all work with resource before this reset.
+	 */
+	SetActiveQueryResource(savedResource);
 
 	/* Clean up storage (probably not really necessary) */
 	processed = cstate->processed;
@@ -1988,10 +2003,16 @@ DoCopyTo(CopyState cstate)
 			}
 			lFullRelOids = lappend_oid(lFullRelOids, cstate->rel->rd_id);
 
-			target_segment_num = calculate_virtual_segment_number(lFullRelOids);
-			elog(LOG, "virtual segment number of copy to is: %d\n", target_segment_num);
-
-			cstate->resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num,NULL,0);
+			QueryResource *savedResource = NULL;
+			savedResource = GetActiveQueryResource();
+			if (!savedResource) {
+			  target_segment_num = calculate_virtual_segment_number(lFullRelOids);
+			  elog(LOG, "virtual segment number of copy to is: %d\n", target_segment_num);
+			  cstate->resource = AllocateResource(QRL_ONCE, 1, 1, target_segment_num, target_segment_num,NULL,0);
+			} else {
+			  cstate->resource = AllocateResource(QRL_INHERIT, 0, 0, 0, 0, NULL, 0);
+			}
+			SetActiveQueryResource(cstate->resource);
 			CopyToDispatch(cstate);
 		}
 		else
