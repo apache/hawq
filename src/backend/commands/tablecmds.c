@@ -3814,7 +3814,39 @@ renamerel(Oid myrelid, const char *newrelname, RenameStmt *stmt)
 				}
 			}
 		}
-		renameHdfsPath(myrelid, pNode, oldrelname, newrelname);
+		// Filter out table which fmtopts == "formatter 'orc' category 'internal'".
+		// Example:
+		// create table test (int a) format 'orc';
+		cqContext  *exPcqCtx = caql_beginscan(
+		    NULL,
+		    cql("SELECT * FROM pg_exttable "
+		        " WHERE reloid = :1 ",
+		        ObjectIdGetDatum(myrelid)));
+		HeapTuple exTuple = caql_getnext(exPcqCtx);
+		bool notSupport = 0;
+		if (exTuple)
+		{
+		  bool isNull;
+		  Relation pgExtTableRel = heap_open(ExtTableRelationId, RowExclusiveLock);
+		  Datum fmtOptDatum = heap_getattr(exTuple, Anum_pg_exttable_fmtopts,
+		                                   RelationGetDescr(pgExtTableRel), &isNull);
+		  char *fmtOptString =
+		          DatumGetCString(DirectFunctionCall1(textout, fmtOptDatum));
+		  char *fmtName = getExtTblFormatterTypeInFmtOptsStr(fmtOptString);
+		  char *fmtCategory = getExtTblCategoryInFmtOptsStr(fmtOptString);
+		  notSupport =
+		      fmtName && fmtCategory && strstr(fmtCategory, "internal") &&
+		      strstr(fmtName, "orc");
+		  heap_close(pgExtTableRel, RowExclusiveLock);
+		}
+		caql_endscan(exPcqCtx);
+		if (notSupport)
+		{
+		  ereport(ERROR,
+		          (errcode(ERRCODE_WRONG_OBJECT_TYPE),
+		              errmsg("rename is not supported."),
+		              errOmitLocation(true)));
+		}
 	}
 
 	/* MPP-6929: metadata tracking */
