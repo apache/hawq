@@ -111,12 +111,13 @@ int sendRUAlive(char *seghostname)
 	context->MessageCleanUpHandler	 = sentRUAliveCleanUp;
 	context->UserData                = (void *)segres;
 
-	/* Connect to HAWQ RM server */
+	/* always create new connection for RUAlive msg */
 	res = registerAsyncConnectionFileDesc(seghostname,
 										  rm_segment_port,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
+										  true,
 										  &newcommbuffer);
 	if ( res != FUNC_RETURN_OK )
 	{
@@ -342,6 +343,7 @@ int increaseMemoryQuota(char *seghostname, GRMContainerSet containerset)
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
+										  false,
 										  &commbuffer);
     if ( res != FUNC_RETURN_OK )
     {
@@ -505,6 +507,7 @@ int decreaseMemoryQuota(char 			*seghostname,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
+										  false,
 										  &commbuffer);
     if ( res != FUNC_RETURN_OK )
     {

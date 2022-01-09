@@ -103,6 +103,7 @@ int sendIMAlive(int  *errorcode,
 										  ASYNCCOMM_READBYTES | ASYNCCOMM_WRITEBYTES,
 										  &AsyncCommBufferHandlersMessage,
 										  context,
+										  false,
 										  &newcommbuffer);
 	if ( res != FUNC_RETURN_OK )
 	{

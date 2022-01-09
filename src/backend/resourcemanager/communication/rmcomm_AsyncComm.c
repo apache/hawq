@@ -414,7 +414,8 @@ int processAllCommFileDescs(void)
 			if ( CommBuffers[i]->ClientHostname.Str != NULL &&
 				 CommBuffers[i]->ServerPort != 0 )
 			{
-				elog(DEBUG3, "Return FD %d Index %d.", CommBuffers[i]->FD, i);
+				elog(DEBUG3, "Return FD %d Index %d. host:port %s:%d", CommBuffers[i]->FD, i,
+				     CommBuffers[i]->ClientHostname.Str, CommBuffers[i]->ServerPort);
 				returnAliveConnectionRemoteByHostname(
 							&(CommBuffers[i]->FD),
 							CommBuffers[i]->ClientHostname.Str,
@@ -659,6 +660,7 @@ int registerAsyncConnectionFileDesc(const char				*address,
 									uint32_t				 actionmask,
 									AsyncCommBufferHandlers  methods,
 									void					*userdata,
+									bool useNewConnection,
 									AsyncCommBuffer			*newcommbuffer)
 {
 	int					res				= FUNC_RETURN_OK;
@@ -678,7 +680,13 @@ int registerAsyncConnectionFileDesc(const char				*address,
 		return UTIL_NETWORK_FAIL_GETHOST;
 	}
 
-	if ( rm_enable_connpool )
+	if ( useNewConnection )
+	{
+	  /* remove old connection in the connpool for RUAlive check */
+	  removeAliveSocketConnection(address, resolvedaddr, port);
+	}
+
+	if ( !useNewConnection && rm_enable_connpool )
 	{
 		/* Try to get an alive connection from connection pool. */
 		fd = fetchAliveSocketConnection(address, resolvedaddr, port);

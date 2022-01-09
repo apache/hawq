@@ -603,6 +603,36 @@ int fetchAliveSocketConnection(const char 	 *hostname,
 	return res;
 }
 
+int removeAliveSocketConnection(const char    *hostname,
+                                AddressString  address,
+                                uint16_t     port)
+{
+  ConnAddressString connaddr = createConnAddressString(address, port);
+  SimpArray key;
+  setSimpleArrayRef(&key, (char *)connaddr, SIZEOFCONNADDRSTRING(connaddr));
+  PAIR pair = getHASHTABLENode(&ActiveConnections, (void *)&key);
+  if ( pair == NULL )
+  {
+    freeConnAddressString(connaddr);
+    return -1;
+  }
+  List *aliveconns = (List *)(pair->Value);
+  while( aliveconns != NULL )
+  {
+    int fd = lfirst_int(list_head(aliveconns));
+    MEMORY_CONTEXT_SWITCH_TO(PCONTEXT)
+    aliveconns = list_delete_first(aliveconns);
+    MEMORY_CONTEXT_SWITCH_BACK
+    elog(DEBUG3, "Removed FD %d for %s:%d.", fd, hostname, port);
+    closeConnectionRemote(&fd);
+  }
+  pair->Value = NULL;
+  removeHASHTABLENode(&ActiveConnections, (void *)&key);
+  freeConnAddressString(connaddr);
+
+  return FUNC_RETURN_OK;
+}
+
 void returnAliveConnectionRemoteByHostname(int 		  *clientfd,
 										   const char *hostname,
 										   uint16_t port)

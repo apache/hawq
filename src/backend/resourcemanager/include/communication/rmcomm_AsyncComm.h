@@ -101,6 +101,7 @@ int registerAsyncConnectionFileDesc(const char				*address,
 									uint32_t				 actionmask,
 									AsyncCommBufferHandlers  methods,
 									void					*userdata,
+									bool useNewConnection,
 									AsyncCommBuffer			*newcommbuffer);
 
 /* Process all registered file descriptors. */

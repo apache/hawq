@@ -148,4 +148,8 @@ AddressString getAddressStringByHostName(const char *hostname);
 int fetchAliveSocketConnection(const char 	 *hostname,
 							   AddressString  address,
 							   uint16_t 	  port);
+
+int removeAliveSocketConnection(const char    *hostname,
+                                AddressString  address,
+                                uint16_t     port);
 #endif /* RESOURCE_MANANGER_NETWORK_UTILITIES_H */
