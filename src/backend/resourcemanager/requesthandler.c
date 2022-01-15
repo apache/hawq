@@ -412,7 +412,16 @@ bool handleRMRequestAcquireResource(void **arg)
 	 *--------------------------------------------------------------------------
 	 */
 	Assert(PRESPOOL->SlavesHostCount > 0);
-	int rejectlimit = ceil(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
+	/*
+	 * original check: unavailcount > rejectlimit cannot handle some situations.
+	 *  int rejectlimit = ceil(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
+	 *  int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
+	 * e.g. rm_rejectrequest_nseg_limit default 0.25
+	 * a cluster with (1-3) nodes, 1 node down, rejectlimit=1, unavailcount=1
+	 * unavailcount > rejectlimit is false, the request won't be rejected.
+	 * but the unavailable ratio varies from 33%~100% > 25%.
+	 */
+	int rejectlimit = floor(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
 	int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
 	if ( unavailcount > rejectlimit )
 	{
@@ -881,7 +890,11 @@ bool handleRMRequestAcquireResourceQuota(void **arg)
 	}
 
 	Assert(PRESPOOL->SlavesHostCount > 0);
-	int rejectlimit = ceil(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
+	/*
+	 * change from ceil to floor, reference to explanation in
+	 * handleRMRequestAcquireResource
+	 */
+	int rejectlimit = floor(PRESPOOL->SlavesHostCount * rm_rejectrequest_nseg_limit);
 	int unavailcount = PRESPOOL->SlavesHostCount - PRESPOOL->AvailNodeCount;
 	if ( unavailcount > rejectlimit )
 	{
