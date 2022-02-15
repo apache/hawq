@@ -1242,12 +1242,30 @@ cdbexplain_depositStatsToNode(PlanState *planstate, CdbExplain_RecvStatCtx *ctx)
           );
         }
 
+        if (gp_enable_explain_allstat) {
+          StringInfoData *extratextbuf = ctx->extratextbuf;
+          if (rsi->bnotes < rsi->enotes)
+          {
+            /* Locate extra message text in dispatch result buffer. */
+            int         notelen = rsi->enotes - rsi->bnotes;
+            const char *notes = (const char *)rsh + rsh->bnotes + rsi->bnotes;
+
+            Insist(rsh->bnotes + rsi->enotes < rsh->enotes &&
+                   notes[notelen] == '\0');
+
+            /* Append to extratextbuf. */
+            nsi->bnotes = extratextbuf->len;
+            appendBinaryStringInfo(extratextbuf, notes, notelen);
+            nsi->enotes = extratextbuf->len;
+          }
+        }
+
         /*
          * Drop qExec's extra text.  We rescue it below if qExec is a winner.
          * For local qDisp slice, ctx->extratextbuf is NULL, which tells us to
          * leave the extra text undisturbed in its existing buffer.
          */
-        if (ctx->extratextbuf)
+        if (ctx->extratextbuf && !gp_enable_explain_allstat)
             nsi->bnotes = nsi->enotes = 0;
 
         if (nsi->running)
@@ -2095,7 +2113,7 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 		appendStringInfoString(str,
                                "allstat: "
         /*	 "seg_starttime_firststart_counter_firsttuple_startup_total_ntuples_nloops" */
-						       "seg_firststart_total_ntuples");
+						       "seg n_tuples start_offset timing_to_first_row timing_to_last_row n_loops\n");
 
         for (i = 0; i < ns->ninst; i++)
 		{
@@ -2110,16 +2128,19 @@ cdbexplain_showExecStats(struct PlanState              *planstate,
 			INSTR_TIME_SET_ZERO(timediff);
 	        INSTR_TIME_ACCUM_DIFF(timediff, nsi->firststart, ctx->querystarttime);
 	        cdbexplain_formatSeconds(startbuf, sizeof(startbuf), INSTR_TIME_GET_DOUBLE(timediff));
+			cdbexplain_formatSeconds(firstbuf, sizeof(firstbuf), nsi->firsttuple);
 			cdbexplain_formatSeconds(totalbuf, sizeof(totalbuf), nsi->total);
 
+			appendStringInfoFill(str, 2*indent + sizeof("allstat:"), ' ');
 			appendStringInfo(str,
-                             "/seg%d_%s_%s_%.0f",
+                             "seg%d rows_out %.0f, start_offset_by %s, %s to_first, %s to_end, in %.0f loop\n",
                              ns->segindex0 + i,
+							 nsi->ntuples,
 							 startbuf,
+							 firstbuf,
 							 totalbuf,
-                             nsi->ntuples);
+							 nsi->nloops);
 		}
-		appendStringInfoString(str, "//end\n");
 	}
 }                               /* cdbexplain_showExecStats */
 
