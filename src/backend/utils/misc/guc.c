@@ -7583,7 +7583,7 @@ static struct config_string ConfigureNamesString[] =
     {"orc_enable_filter_pushdown", PGC_USERSET, EXTERNAL_TABLES,
       gettext_noop("Enable filter pushdown for orc scan"),
       gettext_noop("Valid values are \"OFF\" and \"ON\"."),
-      GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
+      GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL | GUC_GPDB_ADDOPT
     },
     &orc_enable_filter_pushdown,
     "ON", assign_switch_mode, NULL
