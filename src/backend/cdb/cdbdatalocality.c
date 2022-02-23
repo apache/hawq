@@ -1442,8 +1442,8 @@ fetch_hdfs_data_block_location(char *filepath, int64 len, int *block_num,
 		*hit_ratio = 0.0;
 		return NULL;
 	}
-	BlockLocation *locations;
-	HdfsFileInfo *file_info;
+	BlockLocation *locations = NULL;
+	HdfsFileInfo *file_info = NULL;
 	//double hit_ratio;
 	uint64_t beginTime;
 	beginTime = gettime_microsec();
@@ -1461,7 +1461,12 @@ fetch_hdfs_data_block_location(char *filepath, int64 len, int *block_num,
 		}
 		DestroyHdfsFileInfo(file_info);
 	} else {
-		locations = HdfsGetFileBlockLocations(filepath, len, block_num);
+	  BlockLocation *hdfs_locations = HdfsGetFileBlockLocations(filepath, len, block_num);
+	  locations = CreateHdfsFileBlockLocations(hdfs_locations, *block_num);
+	  if (hdfs_locations)
+	  {
+	    HdfsFreeFileBlockLocations(hdfs_locations, *block_num);
+	  }
 	}
 	if (debug_print_split_alloc_result) {
 		uint64 endTime = gettime_microsec();
