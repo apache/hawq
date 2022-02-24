@@ -136,7 +136,7 @@ static void init_format_user_data_for_write(TupleDesc tup_desc,
 static void build_options_in_json(List *fmt_opts_defelem, int encoding,
 		char **json_str, TupleDesc tupDesc);
 static ORCFormatC *create_formatter_instance(List *fmt_opts_defelem,
-		int encoding, int segno, TupleDesc tupDesc);
+		int encoding, int segno, TupleDesc tupDesc, bool forWrite);
 static void build_file_splits(Uri *uri, ScanState *scan_state,
 		ORCFormatUserData *user_data);
 static void build_tuple_descrition_for_read(Plan *plan, Relation relation,
@@ -617,7 +617,7 @@ Datum orc_beginscan(PG_FUNCTION_ARGS)
 	/* 3.2 Create formatter instance */
 	List *fmt_opts_defelem = pstate->custom_formatter_params;
 	user_data->fmt = create_formatter_instance(fmt_opts_defelem, fmt_encoding,
-			ps->ps_segno, tup_desc);
+			ps->ps_segno, tup_desc, false);
 
 	/* 3.3 Build file splits */
 	Uri *uri = ParseExternalTableUri(uri_str);
@@ -841,7 +841,7 @@ Datum orc_rescan(PG_FUNCTION_ARGS)
 		List *fmt_opts_defelem = fsd->fs_pstate->custom_formatter_params;
 		int fmt_encoding = fsd->fs_pstate->client_encoding;
 		user_data->fmt = create_formatter_instance(fmt_opts_defelem,
-				fmt_encoding, ps->ps_segno, tup_desc);
+				fmt_encoding, ps->ps_segno, tup_desc, false);
 
 		/* 3 Build file splits */
 		Uri *uri = ParseExternalTableUri(fsd->fs_uri);
@@ -1251,7 +1251,7 @@ Datum orc_insert_init(PG_FUNCTION_ARGS)
 	/* 2.2 Create formatter instance */
 	List *fmt_opts_defelem = pstate->custom_formatter_params;
 	user_data->fmt = create_formatter_instance(fmt_opts_defelem, fmt_encoding,
-			ps->ps_segno, tup_desc);
+			ps->ps_segno, tup_desc, true);
 
 	/* 2.4 Build tuple description */
 	build_tuple_descrition_for_write(relation, user_data);
@@ -1706,7 +1706,7 @@ static void build_options_in_json(List *fmt_opts_defelem, int encoding,
         {
           if ((strncasecmp(token, ((Form_pg_attribute) (tupDesc->attrs[j]))->attname.data, strlen(token)) == 0))
           {
-            json_object *j_obj = json_object_new_int(j);
+            json_object *j_obj = json_object_new_int(j + 1);
             json_object_array_add(j_array, j_obj);
           }
         }
@@ -1746,13 +1746,17 @@ static void build_options_in_json(List *fmt_opts_defelem, int encoding,
 }
 
 static ORCFormatC *create_formatter_instance(List *fmt_opts_defelem,
-		int fmt_encoding, int segno, TupleDesc tupDesc)
+		int fmt_encoding, int segno, TupleDesc tupDesc, bool forWrite)
 {
 	char *fmt_opts_str = NULL;
 
-	build_options_in_json(fmt_opts_defelem, fmt_encoding, &fmt_opts_str, tupDesc);
-
-	ORCFormatC *orc_format_c = ORCFormatNewORCFormatC(fmt_opts_str, segno);
+	ORCFormatC *orc_format_c = NULL;
+	if (forWrite) {
+		build_options_in_json(fmt_opts_defelem, fmt_encoding, &fmt_opts_str, tupDesc);
+		orc_format_c = ORCFormatNewORCFormatC(fmt_opts_str, segno);
+	} else {
+		orc_format_c = ORCFormatNewORCFormatC("{}", segno);
+	}
 
 	if (fmt_opts_str != NULL)
 	{
