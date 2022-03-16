@@ -972,18 +972,10 @@ ExecutorStart(QueryDesc *queryDesc, int eflags)
                 }
                 CommonPlanContext ctx;
                 bool newPlanner = can_convert_common_plan(queryDesc, &ctx);
-                if (newPlanner && ctx.enforceNewScheduler && scheduler_plan_support_check(queryDesc)) {
-                  const char *queryId = palloc0(sizeof(int) + sizeof(int) + 5);
-                  sprintf(queryId, "QID%d_%d", gp_session_id, gp_command_count);
-                  scheduler_prepare_for_new_query(queryDesc, queryId, 0);
-                  pfree(queryId);
-                  scheduler_run(queryDesc->estate->scheduler_data, &ctx);
-                } else {
-                  estate->mainDispatchData = mainDispatchInit(queryDesc->resource);
-                  estate->dispatch_data = NULL;
-                  mainDispatchPrepare(estate->mainDispatchData, queryDesc, newPlanner);
-                  mainDispatchRun(estate->mainDispatchData, &ctx, newPlanner);
-                }
+                estate->mainDispatchData = mainDispatchInit(queryDesc->resource);
+                estate->dispatch_data = NULL;
+                mainDispatchPrepare(estate->mainDispatchData, queryDesc, newPlanner);
+                mainDispatchRun(estate->mainDispatchData, &ctx, newPlanner);
 
                 DropQueryContextInfo(queryDesc->plannedstmt->contextdisp);
                 queryDesc->plannedstmt->contextdisp = NULL;
@@ -1291,7 +1283,8 @@ ExecutorRun(QueryDesc *queryDesc,
         } while (!readCacheEof());
         result = NULL;
       } else if (queryDesc->newPlan) {
-        exec_mpp_query_new(queryDesc->newPlan->str,
+        exec_mpp_query_new(queryDesc->estate->mainDispatchData,
+                           queryDesc->newPlan->str,
                            queryDesc->newPlan->len, currentSliceId,
                            false, dest, queryDesc->planstate);
         result = NULL;
@@ -1867,6 +1860,13 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
       estate->es_result_aosegnos = NIL;
 
       if (get_rel_relstorage(relid) == RELSTORAGE_ORC &&
+          !(eflags & EXEC_FLAG_EXPLAIN_ONLY) && rel_has_index(relid)) {
+        ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+            errmsg("cannot UPDATE/DELETE on table:%s because the table has indexes.",
+                   get_rel_name(relid))));
+          }
+
+      if (get_rel_relstorage(relid) == RELSTORAGE_ORC &&
           !(eflags & EXEC_FLAG_EXPLAIN_ONLY)) {
         ListCell *cell;
         foreach (cell, plannedstmt->resultRelations) {
@@ -1882,6 +1882,12 @@ InitializeResultRelations(PlannedStmt *plannedstmt, EState *estate, CmdType oper
         }
       }
     } else {
+      if (get_rel_relstorage(relid) == RELSTORAGE_ORC &&
+          !(eflags & EXEC_FLAG_EXPLAIN_ONLY) && rel_has_index(relid)) {
+        ereport(ERROR, (errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+            errmsg("cannot INSERT on table:%s because the table has indexes.",
+                   get_rel_name(relid))));
+          }
       List  *all_relids = NIL;
       all_relids = lappend_oid(all_relids, relid);
       if (rel_is_partitioned(relid))
@@ -2039,7 +2045,7 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	 */
 	if (Gp_role != GP_ROLE_EXECUTE)
 	{
-		ExecCheckRTPerms(plannedstmt->rtable);
+		  ExecCheckRTPerms(plannedstmt->rtable);
 	}
 
 	/*

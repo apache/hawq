@@ -695,7 +695,6 @@ static void dispatcher_serialize_common_plan(MainDispatchData *data,
                    new_executor_enable_partitioned_hashjoin_mode);
     univPlanAddGuc(ctx->univplan, "enable_external_sort",
                    new_executor_enable_external_sort_mode);
-    univPlanAddGuc(ctx->univplan, "new_scheduler", "off");
     univPlanAddGuc(ctx->univplan, "filter_pushdown",
                    orc_enable_filter_pushdown);
     univPlanAddGuc(ctx->univplan, "magma_enable_shm", magma_enable_shm);
@@ -1513,6 +1512,15 @@ char *getTaskConnMsg(struct MyDispatchTask *task) {
 
 struct CdbDispatchResults *getDispatchResults(struct MyDispatchTask *task) {
   return ((CommonDispatchData *)task->refDispatchData)->results;
+}
+
+void checkQdError(void *dispatchData) {
+  if (Gp_role == GP_ROLE_DISPATCH) {
+    MainDispatchData *data = (MainDispatchData *)dispatchData;
+    if (data && mainDispatchHasError(data))
+      ereport(ERROR, (errcode(ERRCODE_GP_INTERCONNECTION_ERROR),
+                      errmsg(CDB_MOTION_LOST_CONTACT_STRING)));
+  }
 }
 
 const char *taskIdToString(struct MyDispatchTask *task) {

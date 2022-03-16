@@ -855,3 +855,32 @@ CREATE VIEW pg_remote_logins AS
 		 LEFT JOIN pg_authid A ON (A.oid = C.rcowner);
 
 REVOKE ALL ON pg_remote_credentials FROM public;
+
+CREATE VIEW skylon_vertex AS
+	SELECT n.vlabelname AS vertexname, n.schemaname AS schemaname FROM skylon_vlabel AS n;
+	
+CREATE VIEW skylon_edge AS
+	SELECT n.elabelname AS edgename, n.schemaname AS schemaname, n.fromvlabel AS fromvertex, n.tovlabel AS tovertex
+	FROM skylon_elabel AS n;
+	
+CREATE VIEW skylon_vertex_attribute AS
+	SELECT n.schemaname AS schemaname, n.vlabelname AS vertexname, 
+	n.attrname AS attrname, n.attrtypid AS attrtypid, n.primaryrank AS primaryrank, n.rank AS rank
+	FROM skylon_vlabel_attribute AS n;
+	
+CREATE VIEW skylon_edge_attribute AS
+	SELECT n.schemaname AS schemaname, n.elabelname AS edgename, 
+	n.attrname AS attrname, n.attrtypid AS attrtypid, n.primaryrank AS primaryrank, n.rank AS rank
+	FROM skylon_elabel_attribute AS n;
+	
+CREATE VIEW skylon_graph_vertex AS
+	SELECT n.schemaname AS schemaname, n.graphname AS graphname, n.vlabelname AS vertexname,
+	m.location AS location, l.relname
+	FROM skylon_graph_vlabel AS n, pg_exttable AS m, pg_class AS l
+	WHERE n.reloid = m.reloid AND n.reloid = l.oid;
+	
+CREATE VIEW skylon_graph_edge AS
+	SELECT n.schemaname AS schemaname, n.graphname AS graphname, n.elabelname AS edgename,
+	m.location AS location, l.relname
+	FROM skylon_graph_elabel AS n, pg_exttable AS m, pg_class AS l
+	WHERE n.reloid = m.reloid AND n.reloid = l.oid;

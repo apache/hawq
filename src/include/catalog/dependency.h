@@ -144,6 +144,9 @@ typedef enum ObjectClass
 	OCLASS_USER_MAPPING,		/* pg_user_mapping */
 	OCLASS_EXTPROTOCOL,			/* pg_extprotocol */
 	OCLASS_COMPRESSION,			/* pg_compression */
+	OCLASS_GRAPH,     /* skylon_graph */
+	OCLASS_VLABEL,     /* skylon_vlabel */
+  OCLASS_ELABEL,     /* skylon_elabel */
 	MAX_OCLASS					/* MUST BE LAST */
 } ObjectClass;
 

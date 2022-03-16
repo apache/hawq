@@ -79,6 +79,14 @@
 #include "catalog/pg_authid.h"
 #include "catalog/pg_partition.h"
 #include "catalog/pg_partition_rule.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_index.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
 #include "catalog/toasting.h"
 #include "cdb/cdbappendonlyam.h"
 #include "cdb/cdbparquetam.h"
@@ -244,6 +252,20 @@ typedef struct NewColumnValue
 	Expr	   *expr;			/* expression to compute */
 	ExprState  *exprstate;		/* execution state */
 } NewColumnValue;
+
+extern Query *transformCreateExternalStmtImpl(ParseState *pstate,
+                                          CreateExternalStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after);
+
+extern Query *transformCreateStmtImpl(ParseState *pstate,
+                                      CreateStmt *stmt,
+                                      List **extras_before,
+                                      List **extras_after);
+
+extern List *transformAsGraphName(ParseState *pstate, RangeVar *rangeVar);
+
+extern bool parseAndTransformAsGraph(ParseState *pstate, RangeVar *rangeVar);
 
 static void truncate_check_rel(Relation rel);
 static void MergeConstraintsIntoExisting(Relation child_rel, Relation parent_rel);
@@ -989,6 +1011,1076 @@ static Datum AddDefaultPageRowGroupSize(Datum relOptions, List *defList){
 
 		return result;
 	}
+}
+
+static Oid CreateInCatalog(Oid tablespace_id, Oid namespaceId, RangeVar *rel, int2 attnum, char relkind) {
+  CreateStmt *createStmt = makeNode(CreateStmt);
+  createStmt->base.relKind = relkind;
+  createStmt->base.relation = rel;
+  ParseState *pstate = make_parsestate(NULL);
+  pstate->p_next_resno = 1;
+  List *extras_before = NIL;
+  List *extras_after = NIL;
+  createStmt = transformCreateStmtImpl(pstate,
+                                       createStmt,
+                                       &extras_before,
+                                       &extras_before)->utilityStmt;
+  ItemPointerData persistentTid;
+  int64     persistentSerialNum;
+  Relation pg_class_desc = heap_open(RelationRelationId, RowExclusiveLock);
+  Oid relid = GetNewRelFileNode(tablespace_id, tablespace_id == GLOBALTABLESPACE_OID,
+                    pg_class_desc,
+                    relstorage_is_ao(pg_class_desc->rd_rel->relstorage));
+  Relation new_rel_desc = heap_create(rel->relname,
+                             namespaceId,
+                             tablespace_id,
+                             relid,
+                             BuildDescForRelation(createStmt->base.tableElts),
+                             InvalidOid,
+                             createStmt->base.relKind,
+                             RELSTORAGE_HEAP,
+                             tablespace_id == GLOBALTABLESPACE_OID,
+                             allowSystemTableModsDDL,
+                             false);
+  new_rel_desc->rd_rel->relnatts = attnum;
+  new_rel_desc->rd_rel->relkind = relkind;
+  InsertPgClassTuple(pg_class_desc, new_rel_desc, relid, (Datum) 0);
+
+  heap_close(new_rel_desc, NoLock);
+  heap_close(pg_class_desc, RowExclusiveLock);
+  return relid;
+}
+
+static void InsertAttribute(Oid relid, ColumnDef *colDef,int rank) {
+  Relation attrdesc = heap_open(AttributeRelationId, RowExclusiveLock);
+  cqContext cqc;
+  cqContext  *patCtx = caql_beginscan(
+      caql_addrel(cqclr(&cqc), attrdesc),
+      cql("INSERT INTO pg_attribute ",
+        NULL));
+
+  FormData_pg_attribute attributeD;
+  HeapTuple attributeTuple = heap_addheader(Natts_pg_attribute,
+                  false,
+                  ATTRIBUTE_TUPLE_SIZE,
+                  (void *) &attributeD);
+  HeapTuple typeTuple = typenameType(NULL, colDef->typname);
+  Form_pg_type tform = (Form_pg_type) GETSTRUCT(typeTuple);
+  Form_pg_attribute attribute = (Form_pg_attribute) GETSTRUCT(attributeTuple);
+  Oid typeOid = HeapTupleGetOid(typeTuple);
+  attribute->attrelid = relid;
+  namestrcpy(&(attribute->attname), colDef->colname);
+  attribute->atttypid = colDef->typname->typid;
+  attribute->attstattarget = -1;
+  attribute->attlen = tform->typlen;
+  attribute->attcacheoff = -1;
+  attribute->atttypmod = colDef->typname->typmod;
+  attribute->attnum = rank;
+  attribute->attbyval = tform->typbyval;
+  attribute->attndims = list_length(colDef->typname->arrayBounds);
+  attribute->attstorage = tform->typstorage;
+  attribute->attalign = tform->typalign;
+  attribute->attnotnull = colDef->is_not_null;
+  attribute->atthasdef = false;
+  attribute->attisdropped = false;
+  attribute->attislocal = colDef->is_local;
+  attribute->attinhcount = colDef->inhcount;
+
+  ReleaseType(typeTuple);
+
+  caql_insert(patCtx, attributeTuple);
+
+  caql_endscan(patCtx);
+  heap_close(attrdesc, RowExclusiveLock);
+}
+
+extern void
+DefineVlabel(CreateVlabelStmt *createVlStmt)
+{
+  /*
+   * Get tablespace, database, schema for the relation
+   */
+  RangeVar *rel = createVlStmt->relation;
+  // get tablespace name for the relation
+  Oid tablespace_id = (gp_upgrade_mode) ? DEFAULTTABLESPACE_OID : GetDefaultTablespace();
+  if (!OidIsValid(tablespace_id))
+  {
+    tablespace_id = get_database_dts(MyDatabaseId);
+  }
+
+  char *filespace_name = NULL;
+  GetFilespacePathForTablespace(tablespace_id, &filespace_name);
+
+  if (filespace_name) {
+    int len = strlen(filespace_name);
+    if ((len > 0) && (filespace_name[len - 1] == '/'))
+      filespace_name[len - 1] = '\0';
+  }
+
+  char *tablespace_name = get_tablespace_name(tablespace_id);
+
+  // get database name for the relation
+  char *database_name = rel->catalogname ? rel->catalogname : get_database_name(MyDatabaseId);
+
+  // get schema name for the relation
+  char *schema_name = get_namespace_name(RangeVarGetCreationNamespace(rel));
+
+  // get table name for the relation
+  char *table_name = rel->relname;
+
+  Oid namespaceId = get_namespace_oid(schema_name);
+
+  if (get_relname_relid(table_name, namespaceId) != InvalidOid)
+    ereport(ERROR,
+        (errcode(ERRCODE_DUPLICATE_TABLE),
+         errmsg("vertex \"%s\" already exists",
+                table_name),
+         errOmitLocation(true)));
+
+  Oid relationId = CreateInCatalog(tablespace_id, namespaceId, rel,
+                                   list_length(createVlStmt->tableElts), RELKIND_VIEW);
+
+  ObjectAddress depender = {VlabelRelationId, relationId, 0, };
+  ObjectAddress ref = {NamespaceRelationId, namespaceId, 0, };
+  recordDependencyOn(&depender, &ref, DEPENDENCY_NORMAL);
+
+  {
+  cqContext cqc;
+  Relation VlabelRelation = heap_open(VlabelRelationId, RowExclusiveLock);
+  HeapTuple vlabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), VlabelRelation),
+                                       cql("SELECT * FROM skylon_vlabel"
+      " WHERE vlabelname = :1 "
+      "AND schemaname = :2",
+      CStringGetDatum(rel->relname),
+      CStringGetDatum(schema_name)));
+  if(HeapTupleIsValid(vlabelTuple))
+    ereport(ERROR,
+      (errcode(ERRCODE_UNDEFINED_COLUMN),
+       errmsg("vertex \"%s\" already exists in \"%s\"",
+              rel->relname, schema_name)));
+  heap_close(VlabelRelation, RowExclusiveLock);
+  }
+  if (filespace_name)
+    pfree(filespace_name);
+
+  List     *schema = createVlStmt->tableElts;
+  TupleDesc descriptor = BuildDescForRelation(schema);
+  InsertVlabelEntry(table_name, schema_name);
+  ListCell *cell;
+  int32 order = 1;
+  foreach(cell,schema) {
+    Node* node=lfirst(cell);
+    if(nodeTag(node) == T_ColumnDef) {
+      ColumnDef* def = (ColumnDef*)node;
+      char* colname = def->colname;
+      Oid typeid = def->typname->typid;
+      List *keys = createVlStmt->constraints?((Constraint*)lfirst(list_head(
+                   createVlStmt->constraints)))->keys : NULL;
+      ListCell *lc;
+      int32 primary = 0;
+      int32 tmp = 1;
+      foreach(lc, keys){
+        Value *key = (Value*)lfirst(lc);
+        if(strcmp(colname, key->val.str) == 0) {
+          primary = tmp;
+          break;
+        }
+        tmp++;
+      }
+      if(!keys && order==1)
+        primary = 1;
+      InsertVlabelAttrEntry(schema_name, createVlStmt->relation->relname, colname, typeid, primary, order);
+      InsertAttribute(relationId, def, order);
+      order++;
+    }
+  }
+}
+
+extern void
+DefineElabel(CreateElabelStmt *createElStmt)
+{
+  /*
+   * Get tablespace, database, schema for the relation
+   */
+  RangeVar *rel = createElStmt->relation;
+  // get tablespace name for the relation
+  Oid tablespace_id = (gp_upgrade_mode) ? DEFAULTTABLESPACE_OID : GetDefaultTablespace();
+  if (!OidIsValid(tablespace_id))
+  {
+    tablespace_id = get_database_dts(MyDatabaseId);
+  }
+
+  char *filespace_name = NULL;
+  GetFilespacePathForTablespace(tablespace_id, &filespace_name);
+
+  if (filespace_name) {
+    int len = strlen(filespace_name);
+    if ((len > 0) && (filespace_name[len - 1] == '/'))
+      filespace_name[len - 1] = '\0';
+  }
+
+  char *tablespace_name = get_tablespace_name(tablespace_id);
+
+  // get database name for the relation
+  char *database_name = rel->catalogname ? rel->catalogname : get_database_name(MyDatabaseId);
+
+  // get schema name for the relation
+  char *schema_name = get_namespace_name(RangeVarGetCreationNamespace(rel));
+
+  // get table name for the relation
+  char *table_name = rel->relname;
+
+  Oid namespaceId = get_namespace_oid(schema_name);
+
+  if (get_relname_relid(table_name, namespaceId) != InvalidOid)
+    ereport(ERROR,
+        (errcode(ERRCODE_DUPLICATE_TABLE),
+         errmsg("edge \"%s\" already exists",
+                table_name),
+         errOmitLocation(true)));
+
+  Oid relationId = CreateInCatalog(tablespace_id, namespaceId, rel,
+                                   list_length(createElStmt->tableElts), RELKIND_VIEW);
+
+  ObjectAddress depender = {ElabelRelationId, relationId, 0, };
+  ObjectAddress ref = {NamespaceRelationId, namespaceId, 0, };
+  recordDependencyOn(&depender, &ref, DEPENDENCY_NORMAL);
+
+  {
+  cqContext cqc;
+  Relation ElabelRelation = heap_open(ElabelRelationId, RowExclusiveLock);
+  HeapTuple elabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), ElabelRelation),
+                                       cql("SELECT * FROM skylon_elabel"
+      " WHERE elabelname = :1 "
+      "AND schemaname = :2",
+      CStringGetDatum(rel->relname),
+      CStringGetDatum(schema_name)));
+  if(HeapTupleIsValid(elabelTuple))
+    ereport(ERROR,
+      (errcode(ERRCODE_UNDEFINED_COLUMN),
+       errmsg("edge \"%s\" already exists in schema \"%s\"",
+              rel->relname, schema_name)));
+  heap_close(ElabelRelation, RowExclusiveLock);
+  }
+  {
+  cqContext cqc;
+  Relation VlabelRelation = heap_open(VlabelRelationId, RowExclusiveLock);
+  HeapTuple vlabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), VlabelRelation),
+                                       cql("SELECT * FROM skylon_vlabel"
+      " WHERE vlabelname = :1 "
+      "AND schemaname = :2",
+      CStringGetDatum(createElStmt->fromVlabel->val.str),
+      CStringGetDatum(schema_name)));
+  if(!HeapTupleIsValid(vlabelTuple))
+    ereport(ERROR,
+      (errcode(ERRCODE_UNDEFINED_COLUMN),
+       errmsg("source vertex \"%s\" does not exists in schema \"%s\"",
+              createElStmt->fromVlabel->val.str, schema_name)));
+  heap_close(VlabelRelation, RowExclusiveLock);
+  }
+
+  {
+  cqContext cqc;
+  Relation VlabelRelation = heap_open(VlabelRelationId, RowExclusiveLock);
+  HeapTuple vlabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), VlabelRelation),
+                                       cql("SELECT * FROM skylon_vlabel"
+      " WHERE vlabelname = :1 "
+      "AND schemaname = :2",
+      CStringGetDatum(createElStmt->toVlabel->val.str),
+      CStringGetDatum(schema_name)));
+  if(!HeapTupleIsValid(vlabelTuple))
+    ereport(ERROR,
+      (errcode(ERRCODE_UNDEFINED_COLUMN),
+       errmsg("dest vertex \"%s\" does not exists in schema \"%s\"",
+              createElStmt->toVlabel->val.str, schema_name)));
+  heap_close(VlabelRelation, RowExclusiveLock);
+  }
+
+  if (filespace_name)
+    pfree(filespace_name);
+
+  List     *schema = createElStmt->tableElts;
+  TupleDesc descriptor = BuildDescForRelation(schema);
+  InsertElabelEntry(table_name, schema_name, createElStmt->fromVlabel->val.str, createElStmt->toVlabel->val.str);
+
+  ListCell *cell;
+  int32 order = 1;
+  foreach(cell,schema) {
+    Node* node=lfirst(cell);
+    if(nodeTag(node) == T_ColumnDef){
+      ColumnDef* def = (ColumnDef*)node;
+      char* colname = def->colname;
+      Oid typeid = def->typname->typid;
+      List *keys = createElStmt->constraints? ((Constraint*)lfirst(list_head(
+                   createElStmt->constraints)))->keys : NULL;
+      ListCell *lc;
+      int32 primary = 0;
+      int32 tmp = 1;
+      foreach(lc, keys){
+        Value *key = (Value*)lfirst(lc);
+        if(strcmp(colname, key->val.str) == 0) {
+          primary = tmp;
+          break;
+        }
+        tmp++;
+      }
+      InsertElabelAttrEntry(schema_name, createElStmt->relation->relname, colname, typeid, primary, order);
+      InsertAttribute(relationId, def, order);
+      order++;
+    }
+  }
+}
+
+char *graphVertexTableName(char *gname,char *vname)
+{
+  char extraname[] = "skylon_vertex_";
+  int len1 = strlen(gname);
+  int len2 = strlen(vname);
+  int len3 = strlen(extraname);
+  char * newname = palloc0(len1 + len2 + len3 + 2);
+  memcpy(newname, extraname, len3);
+  memcpy(newname + len3, gname, len1);
+  memcpy(newname + len3 + len1, "_", 1);
+  memcpy(newname + len3 + len1 + 1, vname, len2);
+  newname[len1 + len2 + len3 + 1] = '\0';
+  return newname;
+}
+
+char *graphEdgeTableName(char *gname,char *ename)
+{
+  char extraname[] = "skylon_edge_";
+  int len1 = strlen(gname);
+  int len2 = strlen(ename);
+  int len3 = strlen(extraname);
+  char * newname = palloc0(len1 + len2 + len3 + 2);
+  memcpy(newname, extraname, len3);
+  memcpy(newname + len3, gname, len1);
+  memcpy(newname + len3 + len1, "_", 1);
+  memcpy(newname + len3 + len1 + 1, ename, len2);
+  newname[len1 + len2 + len3 + 1] = '\0';
+  return newname;
+}
+
+static List * vertexPrimary(const char* schemaname, const char *vname) {
+  cqContext cqc;
+  Relation catalogRelation = heap_open(VlabelAttrRelationId, RowExclusiveLock);
+
+  int primaryNum = caql_getcount(
+            caql_addrel(cqclr(&cqc), catalogRelation),
+            cql("SELECT COUNT(*) FROM skylon_vlabel_attribute "
+              " WHERE vlabelname = :1 AND schemaname = :2 "
+                "AND primaryrank > :3",
+              CStringGetDatum(vname), CStringGetDatum(schemaname), Int32GetDatum(0)));
+  ColumnDef **colVec = (ColumnDef **)palloc0(sizeof(ColumnDef*)*primaryNum);
+
+  cqContext *pcqCtx = caql_beginscan(
+      caql_addrel(cqclr(&cqc), catalogRelation),
+      cql("SELECT * FROM skylon_vlabel_attribute "
+        " WHERE vlabelname = :1 AND schemaname = :2 "
+          "AND primaryrank > :3",
+          CStringGetDatum(vname), CStringGetDatum(schemaname), Int32GetDatum(0)));
+  HeapTuple attributeTuple;
+  List *newCols = NIL;
+  while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))){
+    Form_skylon_vlabel_attribute att = (Form_skylon_vlabel_attribute) GETSTRUCT(attributeTuple);
+    ColumnDef *column = makeNode(ColumnDef);
+    Value *attstr = makeString(pstrdup(NameStr(att->attrname)));
+    column->colname = attstr->val.str;
+    Type type = typeidType(att->attrtypid);
+    column->typname = SystemTypeName(typeTypeName(type));
+    column->constraints = NULL;
+    column->is_local = true;
+    column->encoding = NULL;
+    column->typname->typid = att->attrtypid;
+    ReleaseType(type);
+    colVec[att->primaryrank - 1] = column;
+  }
+  for(int i=0;i<primaryNum;i++) {
+    newCols = lappend(newCols, colVec[i]);
+  }
+  pfree(colVec);
+  caql_endscan(pcqCtx);
+  heap_close(catalogRelation, RowExclusiveLock);
+  return newCols;
+}
+
+static List * edgePrimary(const char *schemaname, const char *ename) {
+  cqContext cqc;
+  Relation catalogRelation = heap_open(ElabelAttrRelationId, RowExclusiveLock);
+
+  int primaryNum = caql_getcount(
+            caql_addrel(cqclr(&cqc), catalogRelation),
+            cql("SELECT COUNT(*) FROM skylon_elabel_attribute "
+              " WHERE elabelname = :1 AND schemaname = :2 "
+                "AND primaryrank > :3",
+              CStringGetDatum(ename), CStringGetDatum(schemaname), Int32GetDatum(0)));
+  ColumnDef **colVec = (ColumnDef **)palloc0(sizeof(ColumnDef*)*primaryNum);
+
+  cqContext *pcqCtx = caql_beginscan(
+      caql_addrel(cqclr(&cqc), catalogRelation),
+      cql("SELECT * FROM skylon_elabel_attribute "
+        " WHERE elabelname = :1 AND schemaname = :2 "
+          "AND primaryrank > :3",
+          CStringGetDatum(ename), CStringGetDatum(schemaname), Int32GetDatum(0)));
+  HeapTuple attributeTuple;
+  List *newCols = NIL;
+  while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))){
+    Form_skylon_vlabel_attribute att = (Form_skylon_vlabel_attribute) GETSTRUCT(attributeTuple);
+    ColumnDef *column = makeNode(ColumnDef);
+    Value *attstr = makeString(pstrdup(NameStr(att->attrname)));
+    column->colname = attstr->val.str;
+    Type type = typeidType(att->attrtypid);
+    column->typname = SystemTypeName(typeTypeName(type));
+    column->constraints = NULL;
+    column->is_local = true;
+    column->encoding = NULL;
+    column->typname->typid = att->attrtypid;
+    ReleaseType(type);
+    colVec[att->primaryrank - 1] = column;
+  }
+  for(int i=0;i<primaryNum;i++) {
+    newCols = lappend(newCols, colVec[i]);
+  }
+  pfree(colVec);
+  caql_endscan(pcqCtx);
+  heap_close(catalogRelation, RowExclusiveLock);
+  return newCols;
+}
+
+static int4 GetTypemod(Oid namespaceId, const char *relname, const char *attname) {
+  Oid relid = caql_getoid(
+      NULL,
+      cql("SELECT oid FROM pg_class "
+        " WHERE relname = :1 "
+        " AND relnamespace = :2 ",
+        CStringGetDatum(relname),
+        ObjectIdGetDatum(namespaceId)));
+
+  Relation attrelation = heap_open(AttributeRelationId, RowExclusiveLock);
+  cqContext cqc;
+  cqContext * pcqCtx = caql_addrel(cqclr(&cqc), attrelation);
+
+  HeapTuple atttup = caql_getfirst(
+      pcqCtx,
+      cql("SELECT * FROM pg_attribute "
+        " WHERE attrelid = :1 "
+        " AND attname = :2 ",
+        ObjectIdGetDatum(relid),
+        CStringGetDatum(attname)));
+
+
+  int4 typemod = ((Form_pg_attribute) GETSTRUCT(atttup))->atttypmod;
+
+
+  heap_freetuple(atttup);
+  heap_close(attrelation, RowExclusiveLock);
+  return typemod;
+}
+
+static bool IfMakePrimaryIndex(CreateGraphStmt *createGrStmt) {
+  Datum reloptions = transformRelOptions((Datum) 0, createGrStmt->options, true, false);
+  const char * default_keywords[] = {
+    "primaryindex"
+  };
+  char     *values[ARRAY_SIZE(default_keywords)];
+  parseRelOptions(reloptions, ARRAY_SIZE(default_keywords), default_keywords, values, false);
+  if(!values[0])
+    return false;
+  if((pg_strcasecmp(values[0], "true") == 0))
+    return true;
+  else
+    return false;
+}
+
+extern void
+DefineGraph(CreateGraphStmt *createGrStmt)
+{
+  /*
+   * Get tablespace, database, schema for the relation
+   */
+  RangeVar *rel = createGrStmt->graph;
+
+  // get tablespace name for the relation
+  Oid tablespace_id = (gp_upgrade_mode) ? DEFAULTTABLESPACE_OID : GetDefaultTablespace();
+  if (!OidIsValid(tablespace_id))
+  {
+    tablespace_id = get_database_dts(MyDatabaseId);
+  }
+
+  char *filespace_name = NULL;
+  GetFilespacePathForTablespace(tablespace_id, &filespace_name);
+
+  if (filespace_name) {
+    int len = strlen(filespace_name);
+    if ((len > 0) && (filespace_name[len - 1] == '/'))
+      filespace_name[len - 1] = '\0';
+  }
+
+  char *tablespace_name = get_tablespace_name(tablespace_id);
+
+  // get database name for the relation
+  char *database_name = rel->catalogname ? rel->catalogname : get_database_name(MyDatabaseId);
+
+  // get schema name for the relation
+  char *schema_name = get_namespace_name(RangeVarGetCreationNamespace(rel));
+
+  Oid namespaceId = get_namespace_oid(schema_name);
+  // get table name for the relation
+  char *table_name = rel->relname;
+
+  if (get_relname_relid(table_name, namespaceId) != InvalidOid)
+    ereport(ERROR,
+        (errcode(ERRCODE_DUPLICATE_TABLE),
+         errmsg("graph \"%s\" already exists",
+                table_name),
+         errOmitLocation(true)));
+
+  Oid relationId = CreateInCatalog(tablespace_id, namespaceId, rel, 0, RELKIND_VIEW);
+
+  if (filespace_name)
+    pfree(filespace_name);
+
+  InsertGraphEntry(table_name, schema_name);
+
+  ObjectAddress depender = {GraphRelationId, relationId, 0, };
+  ObjectAddress ref = {NamespaceRelationId, namespaceId, 0, };
+  recordDependencyOn(&depender, &ref, DEPENDENCY_NORMAL);
+
+  bool haspk = IfMakePrimaryIndex(createGrStmt);
+  ListCell *cell;
+  foreach(cell, createGrStmt->vlabels) {
+    Value *value = lfirst(cell);
+    cqContext cqc;
+    Relation vr = heap_open(VlabelRelationId, RowExclusiveLock);
+    if (caql_getcount(
+            caql_addrel(cqclr(&cqc), vr),
+            cql("SELECT COUNT(*) FROM skylon_vlabel "
+              " WHERE vlabelName = :1 AND schemaname = :2",
+              CStringGetDatum(value->val.str), CStringGetDatum(schema_name))) == 0)
+          ereport(ERROR,
+              (errcode(ERRCODE_DUPLICATE_TABLE),
+               errmsg("vertex \"%s\" does not exist",
+                      value->val.str),
+               errOmitLocation(true)));
+    heap_close(vr, RowExclusiveLock);
+
+    Relation vLabelAttRelation = heap_open(VlabelAttrRelationId, RowExclusiveLock);
+
+    IndexStmt *pkindex = NULL;
+    List *newCols = NIL;
+    char *primarykey = NULL;
+    List *distributedBy = NIL;
+    int2* indexkeys = NULL;
+    int indexcolnum = 0;
+    {
+      int primaryNum = caql_getcount(
+                caql_addrel(cqclr(&cqc), vLabelAttRelation),
+                cql("SELECT COUNT(*) FROM skylon_vlabel_attribute "
+                  " WHERE vlabelname = :1 AND schemaname = :2 "
+                    "AND primaryrank > :3",
+                  CStringGetDatum(value->val.str), CStringGetDatum(schema_name), Int32GetDatum(0)));
+      Value **distributedVec = (Value **)palloc0(sizeof(Value*)*primaryNum);
+
+      cqContext *pcqCtx = caql_beginscan(
+          caql_addrel(cqclr(&cqc), vLabelAttRelation),
+          cql("SELECT * FROM skylon_vlabel_attribute "
+            " WHERE vlabelname = :1 AND schemaname = :2 "
+              "AND primaryrank > :3",
+              CStringGetDatum(value->val.str), CStringGetDatum(schema_name), Int32GetDatum(0)));
+      HeapTuple attributeTuple;
+      while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))){
+        Form_skylon_vlabel_attribute att = (Form_skylon_vlabel_attribute) GETSTRUCT(attributeTuple);
+        distributedVec[att->primaryrank - 1] = makeString(pstrdup(NameStr(att->attrname)));
+        if(haspk) {
+          if(!indexkeys)
+            indexkeys = palloc0(primaryNum * sizeof(int2));
+          indexkeys[att->primaryrank - 1] = (int2)att->rank;
+          indexcolnum = primaryNum;
+        }
+      }
+      for(int i = 0; i < primaryNum; i++) {
+        if(haspk) {
+          if(!pkindex)
+            pkindex = makeNode(IndexStmt);
+          IndexElem* indexElem = makeNode(IndexElem);
+          indexElem->name = distributedVec[i]->val.str;;
+          pkindex->indexParams = lappend(pkindex->indexParams, indexElem);
+        }
+        distributedBy = lappend(distributedBy, (Node *)distributedVec[i]);
+      }
+      caql_endscan(pcqCtx);
+      pfree(distributedVec);
+    }
+    int colNum = caql_getcount(
+              caql_addrel(cqclr(&cqc), vLabelAttRelation),
+              cql("SELECT COUNT(*) FROM skylon_vlabel_attribute "
+                " WHERE vlabelname = :1 AND schemaname = :2",
+                CStringGetDatum(value->val.str), CStringGetDatum(schema_name)));
+    ColumnDef **colVec = (ColumnDef **)palloc0(sizeof(ColumnDef*)*colNum);
+    cqContext *pcqCtx = caql_beginscan(
+        caql_addrel(cqclr(&cqc), vLabelAttRelation),
+        cql("SELECT * FROM skylon_vlabel_attribute "
+          " WHERE vlabelname = :1 AND schemaname = :2",
+          CStringGetDatum(value->val.str), CStringGetDatum(schema_name)));
+    HeapTuple attributeTuple;
+    while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))) {
+      Form_skylon_vlabel_attribute att = (Form_skylon_vlabel_attribute) GETSTRUCT(attributeTuple);
+      ColumnDef *column = makeNode(ColumnDef);
+      Value *attstr = makeString(pstrdup(NameStr(att->attrname)));
+      column->colname = attstr->val.str;
+      Type type = typeidType(att->attrtypid);
+      column->typname = SystemTypeName(typeTypeName(type));
+      column->constraints = NULL;
+      column->is_local = true;
+      column->encoding = NULL;
+      column->typname->typid = att->attrtypid;
+      if(column->typname->typid == NUMERICOID)
+        column->typname->typmod = GetTypemod(namespaceId, value->val.str, column->colname);
+      ReleaseType(type);
+      colVec[att->rank - 1] = column;
+    }
+    for(int i = 0; i < colNum; i++)
+    {
+      newCols = lappend(newCols, colVec[i]);
+    }
+    pfree(colVec);
+    caql_endscan(pcqCtx);
+    heap_close(vLabelAttRelation, RowExclusiveLock);
+    RangeVar *relationName = makeNode(RangeVar);
+    relationName->catalogname = database_name;
+    relationName->schemaname = schema_name;
+    relationName->relname = graphVertexTableName(table_name, value->val.str);
+    if(strcmp(createGrStmt->format,"magmaap") == 0)
+    {
+      CreateExternalStmt *externalStmt = makeNode(CreateExternalStmt);
+      externalStmt->base.relKind = RELKIND_RELATION;
+      externalStmt->base.relation = relationName;
+      externalStmt->base.tableElts = newCols;
+      externalStmt->base.oncommit = ONCOMMIT_NOOP;
+      externalStmt->base.distributedBy = distributedBy;
+      ExtTableTypeDesc *extDesc = makeNode(ExtTableTypeDesc);
+      extDesc->exttabletype = EXTTBL_TYPE_UNKNOWN;
+      externalStmt->exttypedesc = extDesc;
+      externalStmt->format = pstrdup(createGrStmt->format);
+      externalStmt->iswritable = TRUE;
+      if(pkindex) {
+        Constraint *cons = makeNode(Constraint);
+        cons->contype = CONSTR_PRIMARY;
+        ListCell *cell;
+        foreach(cell, pkindex->indexParams) {
+          IndexElem *ele = (IndexElem *)lfirst(cell);
+          cons->keys = lappend(cons->keys, makeString(ele->name));
+        }
+        externalStmt->base.tableElts = lappend(externalStmt->base.tableElts, cons);
+      }
+      ParseState *pstate = make_parsestate(NULL);
+      pstate->p_next_resno = 1;
+      List *extras_before = NIL;
+      List *extras_after = NIL;
+      externalStmt = transformCreateExternalStmtImpl(pstate,
+                                                   externalStmt,
+                                                &extras_before,
+                                                &extras_before)->utilityStmt;
+      DefineExternalRelation(externalStmt);
+    }
+    else
+    {
+      if(strcmp(createGrStmt->format,"orc") && strcmp(createGrStmt->format,"heap"))
+        ereport(ERROR,
+               (errcode(ERRCODE_UNDEFINED_OBJECT),
+               errmsg("unsupported format %s ",
+                      createGrStmt->format)));
+      CreateStmt *createStmt = makeNode(CreateStmt);
+      createStmt->base.relKind = RELKIND_RELATION;
+      createStmt->base.relation = relationName;
+      createStmt->base.tableElts = newCols;
+      createStmt->base.oncommit = ONCOMMIT_NOOP;
+      createStmt->base.distributedBy = distributedBy;
+      if(strcmp(createGrStmt->format,"orc") == 0)
+        createStmt->base.options = lappend(lappend(list_make1(makeDefElem("appendonly", (Node *)makeString(pstrdup("true")))),
+                                           makeDefElem("OIDS", (Node *)makeString(pstrdup("FALSE")))),
+                                           makeDefElem("ORIENTATION", (Node *)makeString(pstrdup("orc"))));
+      else
+        createStmt->base.options = list_make1(makeDefElem("appendonly", (Node *)makeString(pstrdup("false"))));
+      if(strcmp(createGrStmt->format, "heap") == 0)
+        createStmt->base.tablespacename = "pg_default";
+      if(pkindex) {
+        Constraint *cons = makeNode(Constraint);
+        cons->contype = CONSTR_PRIMARY;
+        ListCell *cell;
+        foreach(cell, pkindex->indexParams) {
+          IndexElem *ele = (IndexElem *)lfirst(cell);
+          cons->keys = lappend(cons->keys, makeString(ele->name));
+        }
+        createStmt->base.tableElts = lappend(createStmt->base.tableElts, cons);
+      }
+      ParseState *pstate = make_parsestate(NULL);
+      pstate->p_next_resno = 1;
+      List *extras_before = NIL;
+      List *extras_after = NIL;
+      createStmt = transformCreateStmt(pstate,
+                                       createStmt,
+                                    &extras_before,
+                                    &extras_before)->utilityStmt;
+      ProcessUtility((Node *)createStmt, "", NULL, TRUE, NULL, NULL);
+    }
+    if(haspk) {
+      Oid eleid = caql_getoid_only(
+          NULL,
+          NULL,
+          cql("SELECT oid FROM pg_class "
+            " WHERE relname = :1 and relnamespace = :2",
+            CStringGetDatum(value->val.str),
+            ObjectIdGetDatum(namespaceId)));
+      char *classchar1 = (char*)palloc0(7 + VARHDRSZ);
+      char *classchar2 = (char*)palloc0(7 + VARHDRSZ);
+      pg_ltoa((int32)relationId, classchar1);
+      pg_ltoa((int32)eleid, classchar2);
+      char *indexname = palloc0(sizeof(char)*(strlen(classchar1) + strlen(classchar2) + 5 + 1));
+      sprintf(indexname, "index%s%s", classchar1, classchar2);
+      RangeVar *indexrel = makeNode(RangeVar);
+      indexrel->catalogname = database_name;
+      indexrel->schemaname = schema_name;
+      indexrel->relname = indexname;
+      Oid relid = caql_getoid_only(
+          NULL,
+          NULL,
+          cql("SELECT oid FROM pg_class "
+            " WHERE relname = :1 and relnamespace = :2",
+            CStringGetDatum(relationName->relname),
+            ObjectIdGetDatum(namespaceId)));
+      IndexStmt *indexstmt = makeNode(IndexStmt);
+      indexstmt->idxname = indexname;
+      indexstmt->accessMethod = "btree";
+      indexstmt->indexParams = pkindex->indexParams;
+      indexstmt->unique = true;
+      indexstmt->primary = true;
+      indexstmt->isconstraint = true;
+      DefineIndex(relid,
+            indexstmt->idxname,
+            InvalidOid,
+            indexstmt->accessMethod,
+            indexstmt->tableSpace,
+            indexstmt->indexParams,
+            (Expr *) indexstmt->whereClause,
+            indexstmt->rangetable,
+            indexstmt->options,
+            indexstmt->unique,
+            indexstmt->primary,
+            indexstmt->isconstraint,
+            false,
+            true,
+            false,
+            true,
+            indexstmt->concurrent,
+            false,
+            indexstmt);
+      InsertSkylonIndexEntry(schema_name , table_name,
+                             value->val.str, 'd', indexname,
+                             indexkeys, indexcolnum, NULL, 0);
+    }
+    InsertGraphVlabelEntry(schema_name, table_name, value->val.str, RangeVarGetRelid(relationName, false, false));
+  }
+
+  foreach(cell, createGrStmt->elabels) {
+    Value *value = lfirst(cell);
+    cqContext cqc;
+    Relation er = heap_open(ElabelRelationId, RowExclusiveLock);
+    if (caql_getcount(
+            caql_addrel(cqclr(&cqc), er),
+            cql("SELECT COUNT(*) FROM skylon_elabel "
+              " WHERE elabelName = :1 AND schemaname = :2",
+              CStringGetDatum(value->val.str), CStringGetDatum(schema_name))) == 0)
+          ereport(ERROR,
+              (errcode(ERRCODE_DUPLICATE_TABLE),
+               errmsg("edge \"%s\" does not exist",
+                      value->val.str),
+               errOmitLocation(true)));
+    heap_close(er, RowExclusiveLock);
+    NameData name;
+    snprintf(NameStr(name), NAMEDATALEN, "%s", value->val.str);
+    Relation ElabelRelation = heap_open(ElabelRelationId, RowExclusiveLock);
+    HeapTuple elabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), ElabelRelation),
+                                         cql("SELECT * FROM skylon_elabel"
+        " WHERE elabelname = :1 AND schemaname = :2",
+        NameGetDatum(&name), CStringGetDatum(schema_name)));
+    Form_skylon_elabel elabel = (Form_skylon_elabel) GETSTRUCT(elabelTuple);
+
+    Relation ElabelAttrRelation = heap_open(ElabelAttrRelationId, RowExclusiveLock);
+
+    IndexStmt *pkindex = NULL;
+    List *newCols = NIL;
+    List *distributedBy = NIL;
+    int2* indexkeys = NULL;
+    int indexcolnum = 0;
+    {
+      List *cols=vertexPrimary(schema_name, elabel->fromvlabel.data);
+      ListCell *lc;
+      foreach(lc, cols) {
+        ColumnDef *col= (ColumnDef*)lfirst(lc);
+        ColumnDef *column = makeNode(ColumnDef);
+        column->colname = palloc0(sizeof(char)*(4 + 1 + strlen(col->colname)));
+        memcpy(column->colname, "src_", 4 * sizeof(char));
+        memcpy(column->colname + 4, col->colname, strlen(col->colname) * sizeof(char));
+        column->colname[4 + strlen(col->colname)] = '\0';
+        Type type = typeidType(col->typname->typid);
+        column->typname = SystemTypeName(typeTypeName(type));
+        column->typname->typid = col->typname->typid;
+        if(column->typname->typid == NUMERICOID)
+                column->typname->typmod = GetTypemod(namespaceId, elabel->fromvlabel.data, col->colname);
+        column->constraints = NULL;
+        column->is_local = true;
+        column->encoding = NULL;
+        ReleaseType(type);
+        newCols = lappend(newCols, column);
+        if(haspk) {
+          if(!pkindex)
+            pkindex = makeNode(IndexStmt);
+          IndexElem* indexElem = makeNode(IndexElem);
+          indexElem->name = column->colname;
+          pkindex->indexParams = lappend(pkindex->indexParams, indexElem);
+        }
+        distributedBy = lappend(distributedBy, (Node *)makeString(column->colname));
+      }
+    }
+    {
+      List *cols=vertexPrimary(schema_name, elabel->tovlabel.data);
+      ListCell *lc;
+      foreach(lc, cols) {
+        ColumnDef *col= (ColumnDef*)lfirst(lc);
+        ColumnDef *column = makeNode(ColumnDef);
+        column->colname = palloc0(sizeof(char)*(4 + 1 + strlen(col->colname)));
+        memcpy(column->colname, "dst_", 4 * sizeof(char));
+        memcpy(column->colname + 4, col->colname, strlen(col->colname) * sizeof(char));
+        column->colname[4 + strlen(col->colname)] = '\0';
+        Type type = typeidType(col->typname->typid);
+        column->typname = SystemTypeName(typeTypeName(type));
+        column->typname->typid = col->typname->typid;
+        if(column->typname->typid == NUMERICOID)
+          column->typname->typmod = GetTypemod(namespaceId, elabel->tovlabel.data, col->colname);
+        column->constraints = NULL;
+        column->is_local = true;
+        column->encoding = NULL;
+        ReleaseType(type);
+        newCols = lappend(newCols, column);
+        if(haspk) {
+          if(!pkindex)
+            pkindex = makeNode(IndexStmt);
+          IndexElem* indexElem = makeNode(IndexElem);
+          indexElem->name = column->colname;
+          pkindex->indexParams = lappend(pkindex->indexParams, indexElem);
+        }
+        distributedBy = lappend(distributedBy, (Node *)makeString(column->colname));
+      }
+    }
+    {
+      int primaryNum = caql_getcount(
+                caql_addrel(cqclr(&cqc), ElabelAttrRelation),
+                cql("SELECT COUNT(*) FROM skylon_elabel_attribute "
+                  " WHERE elabelname = :1 AND schemaname = :2 "
+                    "AND primaryrank > :3",
+                    CStringGetDatum(value->val.str), CStringGetDatum(schema_name), Int32GetDatum(0)));
+      Value **distributedVec = (Value **)palloc0(sizeof(Value*)*primaryNum);
+
+      cqContext *pcqCtx = caql_beginscan(
+          caql_addrel(cqclr(&cqc), ElabelAttrRelation),
+          cql("SELECT * FROM skylon_elabel_attribute "
+            " WHERE elabelname = :1 AND schemaname = :2 "
+              "AND primaryrank > :3",
+              CStringGetDatum(value->val.str), CStringGetDatum(schema_name), Int32GetDatum(0)));
+      HeapTuple attributeTuple;
+      while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))){
+        Form_skylon_elabel_attribute att = (Form_skylon_elabel_attribute) GETSTRUCT(attributeTuple);
+        distributedVec[att->primaryrank - 1] = makeString(pstrdup(NameStr(att->attrname)));
+        if(haspk) {
+          if(!indexkeys) {
+            indexkeys = palloc0(primaryNum * sizeof(int2));
+            indexcolnum = primaryNum;
+          }
+          indexkeys[att->primaryrank - 1] = (int2) att->rank;
+        }
+      }
+      for(int i = 0; i < primaryNum; i++) {
+        if(haspk) {
+          if(!pkindex)
+            pkindex = makeNode(IndexStmt);
+          IndexElem* indexElem = makeNode(IndexElem);
+          indexElem->name = distributedVec[i]->val.str;
+          pkindex->indexParams = lappend(pkindex->indexParams, indexElem);
+        }
+        distributedBy = lappend(distributedBy, (Node *)distributedVec[i]);
+      }
+      pfree(distributedVec);
+      caql_endscan(pcqCtx);
+    }
+    {
+      int colNum = caql_getcount(
+                caql_addrel(cqclr(&cqc), ElabelAttrRelation),
+                cql("SELECT COUNT(*) FROM skylon_elabel_attribute "
+                  " WHERE elabelname = :1 AND schemaname = :2",
+                  CStringGetDatum(value->val.str), CStringGetDatum(schema_name)));
+      ColumnDef **colVec = (ColumnDef **)palloc0(sizeof(ColumnDef*)*colNum);
+      cqContext *pcqCtx = caql_beginscan(
+          caql_addrel(cqclr(&cqc), ElabelAttrRelation),
+          cql("SELECT * FROM skylon_elabel_attribute "
+            " WHERE elabelname = :1 AND schemaname = :2",
+            CStringGetDatum(value->val.str), CStringGetDatum(schema_name)));
+      HeapTuple attributeTuple;
+      while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))) {
+        Form_skylon_elabel_attribute att = (Form_skylon_elabel_attribute) GETSTRUCT(attributeTuple);
+        ColumnDef *column = makeNode(ColumnDef);
+        Value *attstr = makeString(pstrdup(NameStr(att->attrname)));
+        column->colname = attstr->val.str;
+        Type type = typeidType(att->attrtypid);
+        column->typname = SystemTypeName(typeTypeName(type));
+        column->constraints = NULL;
+        column->is_local = true;
+        column->encoding = NULL;
+        column->typname->typid = att->attrtypid;
+        if(column->typname->typid == NUMERICOID)
+          column->typname->typmod = GetTypemod(namespaceId, value->val.str, column->colname);
+        ReleaseType(type);
+        colVec[att->rank - 1] = column;
+      }
+      for(int i = 0; i < colNum; i++) {
+        newCols = lappend(newCols, colVec[i]);
+      }
+      pfree(colVec);
+      caql_endscan(pcqCtx);
+    }
+    heap_close(ElabelRelation, RowExclusiveLock);
+    heap_close(ElabelAttrRelation, RowExclusiveLock);
+
+    RangeVar *relationName = makeNode(RangeVar);
+    relationName->catalogname = database_name;
+    relationName->schemaname = schema_name;
+    relationName->relname = graphEdgeTableName(table_name, value->val.str);
+    if(strcmp(createGrStmt->format, "magmaap") == 0)
+    {
+      CreateExternalStmt *externalStmt = makeNode(CreateExternalStmt);
+      externalStmt->base.relKind = RELKIND_RELATION;
+      externalStmt->base.relation = relationName;
+      externalStmt->base.tableElts = newCols;
+      externalStmt->base.oncommit = ONCOMMIT_NOOP;
+      externalStmt->base.distributedBy = distributedBy;
+      ExtTableTypeDesc *extDesc = makeNode(ExtTableTypeDesc);
+      extDesc->exttabletype = EXTTBL_TYPE_UNKNOWN;
+      externalStmt->exttypedesc = extDesc;
+      externalStmt->format = pstrdup(createGrStmt->format);
+      externalStmt->iswritable = TRUE;
+      if(pkindex) {
+        Constraint *cons = makeNode(Constraint);
+        cons->contype = CONSTR_PRIMARY;
+        ListCell *cell;
+        foreach(cell, pkindex->indexParams) {
+          IndexElem *ele = (IndexElem *)lfirst(cell);
+          cons->keys = lappend(cons->keys, makeString(ele->name));
+        }
+        externalStmt->base.tableElts = lappend(externalStmt->base.tableElts, cons);
+      }
+      ParseState *pstate = make_parsestate(NULL);
+      pstate->p_next_resno = 1;
+      List *extras_before = NIL;
+      List *extras_after = NIL;
+      externalStmt = transformCreateExternalStmtImpl(pstate,
+                                                   externalStmt,
+                                                &extras_before,
+                                                &extras_before)->utilityStmt;
+      DefineExternalRelation(externalStmt);
+    }
+    else
+    {
+      CreateStmt *createStmt = makeNode(CreateStmt);
+      createStmt->base.relKind = RELKIND_RELATION;
+      createStmt->base.relation = relationName;
+      createStmt->base.tableElts = newCols;
+      createStmt->base.oncommit = ONCOMMIT_NOOP;
+      createStmt->base.distributedBy = distributedBy;
+      if(strcmp(createGrStmt->format,"orc") == 0)
+        createStmt->base.options = lappend(lappend(list_make1(makeDefElem("appendonly", (Node *)makeString(pstrdup("true")))),
+                                           makeDefElem("OIDS", (Node *)makeString(pstrdup("FALSE")))),
+                                           makeDefElem("ORIENTATION", (Node *)makeString(pstrdup("orc"))));
+      else
+        createStmt->base.options = list_make1(makeDefElem("appendonly", (Node *)makeString(pstrdup("false"))));
+      if(strcmp(createGrStmt->format, "heap") == 0)
+        createStmt->base.tablespacename = "pg_default";
+      ParseState *pstate = make_parsestate(NULL);
+      pstate->p_next_resno = 1;
+      List *extras_before = NIL;
+      List *extras_after = NIL;
+      if(pkindex) {
+        Constraint *cons = makeNode(Constraint);
+        cons->contype = CONSTR_PRIMARY;
+        ListCell *cell;
+        foreach(cell, pkindex->indexParams) {
+          IndexElem *ele = (IndexElem *)lfirst(cell);
+          cons->keys = lappend(cons->keys, makeString(ele->name));
+        }
+        createStmt->base.tableElts = lappend(createStmt->base.tableElts, cons);
+      }
+      createStmt = transformCreateStmt(pstate,
+                                       createStmt,
+                                    &extras_before,
+                                    &extras_before)->utilityStmt;
+      ProcessUtility((Node *)createStmt, "", NULL, TRUE, NULL, NULL);
+    }
+    if(haspk) {
+      Oid eleid = caql_getoid_only(
+          NULL,
+          NULL,
+          cql("SELECT oid FROM pg_class "
+            " WHERE relname = :1 and relnamespace = :2",
+            CStringGetDatum(value->val.str),
+            ObjectIdGetDatum(namespaceId)));
+      char *classchar1 = (char*)palloc0(7 + VARHDRSZ);
+      char *classchar2 = (char*)palloc0(7 + VARHDRSZ);
+      pg_ltoa((int32)relationId, classchar1);
+      pg_ltoa((int32)eleid, classchar2);
+      char *indexname = palloc0(sizeof(char)*(strlen(classchar1) + strlen(classchar2) + 5 + 1));
+      sprintf(indexname, "index%s%s", classchar1, classchar2);
+      RangeVar *indexrel = makeNode(RangeVar);
+      indexrel->catalogname = database_name;
+      indexrel->schemaname = schema_name;
+      indexrel->relname = indexname;
+      Oid relid = caql_getoid_only(
+          NULL,
+          NULL,
+          cql("SELECT oid FROM pg_class "
+            " WHERE relname = :1 and relnamespace = :2",
+            CStringGetDatum(relationName->relname),
+            ObjectIdGetDatum(namespaceId)));
+      IndexStmt *indexstmt = makeNode(IndexStmt);
+      indexstmt->idxname = indexname;
+      indexstmt->accessMethod = "btree";
+      indexstmt->indexParams = pkindex->indexParams;
+      indexstmt->unique = true;
+      indexstmt->primary = true;
+      indexstmt->isconstraint = true;
+      DefineIndex(relid,
+            indexstmt->idxname,
+            InvalidOid,
+            indexstmt->accessMethod,
+            indexstmt->tableSpace,
+            indexstmt->indexParams,
+            (Expr *) indexstmt->whereClause,
+            indexstmt->rangetable,
+            indexstmt->options,
+            indexstmt->unique,
+            indexstmt->primary,
+            indexstmt->isconstraint,
+            false,
+            true,
+            false,
+            true,
+            indexstmt->concurrent,
+            false,
+            indexstmt);
+      InsertSkylonIndexEntry(schema_name , table_name,
+                             value->val.str, 'd', indexname,
+                             indexkeys, indexcolnum, NULL, 0);
+    }
+    InsertGraphElabelEntry(schema_name, table_name, value->val.str, RangeVarGetRelid(relationName, false, false));
+  }
 }
 
 /* ----------------------------------------------------------------
@@ -2063,6 +3155,324 @@ MetaTrackValidKindNsp(Form_pg_class rd_rel)
 			&& (!(isAnyTempNamespace(nsp))));
 }
 
+void RemoveVlabelByOid(Oid relid) {
+  RangeVar *rel = RelidGetRangeVar(relid);
+  RemoveVlabel(rel, false);
+}
+
+void
+RemoveVlabel(RangeVar *rel, bool missing_ok) {
+  // get database name for the relation
+  char *database_name = rel->catalogname ? rel->catalogname : get_database_name(MyDatabaseId);
+
+  // get schema name for the relation
+  char *schema_name = get_namespace_name(RangeVarGetCreationNamespace(rel));
+  {
+    Relation  skylon_graph_vlabel_rel;
+    cqContext cqc;
+
+    skylon_graph_vlabel_rel = heap_open(GraphVlabelRelationId, RowExclusiveLock);
+
+    if (0 < caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_graph_vlabel_rel),
+          cql("SELECT COUNT(*) FROM skylon_graph_vlabel "
+            " WHERE vlabelname = :1 AND schemaname = :2",
+            CStringGetDatum(rel->relname), CStringGetDatum(schema_name))))
+    {
+      ereport(ERROR,
+          (errcode(ERRCODE_UNDEFINED_OBJECT),
+           errmsg("vlabel object name \"%s\" is still referenced to graphs",
+                  rel->relname)));
+    }
+    heap_close(skylon_graph_vlabel_rel, RowExclusiveLock);
+  }
+
+  {
+    Relation  skylon_vlabel_rel;
+    cqContext cqc;
+
+    skylon_vlabel_rel = heap_open(VlabelRelationId, RowExclusiveLock);
+
+    if (0 == caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_vlabel_rel),
+          cql("DELETE FROM skylon_vlabel "
+            " WHERE vlabelname = :1 AND schemaname = :2",
+            CStringGetDatum(rel->relname), CStringGetDatum(schema_name))))
+    {
+      if(!missing_ok)
+        ereport(ERROR,
+            (errcode(ERRCODE_UNDEFINED_OBJECT),
+             errmsg("vlabel object name \"%s\" does not exist in schema %s",
+                    rel->relname, schema_name)));
+      else
+        ereport(NOTICE,
+          (errcode(ERRCODE_UNDEFINED_OBJECT),
+           errmsg("vlabel object name \"%s\" does not exist in schema %s, skipping",
+                  rel->relname, schema_name),
+                     errOmitLocation(true)));
+      heap_close(skylon_vlabel_rel, NoLock);
+      return;
+    }
+    heap_close(skylon_vlabel_rel, RowExclusiveLock);
+  }
+  {
+    Relation  skylon_vlabel_attribute_rel;
+    cqContext cqc;
+
+    skylon_vlabel_attribute_rel = heap_open(VlabelAttrRelationId, RowExclusiveLock);
+
+    caql_getcount(
+              caql_addrel(cqclr(&cqc), skylon_vlabel_attribute_rel),
+              cql("DELETE FROM skylon_vlabel_attribute "
+                " WHERE vlabelname = :1 AND schemaname = :2",
+                CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    heap_close(skylon_vlabel_attribute_rel, NoLock);
+  }
+  {
+    RangeVar   *vlabel = makeRangeVar(NULL, NULL, NULL, -1);
+    vlabel->catalogname = database_name;
+    vlabel->schemaname = schema_name;
+    vlabel->relname = rel->relname;
+    Oid vid = RangeVarGetRelid(vlabel, true, false /*allowHcatalog*/);
+    DeleteRelationTuple(vid);
+    deleteDependencyRecordsFor(VlabelRelationId, vid);
+  }
+}
+
+void RemoveElabelByOid(Oid relid) {
+  RangeVar *rel = RelidGetRangeVar(relid);
+  RemoveElabel(rel, false);
+}
+
+void
+RemoveElabel(RangeVar *rel, bool missing_ok) {
+  // get database name for the relation
+  char *database_name = rel->catalogname ? rel->catalogname : get_database_name(MyDatabaseId);
+
+  // get schema name for the relation
+  char *schema_name = get_namespace_name(RangeVarGetCreationNamespace(rel));
+  {
+    Relation  skylon_graph_elabel_rel;
+    cqContext cqc;
+
+    skylon_graph_elabel_rel = heap_open(GraphElabelRelationId, RowExclusiveLock);
+
+    if (0 < caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_graph_elabel_rel),
+          cql("SELECT COUNT(*) FROM skylon_graph_elabel "
+            " WHERE elabelname = :1 AND schemaname = :2",
+            CStringGetDatum(rel->relname), CStringGetDatum(schema_name))))
+    {
+      ereport(ERROR,
+          (errcode(ERRCODE_UNDEFINED_OBJECT),
+           errmsg("elabel object name \"%s\" is still referenced to graphs",
+                  rel->relname)));
+    }
+    heap_close(skylon_graph_elabel_rel, RowExclusiveLock);
+  }
+  {
+    Relation  skylon_elabel_rel;
+    cqContext cqc;
+
+    skylon_elabel_rel = heap_open(ElabelRelationId, RowExclusiveLock);
+
+    if (0 == caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_elabel_rel),
+          cql("DELETE FROM skylon_elabel "
+            " WHERE elabelname = :1 AND schemaname = :2",
+            CStringGetDatum(rel->relname), CStringGetDatum(schema_name))))
+    {
+      if(!missing_ok)
+        ereport(ERROR,
+            (errcode(ERRCODE_UNDEFINED_OBJECT),
+             errmsg("elabel object name \"%s\" does not exist in schema %s",
+                    rel->relname, schema_name)));
+      else
+        ereport(NOTICE,
+          (errcode(ERRCODE_UNDEFINED_OBJECT),
+           errmsg("elabel object name \"%s\" does not exist in schema %s, skipping",
+                  rel->relname, schema_name),
+                     errOmitLocation(true)));
+      heap_close(skylon_elabel_rel, RowExclusiveLock);
+      return;
+    }
+    heap_close(skylon_elabel_rel, RowExclusiveLock);
+  }
+  {
+    Relation  skylon_elabel_attribute_rel;
+    cqContext cqc;
+
+    skylon_elabel_attribute_rel = heap_open(ElabelAttrRelationId, RowExclusiveLock);
+
+    caql_getcount(
+              caql_addrel(cqclr(&cqc), skylon_elabel_attribute_rel),
+              cql("DELETE FROM skylon_elabel_attribute "
+                " WHERE elabelName = :1 AND schemaname = :2",
+                CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    heap_close(skylon_elabel_attribute_rel, NoLock);
+  }
+  {
+    RangeVar   *elabel = makeRangeVar(NULL, NULL, NULL, -1);
+    elabel->catalogname = database_name;
+    elabel->schemaname = schema_name;
+    elabel->relname = rel->relname;
+    Oid eid = RangeVarGetRelid(elabel, true, false /*allowHcatalog*/);
+    DeleteRelationTuple(eid);
+    deleteDependencyRecordsFor(ElabelRelationId, eid);
+  }
+}
+
+void RemoveGraphByOid(Oid relid, bool ifRemoveTable) {
+  RangeVar *rel = RelidGetRangeVar(relid);
+  RemoveGraph(rel, false, ifRemoveTable);
+}
+
+void RemoveGraph(RangeVar *rel, bool missing_ok, bool ifRemoveTable) {
+  // get database name for the relation
+  char *database_name = rel->catalogname ? rel->catalogname : get_database_name(MyDatabaseId);
+
+  // get schema name for the relation
+  char *schema_name = get_namespace_name(RangeVarGetCreationNamespace(rel));
+
+  {
+    Relation  skylon_graph_rel;
+    cqContext cqc;
+
+    skylon_graph_rel = heap_open(GraphRelationId, RowExclusiveLock);
+
+    if (0 == caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_graph_rel),
+          cql("DELETE FROM skylon_graph "
+            " WHERE graphname = :1 AND schemaname = :2",
+            CStringGetDatum(rel->relname), CStringGetDatum(schema_name))))
+    {
+      if(!missing_ok)
+        ereport(ERROR,
+            (errcode(ERRCODE_UNDEFINED_OBJECT),
+             errmsg("graph object name \"%s\" does not exist in schema %s",
+                    rel->relname, schema_name)));
+      else
+        ereport(NOTICE,
+          (errcode(ERRCODE_UNDEFINED_OBJECT),
+           errmsg("graph object name \"%s\" does not exist in schema %s, skipping",
+                  rel->relname, schema_name),
+                     errOmitLocation(true)));
+      heap_close(skylon_graph_rel, RowExclusiveLock);
+      return;
+    }
+    heap_close(skylon_graph_rel, RowExclusiveLock);
+  }
+
+  if(ifRemoveTable) {
+    Relation  skylon_graph_vlabel_rel;
+    cqContext cqc;
+
+    skylon_graph_vlabel_rel = heap_open(GraphVlabelRelationId, RowExclusiveLock);
+    cqContext *pcqCtx = caql_beginscan(
+        caql_addrel(cqclr(&cqc), skylon_graph_vlabel_rel),
+        cql("SELECT * FROM skylon_graph_vlabel "
+                        " WHERE graphname = :1 AND schemaname = :2",
+                        CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    HeapTuple vlabelTuple = NULL;
+    while (HeapTupleIsValid(vlabelTuple = caql_getnext(pcqCtx))) {
+      Form_skylon_graph_vlabel tuple = (Form_skylon_graph_vlabel) GETSTRUCT(vlabelTuple);
+      char *vname = pstrdup(NameStr(tuple->vlabelname));
+      DropStmt *dropStmt = makeNode(DropStmt);
+      dropStmt->removeType = OBJECT_VLABEL;
+      dropStmt->missing_ok = TRUE;
+      dropStmt->objects = NIL;
+      dropStmt->behavior = DROP_RESTRICT;
+      RangeVar   *vlabel = makeRangeVar(NULL, NULL, NULL, -1);
+      vlabel->catalogname = database_name;
+      vlabel->schemaname = schema_name;
+      vlabel->relname = graphVertexTableName(rel->relname, vname);
+      if (OidIsValid(RangeVarGetRelid(vlabel, true, false)))
+      {
+        RemoveRelation(vlabel, dropStmt->behavior, dropStmt, RELKIND_RELATION);
+      }
+    }
+    caql_endscan(pcqCtx);
+    heap_close(skylon_graph_vlabel_rel, RowExclusiveLock);
+  }
+  if(ifRemoveTable) {
+    Relation  skylon_graph_elabel_rel;
+    cqContext cqc;
+
+    skylon_graph_elabel_rel = heap_open(GraphElabelRelationId, RowExclusiveLock);
+    cqContext *pcqCtx = caql_beginscan(
+        caql_addrel(cqclr(&cqc), skylon_graph_elabel_rel),
+        cql("SELECT * FROM skylon_graph_elabel "
+                        " WHERE graphname = :1 AND schemaname = :2",
+                        CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    HeapTuple elabelTuple = NULL;
+    while (HeapTupleIsValid(elabelTuple = caql_getnext(pcqCtx))) {
+      Form_skylon_graph_elabel tuple = (Form_skylon_graph_elabel) GETSTRUCT(elabelTuple);
+      char *ename = pstrdup(NameStr(tuple->elabelname));
+      DropStmt *dropStmt = makeNode(DropStmt);
+      dropStmt->removeType = OBJECT_VLABEL;
+      dropStmt->missing_ok = TRUE;
+      dropStmt->objects = NIL;
+      dropStmt->behavior = DROP_RESTRICT;
+      RangeVar   *elabel = makeRangeVar(NULL, NULL, NULL, -1);
+      elabel->catalogname = database_name;
+      elabel->schemaname = schema_name;
+      elabel->relname = graphEdgeTableName(rel->relname, ename);;
+      if (OidIsValid(RangeVarGetRelid(elabel, true, false)))
+      {
+        RemoveRelation(elabel, dropStmt->behavior, dropStmt, RELKIND_RELATION);
+      }
+    }
+    caql_endscan(pcqCtx);
+    heap_close(skylon_graph_elabel_rel, RowExclusiveLock);
+  }
+  {
+    Relation  skylon_graph_vlabel_rel;
+    cqContext cqc;
+
+    skylon_graph_vlabel_rel = heap_open(GraphVlabelRelationId, RowExclusiveLock);
+
+    caql_getcount(
+              caql_addrel(cqclr(&cqc), skylon_graph_vlabel_rel),
+              cql("DELETE FROM skylon_graph_vlabel "
+                " WHERE graphname = :1 AND schemaname = :2",
+                CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    heap_close(skylon_graph_vlabel_rel, RowExclusiveLock);
+  }
+  {
+    Relation  skylon_graph_elabel_rel;
+    cqContext cqc;
+
+    skylon_graph_elabel_rel = heap_open(GraphElabelRelationId, RowExclusiveLock);
+
+    caql_getcount(
+              caql_addrel(cqclr(&cqc), skylon_graph_elabel_rel),
+              cql("DELETE FROM skylon_graph_elabel "
+                " WHERE graphname = :1 AND schemaname = :2",
+                CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    heap_close(skylon_graph_elabel_rel, RowExclusiveLock);
+  }
+  {
+    RangeVar   *graph = makeRangeVar(NULL, NULL, NULL, -1);
+    graph->catalogname = database_name;
+    graph->schemaname = schema_name;
+    graph->relname = rel->relname;
+    Oid graphid = RangeVarGetRelid(graph, true, false /*allowHcatalog*/);
+    DeleteRelationTuple(graphid);
+    deleteDependencyRecordsFor(GraphRelationId, graphid);
+  }
+  {
+    Relation  skylon_index_rel;
+    cqContext cqc;
+    skylon_index_rel = heap_open(SkylonIndexRelationId, RowExclusiveLock);
+    caql_getcount(
+              caql_addrel(cqclr(&cqc), skylon_index_rel),
+              cql("DELETE FROM skylon_index "
+                " WHERE graphname = :1 AND schemaname = :2",
+                CStringGetDatum(rel->relname), CStringGetDatum(schema_name)));
+    heap_close(skylon_index_rel, RowExclusiveLock);
+  }
+}
+
 /*
  * RemoveRelation
  *		Deletes a relation.
@@ -2286,11 +3696,13 @@ ExecuteTruncate(TruncateStmt *stmt)
     int partcheck = 2;
 	List *partList = NIL;
 
+
 	/*
 	 * Open, exclusive-lock, and check all the explicitly-specified relations
 	 *
 	 * Check if table has partitions and add them too
 	 */
+	bool ifReturn = false;
 	while (partcheck)
 	{
 		foreach(cell, stmt->relations)
@@ -2298,6 +3710,19 @@ ExecuteTruncate(TruncateStmt *stmt)
 			RangeVar   *rv = lfirst(cell);
 			Relation	rel;
 			PartitionNode *pNode;
+
+			List *labellist = transformAsGraphName(NULL, rv);
+			if(labellist) {
+			  TruncateStmt *truncate = makeNode(TruncateStmt);
+			  truncate->relations = labellist;
+			  truncate->behavior = stmt->behavior;
+			  ExecuteTruncate(truncate);
+			  ifReturn = true;
+			  continue;
+			}
+			else {
+			  parseAndTransformAsGraph(NULL, rv);
+			}
 
 		  rel = heap_openrv(rv, AccessExclusiveLock);
 			truncate_check_rel(rel);
@@ -2321,6 +3746,9 @@ ExecuteTruncate(TruncateStmt *stmt)
 			}
 			heap_close(rel, NoLock);
 		}
+		//if truncate a whole graph, return now,because the verticies and edges have truncated before
+		if(ifReturn)
+		  return;
 
 		partcheck--;
 

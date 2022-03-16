@@ -264,6 +264,9 @@ static Relation open_relation_and_check_permission(VacuumStmt *vacstmt,
 												   char expected_relkind);
 static void vacuumStatement(VacuumStmt *vacstmt, List *relids);
 
+extern bool parseAndTransformAsGraph(ParseState *pstate, RangeVar *rangeVar);
+
+extern List *transformAsGraphName(ParseState *pstate, RangeVar *rangeVar);
 
 /****************************************************************************
  *																			*
@@ -288,6 +291,23 @@ void vacuum(VacuumStmt *vacstmt, List *relids, int preferred_seg_num)
 	
 	Assert(!(vacstmt != NULL && relids != NULL));
 	
+	List *labellist = transformAsGraphName(NULL, vacstmt->relation);
+	if(labellist) {
+	  ListCell *cell;
+	  foreach(cell, labellist) {
+	    RangeVar *labelrel = (RangeVar*)lfirst(cell);
+	    VacuumStmt *refactoredStmt = copyObject(vacstmt);
+	    refactoredStmt->relation = labelrel;
+	    vacuum(refactoredStmt, NIL, -1);
+	  }
+	  return;
+	}
+	else {
+	  parseAndTransformAsGraph(NULL, vacstmt->relation);
+	  analyzeStmt->relation = vacstmt->relation;
+	}
+
+
 	if (doVacuum)
 	{
 		if (vacstmt->rootonly)

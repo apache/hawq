@@ -24,6 +24,7 @@
  */
 #include "postgres.h"
 
+#include "catalog/pg_exttable.h"
 #include "access/genam.h"
 #include "access/nbtree.h"
 #include "executor/execIndexscan.h"
@@ -162,6 +163,9 @@ OpenIndexRelation(EState *estate, Oid indexOid, Index tableRtIndex)
  *
  * Caller may pass NULL for arrayKeys and numArrayKeys to indicate that
  * ScalarArrayOpExpr quals are not supported.
+ *
+ * TODO(hwy): This code is used for both external scan and index scan, so it
+ * should be placed in a common file.
  */
 
 void
@@ -232,6 +236,9 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 		Expr	   *leftop;		/* expr on lhs of operator */
 		Expr	   *rightop;	/* expr on rhs ... */
 		AttrNumber	varattno;	/* att number used in scan */
+		AttrNumber      varattnoold;
+		Oid             out_func_id = InvalidOid;
+		bool            typ_is_var_lena = InvalidOid;
 
 		/*
 		 * extract clause information from the qualification
@@ -243,6 +250,10 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 		subtype = lfirst_oid(subtype_cell);
 		subtype_cell = lnext(subtype_cell);
 
+		/*
+		 * So far, for a runTimeKey's expression, magma only supports OpExpr,
+		 * and must be (Var eq Var).
+		 */
 		if (IsA(clause, OpExpr))
 		{
 			/* indexkey op const or indexkey op expression */
@@ -266,6 +277,7 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 				insist_log(false,"indexqual doesn't have key on left side");
 
 			varattno = ((Var *) leftop)->varattno;
+			varattnoold = ((Var *) leftop)->varoattno;
 
 			/*
 			 * rightop is the constant or variable comparison value
@@ -286,6 +298,16 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 			}
 			else
 			{
+			        /* Only magma need do this logic. */
+			        if (IsA(planstate, ExternalScanState)
+			                && RelationIsMagmaTable2(((ExternalScanState *)planstate)->ss.ss_currentRelation->rd_id)
+			                /* We only need processing (Var op Var). */
+			                && IsA(rightop, Var))
+			        {
+			                Assert(((Var *) leftop)->vartype == ((Var *) rightop)->vartype);
+			                getTypeOutputInfo(((Var *) rightop)->vartype, &out_func_id, &typ_is_var_lena);
+			        }
+
 				/* Need to treat this one as a runtime key */
 				runtime_keys[n_runtime_keys].scan_key = this_scan_key;
 				runtime_keys[n_runtime_keys].key_expr =
@@ -303,7 +325,9 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 								   strategy,	/* op's strategy */
 								   subtype,		/* strategy subtype */
 								   opfuncid,	/* reg proc to use */
-								   scanvalue);	/* constant */
+								   scanvalue,   /* constant */
+								   varattnoold,
+								   out_func_id);
 		}
 		else if (IsA(clause, RowCompareExpr))
 		{
@@ -399,7 +423,9 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 									   op_strategy,		/* op's strategy */
 									   op_subtype,		/* strategy subtype */
 									   opfuncid,		/* reg proc to use */
-									   scanvalue);		/* constant */
+									   scanvalue,		/* constant */
+									   InvalidAttrNumber,
+				                                           InvalidOid);
 				extra_scan_keys++;
 			}
 
@@ -466,7 +492,9 @@ ExecIndexBuildScanKeys(PlanState *planstate, Relation index,
 								   strategy,	/* op's strategy */
 								   subtype,		/* strategy subtype */
 								   opfuncid,	/* reg proc to use */
-								   (Datum) 0);	/* constant */
+								   (Datum) 0,	/* constant */
+								   InvalidAttrNumber,
+								   InvalidOid);
 		}
 		else
 			insist_log(false, "unsupported indexqual type: %d",

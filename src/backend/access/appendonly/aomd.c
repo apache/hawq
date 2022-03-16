@@ -104,6 +104,38 @@ FormatAOSegmentFileName(
 	sprintf(filepathname, "%s/%u", basepath, pseudoSegNo);
 }
 
+void
+FormatAOSegmentIndexFileName(
+              char *basepath,
+              int segno,
+              int idxId,
+              int col,
+              int numCols,
+              int32 *fileSegNo,
+              char *filepathname)
+{
+  int pseudoSegNo;
+
+  if (col < 0)
+  {
+    /*
+     * Row oriented Append-Only.
+     */
+    pseudoSegNo = segno;
+  }
+  else
+  {
+    /*
+     * Column oriented Append-only.
+     */
+    pseudoSegNo = ((segno - 1) * numCols) + (col + 1);
+  }
+
+  *fileSegNo = pseudoSegNo;
+
+  sprintf(filepathname, "%s/%u_%u", basepath, pseudoSegNo, idxId);
+}
+
 /*
  * Make an Append Only relation file segment file name.
  *
@@ -132,6 +164,29 @@ MakeAOSegmentFileName(
 	pfree(basepath);
 }
 
+void
+MakeAOSegmentIndexFileName(
+              Relation rel,
+              int idxId,
+              int segno,
+              int col,
+              int32 *fileSegNo,
+              char *filepathname)
+{
+  char  *basepath;
+  int32   fileSegNoLocal;
+  int numCols;
+
+  /* Get base path for this relation file */
+  basepath = relpath(rel->rd_node);
+  numCols = rel->rd_att->natts;
+
+  FormatAOSegmentIndexFileName(basepath, segno, idxId, col, numCols, &fileSegNoLocal, filepathname);
+
+  *fileSegNo = fileSegNoLocal;
+
+  pfree(basepath);
+}
 /*
  * Open an Append Only relation file segment
  *

@@ -1254,10 +1254,9 @@ index_drop(Oid indexId)
 						ObjectIdGetDatum(aoEntry->blkdirrelid))))
 		{
 			Assert(aoEntry != NULL);
-			deleteOrcIndexFileInfo(aoEntry, indexId);
+			deleteOrcIndexFileInfo(userHeapRelation, aoEntry, indexId);
 			pfree(aoEntry);
 		}
-		/* todo: need to dispatch drop index to clean index data */
 	}
 
 	/*

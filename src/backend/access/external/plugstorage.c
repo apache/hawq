@@ -432,8 +432,6 @@ ExternalSelectDesc InvokePlugStorageFormatGetNextInit(FmgrInfo *func,
 	FunctionCallInfoData fcinfo;
 
 	psdata.type              = T_PlugStorageData;
-	psdata.ps_plan_state     = planState;
-	psdata.ps_ext_scan_state = extScanState;
 
 	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
 	                         func,    // FmgrInfo
@@ -495,13 +493,53 @@ bool InvokePlugStorageFormatGetNext(FmgrInfo *func,
 }
 
 void InvokePlugStorageFormatReScan(FmgrInfo *func,
-                                   FileScanDesc fileScanDesc)
+                                   FileScanDesc fileScanDesc,
+                                   ScanState* scanState,
+                                   MagmaSnapshot* snapshot,
+                                   IndexRuntimeKeyInfo* runtimeKeyInfo,
+                                   int numRuntimeKeys,
+                                   TupleTableSlot *tupTableSlot)
 {
 	PlugStorageData psdata;
 	FunctionCallInfoData fcinfo;
 
-	psdata.type              = T_PlugStorageData;
-	psdata.ps_file_scan_desc = fileScanDesc;
+	psdata.type                = T_PlugStorageData;
+	psdata.ps_scan_state       = scanState;
+	psdata.ps_file_scan_desc   = fileScanDesc;
+	psdata.runtime_key_info    = runtimeKeyInfo;
+	psdata.num_run_time_keys   = numRuntimeKeys;
+	psdata.ps_tuple_table_slot = tupTableSlot;
+
+        if (strncmp(fileScanDesc->fs_formatter_name, "magma", strlen("magma")) == 0)
+        {
+                Insist(snapshot != NULL);
+
+                // save current transaction in snapshot
+                psdata.ps_snapshot.currentTransaction.txnId =
+                    snapshot->currentTransaction.txnId;
+                psdata.ps_snapshot.currentTransaction.txnStatus =
+                    snapshot->currentTransaction.txnStatus;;
+
+                psdata.ps_snapshot.cmdIdInTransaction = snapshot->cmdIdInTransaction;
+
+                // allocate txnActions
+                psdata.ps_snapshot.txnActions.txnActionStartOffset =
+                    snapshot->txnActions.txnActionStartOffset;
+                psdata.ps_snapshot.txnActions.txnActions =
+                    (MagmaTxnAction *)palloc0(sizeof(MagmaTxnAction) * snapshot->txnActions
+                        .txnActionSize);
+
+                // save txnActionsp
+                psdata.ps_snapshot.txnActions.txnActionSize = snapshot->txnActions
+                    .txnActionSize;
+                for (int i = 0; i < snapshot->txnActions.txnActionSize; ++i)
+                {
+                        psdata.ps_snapshot.txnActions.txnActions[i].txnId =
+                              snapshot->txnActions.txnActions[i].txnId;
+                        psdata.ps_snapshot.txnActions.txnActions[i].txnStatus =
+                              snapshot->txnActions.txnActions[i].txnStatus;
+                }
+        }
 
 	InitFunctionCallInfoData(fcinfo,  // FunctionCallInfoData
 	                         func,    // FmgrInfo
@@ -511,6 +549,12 @@ void InvokePlugStorageFormatReScan(FmgrInfo *func,
 
 	// Invoke function
 	FunctionCallInvoke(&fcinfo);
+
+	// free memory for magma snapshot
+	if (strncmp(fileScanDesc->fs_formatter_name, "magma", strlen("magma")) == 0)
+	{
+	        pfree(psdata.ps_snapshot.txnActions.txnActions);
+	}
 
 	// We do not expect a null result
 	if (fcinfo.isnull)

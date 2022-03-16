@@ -35,7 +35,6 @@
 #include "cdb/cdbexplain.h"             /* me */
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbvars.h"                /* Gp_segment */
-#include "cdb/scheduler.h"
 #include "executor/executor.h"          /* ExecStateTreeWalker */
 #include "executor/instrument.h"        /* Instrumentation */
 #include "lib/stringinfo.h"             /* StringInfo */
@@ -275,11 +274,10 @@ static int
 cdbexplain_countLeafPartTables(PlanState *planstate);
 static CdbVisitOpt newplan_collectExecStats(MyInstrumentation *instr,
                                      CdbExplain_SendStatCtx *ctx);
-
-static void cdbexplain_depositSchedulerStatsToNode(
-    PlanState *planstate, struct SchedulerData *scheduler_data,
-    MyInstrumentation **myInstr, int iInst, int stageNo,
-    struct CdbExplain_ShowStatCtx *showstatctx);
+static CdbVisitOpt myinstrument_walk_node(
+    MyInstrumentation *instr,
+    CdbVisitOpt (*walker)(MyInstrumentation *instr, void *context),
+    void *context);
 
 /*
  * cdbexplain_localExecStats
@@ -517,6 +515,36 @@ static CdbVisitOpt newplan_collectExecStats(MyInstrumentation *myinstr,
   ctx->hdr.nInst++;
 
   return CdbVisit_Walk;
+}
+
+CdbVisitOpt myinstrument_walk_node(
+    MyInstrumentation *instr,
+    CdbVisitOpt (*walker)(MyInstrumentation *instr, void *context),
+    void *context) {
+  CdbVisitOpt whatnext;
+
+  if (instr == NULL) return CdbVisit_Walk;
+
+  whatnext = walker(instr, context);
+  if (whatnext == CdbVisit_Walk) {
+    if (instr->leftTree && whatnext == CdbVisit_Walk)
+      whatnext = myinstrument_walk_node(instr->leftTree, walker, context);
+    if (instr->rightTree && whatnext == CdbVisit_Walk)
+      whatnext = myinstrument_walk_node(instr->rightTree, walker, context);
+    if (instr->subTree && whatnext == CdbVisit_Walk)
+      whatnext = myinstrument_walk_node(instr->subTree, walker, context);
+    if (instr->subplan && whatnext == CdbVisit_Walk) {
+      whatnext = myinstrument_walk_node(instr->subplan, walker, context);
+    }
+    if (instr->subplanSibling && whatnext == CdbVisit_Walk) {
+      whatnext = myinstrument_walk_node(instr->subplanSibling, walker, context);
+    }
+  } else if (whatnext == CdbVisit_Skip) {
+    whatnext = CdbVisit_Walk;
+  }
+
+  Assert(whatnext != CdbVisit_Skip);
+  return whatnext;
 }
 
 /*
@@ -2399,128 +2427,3 @@ cdbexplain_countLeafPartTables(PlanState *planstate)
 	Oid root_oid = getrelid(scan->scanrelid, planstate->state->es_range_table);
 	return countLeafPartTables(root_oid);
 }
-
-typedef struct CdbExplain_RecvSchedulerStatCtx {
-  CdbExplain_ShowStatCtx *showstatctx;
-  struct SchedulerData *scheduler_data;
-  int stageNo;
-} CdbExplain_RecvSchedulerStatCtx;
-
-CdbVisitOpt cdbexplain_recvSchedulerStatWalker(PlanState *planstate,
-                                               void *context) {
-  CdbExplain_RecvSchedulerStatCtx *ctx =
-      (CdbExplain_RecvSchedulerStatCtx *)context;
-
-  SchedulerSliceStats *sliceStat = &ctx->scheduler_data->slices[ctx->stageNo];
-  if (ctx->stageNo > 0)
-    cdbexplain_depositSchedulerStatsToNode(
-        planstate, ctx->scheduler_data, sliceStat->instr, sliceStat->iStatInst,
-        ctx->stageNo, ctx->showstatctx);
-  sliceStat->iStatInst++;
-
-  if (IsA(planstate, MotionState)) {
-    cdbexplain_recvSchedulerExecStats(planstate->lefttree, ctx->scheduler_data,
-                                      ((Motion *)planstate->plan)->motionID,
-                                      ctx->showstatctx);
-    return CdbVisit_Skip;
-  }
-
-  return CdbVisit_Walk;
-}
-
-void cdbexplain_recvSchedulerExecStats(
-    struct PlanState *planstate, struct SchedulerData *scheduler_data,
-    int stageNo, struct CdbExplain_ShowStatCtx *showstatctx) {
-  if (!planstate || !planstate->instrument || !showstatctx) return;
-
-  CdbExplain_RecvSchedulerStatCtx ctx;
-  ctx.scheduler_data = scheduler_data;
-  ctx.showstatctx = showstatctx;
-  ctx.stageNo = stageNo;
-  SchedulerSliceStats *sliceStat = &ctx.scheduler_data->slices[ctx.stageNo];
-  sliceStat->iStatInst = 1;
-
-  MemoryContext oldcxt;
-  oldcxt = MemoryContextSwitchTo(showstatctx->explaincxt);
-
-  planstate_walk_node(planstate, cdbexplain_recvSchedulerStatWalker, &ctx);
-  if (ctx.stageNo > 0)
-    Assert(sliceStat->iStatInst * ctx.scheduler_data->segmentNum ==
-           sliceStat->nStatInst);
-
-  MemoryContextSwitchTo(oldcxt);
-}
-
-/*
- * cdbexplain_depositSchedulerStatsToNode
- *
- * Called by cdbexplain_recvSchedulerStatWalker to update the given
- * PlanState node's Instrument node with statistics received from
- * workers or collected locally.  Attaches a CdbExplain_NodeSummary
- * block to the Instrument node.  If top node of slice, per-slice
- * statistics are transferred from the StatHdr to the SliceSummary.
- */
-static void cdbexplain_depositSchedulerStatsToNode(
-    PlanState *planstate, struct SchedulerData *scheduler_data,
-    MyInstrumentation **myInstr, int iInst, int stageNo,
-    struct CdbExplain_ShowStatCtx *showstatctx) {
-  Instrumentation *instr = planstate->instrument;
-
-  /*
-   * ns is the node summary across all QEs of the segworker group. It also
-   * contains detailed "unsummarized" raw stat for a node across all QEs in
-   * current segworker group (in the insts array)
-   */
-  CdbExplain_NodeSummary *ns;
-  int nInst;
-
-  Insist(instr);
-
-  /* Caller already switched to EXPLAIN context. */
-  Assert(CurrentMemoryContext == showstatctx->explaincxt);
-
-  /* Allocate NodeSummary block. */
-  nInst = scheduler_data->segmentNum;
-  ns = (CdbExplain_NodeSummary *)palloc0(sizeof(*ns) - sizeof(ns->insts) +
-                                         nInst * sizeof(ns->insts[0]));
-  ns->segindex0 = 0;
-  ns->ninst = nInst;
-  ns->ntuples.vcnt = scheduler_data->segmentNum;
-
-  int step = scheduler_data->slices[stageNo].nStatInst / nInst;
-
-  for (int i = 0; i < scheduler_data->segmentNum; i++, iInst+=step) {
-    ns->insts[i].startup = myInstr[iInst]->firstTupleBatch / 1000000.0;
-    ns->insts[i].total = myInstr[iInst]->counter / 1000000.0;
-    ns->insts[i].firststart.tv_sec = myInstr[iInst]->firstStart / 1000000;
-    ns->insts[i].firststart.tv_usec = myInstr[iInst]->firstStart % 1000000;
-    ns->insts[i].ntuples = myInstr[iInst]->tupleCount;
-    ns->insts[i].execmemused = myInstr[iInst]->execmemused;
-    ns->insts[i].workmemused = myInstr[iInst]->workmemused;
-    ns->insts[i].workmemwanted = myInstr[iInst]->workmemwanted;
-    ns->ntuples.vsum += myInstr[iInst]->tupleCount;
-    ns->execmemused.vsum += myInstr[iInst]->execmemused;
-    ns->workmemused.vsum += myInstr[iInst]->workmemused;
-    ns->workmemwanted.vsum += myInstr[iInst]->workmemwanted;
-    if (instr->ntuples <= ns->insts[i].ntuples) {
-      ns->ntuples.imax = i;
-      strcpy(ns->ntuples.hostnamemax, scheduler_data->hosts[i]);
-      ns->ntuples.vmax = ns->insts[i].ntuples;
-      instr->ntuples = ns->insts[i].ntuples;
-      instr->startup = ns->insts[i].startup;
-      instr->total = ns->insts[i].total;
-      instr->firststart = ns->insts[i].firststart;
-    }
-    if (instr->totalLast <= ns->insts[i].total) {
-      ns->ntuples.ilast = i;
-      strcpy(ns->ntuples.hostnamelast, scheduler_data->hosts[i]);
-      ns->ntuples.vlast = ns->insts[i].ntuples;
-      instr->startupLast = ns->insts[i].startup;
-      instr->totalLast = ns->insts[i].total;
-      instr->firststartLast = ns->insts[i].firststart;
-    }
-  }
-
-  /* Attach our new NodeSummary to the Instrumentation node. */
-  instr->cdbNodeSummary = ns;
-} /* cdbexplain_depositSchedulerStatsToNode */

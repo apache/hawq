@@ -209,6 +209,7 @@ typedef struct Query {
 
   QueryContextInfo *contextdisp; /* query context for dispatching */
 
+  List *graphEntry;
 } Query;
 
 /****************************************************************************
@@ -646,7 +647,6 @@ typedef enum RTEKind {
 
 typedef struct RangeTblEntry {
   NodeTag type;
-
   RTEKind rtekind; /* see above */
 
   /*
@@ -734,7 +734,14 @@ typedef struct RangeTblEntry {
                      *  the 0-based position in the list.  Used
                      *  only in planner & EXPLAIN, not in executor.
                      */
+  char * graphName;
 } RangeTblEntry;
+
+typedef struct GraphEntry {
+  NodeTag type;
+  Oid relid;
+  AclMode requiredPerms;
+} GraphEntry;
 
 /*
  * SortClause -
@@ -1071,7 +1078,10 @@ typedef enum ObjectType {
   OBJECT_TRIGGER,
   OBJECT_TYPE,
   OBJECT_VIEW,
-  OBJECT_RESQUEUE
+  OBJECT_RESQUEUE,
+  OBJECT_VLABEL,
+  OBJECT_ELABEL,
+  OBJECT_GRAPH
 } ObjectType;
 
 /* ----------------------
@@ -1457,6 +1467,31 @@ typedef struct CreateExternalStmt {
   char *parentPath;         // keep the parent relative path for partition
   struct IndexStmt *pkey;  /* PRIMARY KEY index, if any */
 } CreateExternalStmt;
+
+typedef struct CreateVlabelStmt {
+  NodeTag type;
+  RangeVar *relation;
+  List *tableElts;
+  List *constraints;
+} CreateVlabelStmt;
+
+typedef struct CreateElabelStmt {
+  NodeTag type;
+  RangeVar *relation;
+  List *tableElts;
+  List *constraints;
+  Value* fromVlabel;
+  Value* toVlabel;
+} CreateElabelStmt;
+
+typedef struct CreateGraphStmt {
+  NodeTag type;
+  RangeVar *graph;
+  List *vlabels;
+  List *elabels;
+  List *options;
+  char *format;
+} CreateGraphStmt;
 
 /* ----------------------
  *	Definitions for foreign tables
@@ -2168,6 +2203,10 @@ typedef struct IndexStmt {
   List *allidxinfos;    /* list of NativeOrcIndexFile */
   List *columnsToRead;  /* all indexs of key and include columns */
   QueryContextInfo *contextdisp; /* native orc need to dispatch relation */
+  RangeVar *graphele;
+  List *graphIndexAttnum;
+  List *graphIncludeAttnum;
+  bool reverse;
 } IndexStmt;
 
 /* ----------------------

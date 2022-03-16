@@ -570,13 +570,6 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
                                      LocallyExecutingSliceIndex(estate),
                                      es->showstatctx,
                                      mainDispatchGetSegNum(queryDesc->estate->mainDispatchData));
-        if (estate->scheduler_data) {
-          scheduler_receive_computenode_stats(queryDesc->estate->scheduler_data,
-                                              queryDesc->planstate);
-          cdbexplain_recvSchedulerExecStats(queryDesc->planstate,
-                                            queryDesc->estate->scheduler_data,
-                                            0, es->showstatctx);
-        }
 	} else {
 		CommonPlanContext ctx;
 		queryDesc->newPlanForceAuto = true;
@@ -793,8 +786,6 @@ ExplainOnePlan_internal(PlannedStmt *plannedstmt,
 	{
 	  if (estate->mainDispatchData)
 	    mainDispatchPrintStats(buf, estate->mainDispatchData);
-	  else if (estate->scheduler_data)
-	    scheduler_print_stats(estate->scheduler_data, buf);
 		appendStringInfo(buf, "Data locality statistics:\n");
 		if(plannedstmt->datalocalityInfo ==NULL){
 		  appendStringInfo(buf, "  no data locality information in this query\n");

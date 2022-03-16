@@ -528,6 +528,8 @@ set_plan_refs(PlannerGlobal *glob, Plan *plan, const int rtoffset)
 			fix_scan_list(glob, splan->scan.plan.targetlist, rtoffset);
 			splan->scan.plan.qual =
 			fix_scan_list(glob, splan->scan.plan.qual, rtoffset);
+			splan->indexqual =
+			fix_scan_list(glob, splan->indexqual, rtoffset);
 			splan->indexqualorig =
 			fix_scan_list(glob, splan->indexqualorig, rtoffset);
 		}
@@ -1445,6 +1447,30 @@ set_inner_join_references(PlannerGlobal *glob, Plan *inner_plan,
 												 NULL,
 												 innerrel,
 												 rtoffset);
+		}
+	}
+	else if (IsA(inner_plan, MagmaIndexOnlyScan) || IsA(inner_plan, MagmaIndexScan))
+	{
+		ExternalScan  *innerscan = (ExternalScan *) inner_plan;
+		List	   *indexqualorig = innerscan->indexqualorig;
+
+		/* No work needed if indexqual refers only to its own rel... */
+		if (NumRelids((Node *) indexqualorig) > 1)
+		{
+			Index		innerrel = innerscan->scan.scanrelid;
+
+			/* only refs to outer vars get changed in the inner qual */
+			innerscan->indexqualorig = fix_join_expr(
+			        glob, indexqualorig, outer_itlist, NULL,
+			        innerrel, rtoffset);
+			innerscan->indexqual = fix_join_expr(
+			        glob, innerscan->indexqual, outer_itlist, NULL,
+			        innerrel, rtoffset);
+
+			if (NumRelids((Node *) inner_plan->qual) > 1)
+				inner_plan->qual = fix_join_expr(
+						glob, inner_plan->qual, outer_itlist, NULL,
+						innerrel, rtoffset);
 		}
 	}
 	else if (IsA(inner_plan, BitmapIndexScan))

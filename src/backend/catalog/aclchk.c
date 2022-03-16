@@ -43,6 +43,8 @@
 #include "catalog/pg_filespace.h"
 #include "catalog/pg_filesystem.h"
 #include "catalog/pg_type.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
 #include "cdb/cdbpartition.h"
 #include "commands/dbcommands.h"
 #include "foreign/foreign.h"
@@ -84,6 +86,9 @@ static AclMode pg_aclmask(AclObjectKind objkind, Oid table_oid, Oid roleid,
 
 static bool is_sequence(Oid object_oid);
 
+extern char *graphVertexTableName(char *gname,char *vname);
+
+extern char *graphEdgeTableName(char *gname,char *ename);
 
 #ifdef ACLDEBUG
 static void
@@ -635,6 +640,76 @@ objectNamesToOids(GrantObjectType objtype, List *objnames)
 
 				relOid = RangeVarGetRelid(relvar, false, false /*allowHcatalog*/);
 				objects = lappend_oid(objects, relOid);
+
+				/*
+				 * If relval represents a graph, then we add all vertex and edge
+				 * tables into ojbnames such that someone who is being given
+				 * privileges to access the graph will be granted to access its
+				 * vertexs and edges.
+				 */
+
+				if (0 != caql_getcount(NULL,
+							cql("SELECT COUNT(*) FROM skylon_graph "
+								" WHERE graphname = :1 ",
+								CStringGetDatum(relvar->relname)))) {
+					cqContext cqc;
+					cqContext *pcqCtx;
+					Relation relation;
+					HeapTuple tuple;
+					Form_skylon_graph_elabel formElabel;
+					Form_skylon_graph_vlabel formVlabel;
+					Oid relid;
+					char *elabelTableName, *vlabelTableName;
+
+					/*
+					 * Try to get all edge tables.
+					 */
+					relation = heap_open(GraphElabelRelationId, AccessShareLock);
+
+					pcqCtx = caql_beginscan(
+						caql_addrel(cqclr(&cqc), relation),
+						cql("SELECT * FROM skylon_graph_elabel"
+							" WHERE graphname = :1",
+							CStringGetDatum(relvar->relname)));
+					while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx))) {
+						formElabel = (Form_skylon_graph_elabel) GETSTRUCT(tuple);
+						elabelTableName = graphEdgeTableName(relvar->relname,
+																&(NameStr(formElabel->elabelname)[0]));
+						relid = RelnameGetRelid(elabelTableName);
+						pfree(elabelTableName);
+
+						if (OidIsValid(relid)) {
+							objects = lappend_oid(objects, relid);
+						}
+					}
+					caql_endscan(pcqCtx);
+					heap_close(relation, AccessShareLock);
+
+					/*
+					 * Try to get all vertex tables.
+					 */
+					relation = heap_open(GraphVlabelRelationId, AccessShareLock);
+
+					pcqCtx = caql_beginscan(
+						caql_addrel(cqclr(&cqc), relation),
+						cql("SELECT * FROM skylon_graph_vlabel"
+							" WHERE graphname = :1",
+							CStringGetDatum(relvar->relname)));
+
+					while (HeapTupleIsValid(tuple = caql_getnext(pcqCtx))) {
+						formVlabel = (Form_skylon_graph_vlabel) GETSTRUCT(tuple);
+						vlabelTableName = graphVertexTableName(relvar->relname,
+																&(NameStr(formVlabel->vlabelname)[0]));
+						relid = RelnameGetRelid(vlabelTableName);
+						pfree(vlabelTableName);
+
+						if (OidIsValid(relid)) {
+							objects = lappend_oid(objects, relid);
+						}
+					}
+					caql_endscan(pcqCtx);
+					heap_close(relation, AccessShareLock);
+				}
 			}
 			break;
 		case ACL_OBJECT_DATABASE:
@@ -2197,7 +2272,9 @@ static const char *const no_priv_msg[MAX_ACL_KIND] =
 	/* ACL_KIND_FOREIGN_SERVER */
 	gettext_noop("permission denied for foreign server %s"),
 	/* ACL_KIND_EXTPROTOCOL */
-	gettext_noop("permission denied for external protocol %s")	
+	gettext_noop("permission denied for external protocol %s"),
+	/* ACL_CLASS_GRAPH */
+	gettext_noop("permission denied for graph %s")
 };
 
 static const char *const not_owner_msg[MAX_ACL_KIND] =
@@ -2233,7 +2310,9 @@ static const char *const not_owner_msg[MAX_ACL_KIND] =
 	/* ACL_KIND_FOREIGN_SERVER */
 	gettext_noop("must be owner of foreign server %s"),
 	/* ACL_KIND_EXTPROTOCOL */
-	gettext_noop("must be owner of external protocol %s")
+	gettext_noop("must be owner of external protocol %s"),
+	/* ACL_CLASS_GRAPH */
+	gettext_noop("must be owner of graph %s")
 };
 
 

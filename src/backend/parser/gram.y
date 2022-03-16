@@ -205,7 +205,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 		CommentStmt ConstraintsSetStmt CopyStmt CreateAsStmt CreateCastStmt
 		CreateDomainStmt CreateExternalStmt CreateFileSpaceStmt CreateGroupStmt
 		CreateOpClassStmt CreatePLangStmt
-		CreateQueueStmt CreateSchemaStmt CreateSeqStmt CreateStmt 
+		CreateQueueStmt CreateSchemaStmt CreateSeqStmt CreateStmt CreateGraphStmt
 		CreateTableSpaceStmt CreateFdwStmt CreateForeignServerStmt CreateForeignStmt 
 		CreateAssertStmt CreateTrigStmt 
 		CreateUserStmt CreateUserMappingStmt CreateRoleStmt
@@ -351,7 +351,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <node>	overlay_placing substr_from substr_for
 
 %type <boolean> opt_instead opt_analyze
-%type <boolean> index_opt_unique opt_verbose opt_full
+%type <boolean> index_opt_unique opt_verbose opt_full index_opt_reverse
 %type <boolean> opt_freeze opt_default opt_ordered opt_recheck
 %type <boolean> opt_rootonly_all
 %type <boolean> opt_dxl
@@ -373,7 +373,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 %type <vsetstmt> set_rest
 %type <node>	TableElement ExtTableElement ConstraintElem ExtConstraintElem TableFuncElement
-%type <node>	columnDef ExtcolumnDef
+%type <node>	columnDef ExtcolumnDef fromVlabel toVlabel
 %type <node>	cdb_string
 %type <defelt>	def_elem old_aggr_elem keyvalue_pair
 %type <node>	def_arg columnElem where_clause where_or_current_clause
@@ -443,7 +443,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 %type <node>	TableConstraint ExtTableConstraint TableLikeClause 
 %type <list>	TableLikeOptionList
 %type <ival>	TableLikeOption
-%type <list>	ColQualList
+%type <list>	ColQualList LabelList
 %type <node>	ColConstraint ColConstraintElem ConstraintAttr
 %type <ival>	key_actions key_delete key_match key_update key_action
 %type <ival>	ConstraintAttributeSpec ConstraintDeferrabilitySpec
@@ -517,15 +517,15 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 
 	DATA_P DATABASE DAY_P DEALLOCATE DEC DECIMAL_P DECLARE DECODE DEFAULT DEFAULTS
 	DEFERRABLE DEFERRED DEFINER DELETE_P DELIMITER DELIMITERS DENY
-	DESC DISABLE_P DISTINCT DISTRIBUTED DO DOMAIN_P DOUBLE_P DROP DXL
+	DESC DISABLE_P DISTINCT DISTRIBUTED DISCRIMINATOR DO DOMAIN_P DOUBLE_P DROP DXL
 
 	EACH ELSE ENABLE_P ENCODING ENCRYPTED END_P ENUM_P ERRORS ESCAPE EVERY EXCEPT 
-	EXCHANGE EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXTERNAL EXTRACT
+	EXCHANGE EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXTERNAL EXTRACT EDGE
 
 	FALSE_P FETCH FIELDS FILESPACE FILESYSTEM FILL FILTER FIRST_P FLOAT_P FOLLOWING FOR 
     	FORCE FOREIGN FORMAT FORMATTER FORWARD FREEZE FROM FULL FUNCTION
 
-	GB GLOBAL GRANT GRANTED GREATEST GROUP_P GROUP_ID GROUPING
+	GB GLOBAL GRANT GRANTED GREATEST GROUP_P GROUP_ID GROUPING GRAPH
 
 	HANDLER HASH HAVING HEADER_P HOLD HOST HOUR_P
 
@@ -563,7 +563,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	RANDOMLY RANGE READ READABLE READS REAL REASSIGN RECHECK RECURSIVE 
     REFERENCES REINDEX REJECT_P RELATIVE_P 
 	RELEASE RENAME REPEATABLE REPLACE RESET RESOURCE RESTART RESTRICT 
-	RETURNING RETURNS REVOKE RIGHT
+	RETURNING RETURNS REVERSED REVOKE RIGHT
 	ROLE ROLLBACK ROLLUP ROOTPARTITION ROW ROWS RULE
 
 	SAVEPOINT SCATTER SCHEMA SCROLL SEARCH SECOND_P 
@@ -583,7 +583,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	UPDATE USER USING
 
 	VACUUM VALID VALIDATION VALIDATOR VALUE_P VALUES VARCHAR VARYING
-	VERBOSE VERSION_P VIEW VOLATILE VARIADIC
+	VERBOSE VERSION_P VIEW VOLATILE VARIADIC VERTEX
 
 	WEB WHEN WHERE WINDOW WITH WITHIN WITHOUT WORK WRAPPER WRITABLE WRITE
 
@@ -1050,6 +1050,7 @@ stmt :
 			| CreateSchemaStmt
 			| CreateSeqStmt
 			| CreateStmt
+			| CreateGraphStmt
 			| CreateTableSpaceStmt
 			| CreateTrigStmt
 			| CreateRoleStmt
@@ -3302,12 +3303,12 @@ opt_using:
 			USING									{}
 			| /*EMPTY*/								{}
 		;
-
-
+ 
+ 
 /*****************************************************************************
  *
  *		QUERY :
- *				CREATE TABLE relname
+ *				CREATE TABLE/VERTEX/EDGE relname
  *
  *****************************************************************************/
 
@@ -3542,8 +3543,89 @@ CreateStmt:	CREATE OptTemp TABLE qualified_name '(' OptTableElementList ')'
 
 					$$ = (Node *)n;
 				}
+				| CREATE VERTEX qualified_name '(' OptTableElementList ')'
+		  		{
+		  			CreateVlabelStmt *n = makeNode(CreateVlabelStmt);
+		  			n->relation = $3;
+		  			n->tableElts = $5;
+		  			n->constraints = NULL;
+					$$ = (Node *)n;
+				}
+		| CREATE EDGE qualified_name '(' fromVlabel ',' toVlabel ',' OptTableElementList ')'
+		  		{
+		  			CreateElabelStmt *n = makeNode(CreateElabelStmt);
+		  			n->relation = $3;
+		  			n->tableElts = $9;
+		  			n->constraints = NULL;
+		  			n->fromVlabel = $5;
+		  			n->toVlabel = $7;
+					$$ = (Node *)n;
+				}
+		| CREATE EDGE qualified_name '(' fromVlabel ',' toVlabel ')'
+		  		{
+		  			CreateElabelStmt *n = makeNode(CreateElabelStmt);
+		  			n->relation = $3;
+		  			n->tableElts = NULL;
+		  			n->constraints = NULL;
+		  			n->fromVlabel = $5;
+		  			n->toVlabel = $7;
+					$$ = (Node *)n;
+				}
+		;
+		
+CreateGraphStmt: CREATE GRAPH qualified_name '(' VERTEX '(' LabelList ')' ',' EDGE '(' LabelList ')' ')' FORMAT Sconst format_opt OptWith
+				{
+					CreateGraphStmt *n = makeNode(CreateGraphStmt);
+					n->graph = $3;
+					n->vlabels = $7;
+					n->elabels = $12;
+					n->options = $18;
+					n->format = $16;
+					$$ = (Node *)n;
+				}
+				| CREATE GRAPH qualified_name '(' VERTEX '(' LabelList ')' ',' EDGE '(' LabelList ')' ')' OptWith
+				{
+					CreateGraphStmt *n = makeNode(CreateGraphStmt);
+					n->graph = $3;
+					n->vlabels = $7;
+					n->elabels = $12;
+					n->format = pstrdup("magmaap");
+					n->options = $15;
+					$$ = (Node *)n;
+				}
+				| CREATE GRAPH qualified_name '(' VERTEX '(' LabelList ')' ')' OptWith
+				{
+					CreateGraphStmt *n = makeNode(CreateGraphStmt);
+					n->graph = $3;
+					n->vlabels = $7;
+					n->elabels = NULL;
+					n->format = pstrdup("magmaap");
+					n->options = $10;
+					$$ = (Node *)n;
+				}
+				| CREATE GRAPH qualified_name '(' VERTEX '(' LabelList ')' ')' FORMAT Sconst format_opt OptWith
+				{
+					CreateGraphStmt *n = makeNode(CreateGraphStmt);
+					n->graph = $3;
+					n->vlabels = $7;
+					n->elabels = NULL;
+					n->format = $11;
+					n->options = $13;
+					$$ = (Node *)n;
+				}
 		;
 
+LabelList:
+			ColId
+				{
+					$$ = list_make1(makeString($1));
+				}
+			| LabelList ',' ColId
+				{
+					$$ = lappend($1, makeString($3));
+				}
+		;
+		
 /*
  * Redundancy here is needed to avoid shift/reduce conflicts,
  * since TEMP is not a reserved word.  See also OptTempTableName.
@@ -3614,6 +3696,20 @@ columnDef:	ColId Typename ColQualList opt_storage_encoding
 					n->is_local = true;
 					n->encoding = $4;
 
+					$$ = (Node *)n;
+				}
+		;
+		
+fromVlabel:	FROM ColId
+				{
+					Value *n = makeString($2);					
+					$$ = (Node *)n;
+				}
+		;
+		
+toVlabel:	TO ColId
+				{
+					Value *n = makeString($2);					
 					$$ = (Node *)n;
 				}
 		;
@@ -3897,6 +3993,18 @@ ConstraintElem:
 					n->including = $6;
 					n->options = $7;
 					n->indexspace = $8;
+					$$ = (Node *)n;
+				}
+			| DISCRIMINATOR '(' columnList ')' opt_definition OptConsTableSpace
+				{
+					Constraint *n = makeNode(Constraint);
+					n->contype = CONSTR_PRIMARY;
+					n->name = NULL;
+					n->raw_expr = NULL;
+					n->cooked_expr = NULL;
+					n->keys = $3;
+					n->options = $5;
+					n->indexspace = $6;
 					$$ = (Node *)n;
 				}
 			| FOREIGN KEY '(' columnList ')' REFERENCES qualified_name
@@ -4937,7 +5045,7 @@ format_opt:
 format_opt_list:
 			format_opt_item2
 			{
-				$$ = list_make1($1)
+				$$ = list_make1($1);
 			}
 			| format_opt_item2 '=' format_opt_item2
 			{
@@ -6327,7 +6435,9 @@ DropStmt:	DROP drop_type IF_P EXISTS any_name_list opt_drop_behavior
 					DropStmt *n = makeNode(DropStmt);
 					n->removeType = $2;
 					n->missing_ok = TRUE;
-					n->objects = $5;
+					List *list = $5;
+					ListCell *cell;
+					n->objects = list;
 					n->behavior = $6;
 					$$ = (Node *)n;
 				}
@@ -6336,7 +6446,9 @@ DropStmt:	DROP drop_type IF_P EXISTS any_name_list opt_drop_behavior
 					DropStmt *n = makeNode(DropStmt);
 					n->removeType = $2;
 					n->missing_ok = FALSE;
-					n->objects = $3;
+					List *list = $3;
+					ListCell *cell;
+					n->objects = list;
 					n->behavior = $4;
 					$$ = (Node *)n;
 				}
@@ -6358,6 +6470,9 @@ drop_type:	TABLE									{ $$ = OBJECT_TABLE; }
 			| TABLESPACE							{ $$ = OBJECT_TABLESPACE; }
 			| FOREIGN TABLE							{ $$ = OBJECT_FOREIGNTABLE; }
 			| PROTOCOL								{ $$ = OBJECT_EXTPROTOCOL; }
+			| VERTEX									{ $$ = OBJECT_VLABEL; }
+			| EDGE									{ $$ = OBJECT_ELABEL; }
+			| GRAPH									{ $$ = OBJECT_GRAPH; }
 		;
 
 any_name_list:
@@ -6977,20 +7092,40 @@ opt_granted_by: GRANTED BY RoleId						{ $$ = $3; }
  *****************************************************************************/
 
 IndexStmt:	CREATE index_opt_unique INDEX index_name
-			ON qualified_name access_method_clause '(' index_params ')'
+			ON index_opt_reverse qualified_name access_method_clause '(' index_params ')'
 			opt_include opt_definition OptTableSpace where_clause
 				{
 					IndexStmt *n = makeNode(IndexStmt);
 					n->unique = $2;
 					n->concurrent = false;
 					n->idxname = $4;
-					n->relation = $6;
-					n->accessMethod = $7;
-					n->indexParams = $9;
-					n->indexIncludingParams = $11;
-					n->options = $12;
-					n->tableSpace = $13;
-					n->whereClause = $14;
+					n->reverse = $6;
+					n->relation = $7;
+					n->accessMethod = $8;
+					n->indexParams = $10;
+					n->indexIncludingParams = $12;
+					n->options = $13;
+					n->tableSpace = $14;
+					n->whereClause = $15;
+					n->idxOids = NULL;
+					$$ = (Node *)n;
+				}
+			| CREATE index_opt_unique INDEX index_name
+			ON index_opt_reverse qualified_name access_method_clause
+			opt_include opt_definition OptTableSpace where_clause
+				{
+					IndexStmt *n = makeNode(IndexStmt);
+					n->unique = $2;
+					n->concurrent = false;
+					n->idxname = $4;
+					n->reverse = $6;
+					n->relation = $7;
+					n->accessMethod = $8;
+					n->indexParams = NULL;
+					n->indexIncludingParams = $9;
+					n->options = $10;
+					n->tableSpace = $11;
+					n->whereClause = $12;
 					n->idxOids = NULL;
 					$$ = (Node *)n;
 				}
@@ -7023,6 +7158,10 @@ IndexStmt:	CREATE index_opt_unique INDEX index_name
 					$$ = (Node *)n;
 				}
 		;
+		
+index_opt_reverse:
+			REVERSED									{ $$ = TRUE; }
+			| /*EMPTY*/								{ $$ = FALSE; }
 
 index_opt_unique:
 			UNIQUE									{ $$ = TRUE; }
@@ -13513,6 +13652,7 @@ reserved_keyword:
 			| DEFAULT
 			| DEFERRABLE
 			| DESC
+			| DISCRIMINATOR
 			| DISTINCT
 			| DISTRIBUTED /* gp */
 			| DO
@@ -13520,6 +13660,7 @@ reserved_keyword:
 			| END_P
 			| EXCEPT
 			| EXCLUDE 
+			| EDGE
 			| FALSE_P
 			| FETCH
 			| FILTER
@@ -13528,6 +13669,7 @@ reserved_keyword:
 			| FOREIGN
 			| FROM
 			| GRANT
+			| GRAPH
 			| GROUP_P
 			| HAVING
 			| IN_P
@@ -13555,6 +13697,7 @@ reserved_keyword:
 			| RANGE
 			| REFERENCES
 			| RETURNING
+			| REVERSED
 			| ROWS
 			| SCATTER  /* gp */
 			| SELECT
@@ -13572,6 +13715,7 @@ reserved_keyword:
 			| USER
 			| USING
 			| VARIADIC
+			| VERTEX
 			| WINDOW
 			| WITH
 			| WHEN
@@ -14205,6 +14349,78 @@ makeIsNotDistinctFromNode(Node *expr, int position)
 								(Node *) makeSimpleA_Expr(AEXPR_DISTINCT, 
 	 													"=", NULL, expr, position), position);
 	return n;
+}
+
+char *fromVlabelColName(char *vname)
+{
+	char extraname[] = "from_";
+	int len1 = strlen(vname);
+	int len2 = strlen(extraname);
+	char * newname = palloc0(len1+len2+1);
+	memcpy(newname,extraname,len2);
+	memcpy(newname+len2,vname,len1);
+	newname[len1 + len2] = '\0';
+	return newname;
+}
+
+char *toVlabelColName(char *vname)
+{
+	char extraname[] = "to_";
+	int len1 = strlen(vname);
+	int len2 = strlen(extraname);
+	char * newname = palloc0(len1+len2+1);
+	memcpy(newname,extraname,len2);
+	memcpy(newname+len2,vname,len1);
+	newname[len1 + len2] = '\0';
+	return newname;
+}
+
+char *vlabelName(char *vname)
+{
+	char extraname[] = "graph_vlabel_";
+	int len1 = strlen(vname);
+	int len2 = strlen(extraname);
+	char * newname = palloc0(len1+len2+1);
+	memcpy(newname,extraname,len2);
+	memcpy(newname+len2,vname,len1);
+	newname[len1 + len2] = '\0';
+	return newname;
+}
+
+char *elabelName(char *ename)
+{
+	char extraname[] = "graph_elabel_";
+	int len1 = strlen(ename);
+	int len2 = strlen(extraname);
+	char * newname = palloc0(len1+len2+1);
+	memcpy(newname,extraname,len2);
+	memcpy(newname+len2,ename,len1);
+	newname[len1 + len2] = '\0';
+	return newname;
+}
+
+char *graphVertexName(char *gname)
+{
+  char extraname[] = "graph_vertex_";
+  int len1 = strlen(gname);
+  int len2 = strlen(extraname);
+  char * newname = palloc0(len1+len2+1);
+  memcpy(newname,extraname,len2);
+  memcpy(newname+len2,gname,len1);
+  newname[len1 + len2] = '\0';
+  return newname;
+}
+
+char *graphEdgeName(char *gname)
+{
+  char extraname[] = "graph_edge_";
+  int len1 = strlen(gname);
+  int len2 = strlen(extraname);
+  char * newname = palloc0(len1+len2+1);
+  memcpy(newname,extraname,len2);
+  memcpy(newname+len2,gname,len1);
+  newname[len1 + len2] = '\0';
+  return newname;
 }
 
 /*

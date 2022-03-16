@@ -293,7 +293,7 @@ _bitmap_init_buildstate(Relation index, BMBuildState *bmstate)
 
 			ScanKeyEntryInitialize(&(bmstate->bm_lov_scanKeys[attno]), SK_ISNULL, 
 							   attno + 1, BTEqualStrategyNumber, InvalidOid, 
-							   opfuncid, 0);
+							   opfuncid, 0,  InvalidAttrNumber, InvalidOid);
 		}
 
 		bmstate->bm_lov_scanDesc = index_beginscan(bmstate->bm_lov_heap,

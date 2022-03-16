@@ -169,6 +169,7 @@ extern List *get_relation_keys(Oid relid);
 extern bool attname_exists(Oid relid, const char *attname);
 extern bool trigger_exists(Oid oid);
 
+extern bool rel_has_index(Oid relid);
 extern bool check_constraint_exists(Oid oidCheckconstraint);
 extern List *get_check_constraint_oids(Oid relid);
 extern char *get_check_constraint_name(Oid oidCheckconstraint);

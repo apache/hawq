@@ -130,7 +130,6 @@ typedef struct PlugStorageData
 	ScanState              *ps_scan_state;
 	ScanDirection           ps_scan_direction;
 	FileScanDesc            ps_file_scan_desc;
-	ExternalScanState      *ps_ext_scan_state;
 	ResultRelSegFileInfo   *ps_result_seg_file_info;
 	ExternalInsertDesc      ps_ext_insert_desc;
 	ExternalInsertDesc      ps_ext_delete_desc;
@@ -163,8 +162,11 @@ typedef struct PlugStorageData
 	char                   *ps_hive_url;
 	/* Add for magma index info */
 	MagmaIndex              magma_idx;
-	/* for beginTransaction */
+	/* For beginTransaction */
 	List*                   magma_talbe_full_names;
+	/* The following two fields are for parameterized index scan */
+	IndexRuntimeKeyInfo*    runtime_key_info;
+	int                     num_run_time_keys;
 } PlugStorageData;
 
 typedef PlugStorageData *PlugStorage;
@@ -238,7 +240,12 @@ bool InvokePlugStorageFormatGetNext(FmgrInfo *func,
                                     TupleTableSlot *tupTableSlot);
 
 void InvokePlugStorageFormatReScan(FmgrInfo *func,
-                                   FileScanDesc fileScanDesc);
+                                   FileScanDesc fileScanDesc,
+                                   ScanState* scanState,
+                                   MagmaSnapshot* snapshot,
+                                   IndexRuntimeKeyInfo* runtimeKeyInfo,
+                                   int numRuntimeKeys,
+                                   TupleTableSlot *tupTableSlot);
 
 void InvokePlugStorageFormatEndScan(FmgrInfo *func,
                                     FileScanDesc fileScanDesc);

@@ -209,6 +209,7 @@ typedef struct PlannedStmt
 		double     datalocalityTime;
 		char *hiveUrl;
 		NodeTag		originNodeType;
+		List* graphEntry;
 } PlannedStmt;
 
 
@@ -565,6 +566,7 @@ typedef struct IndexScan
 	/* logical index to use */
 	LogicalIndexInfo *logicalIndexInfo;
 	bool		indexonly;		/* attempt to skip user data fetches */
+	List		*idxColummns;
 } IndexScan;
 
 typedef IndexScan OrcIndexScan;
@@ -764,8 +766,11 @@ typedef struct ExternalScan
 	uint32      scancounter;	/* counter incr per scan node created */
 
 	// Index info
-	char		*indexname;
-	List		*indexqualorig;	/* the same in original form */
+	char	   *indexname;
+	List	   *indexqual;		/* list of index quals (OpExprs) */
+	List	   *indexqualorig;	/* the same in original form */
+	List	   *indexstrategy;	/* integer list of strategy numbers */
+	List	   *indexsubtype;	/* OID list of strategy subtypes */
 	ScanDirection indexorderdir;	/* forward or backward or don't care */
 	// BitmapIndex info
 	MagmaBitmapQual *bitmapqual;

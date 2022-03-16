@@ -588,8 +588,6 @@ typedef struct EState
 	struct DispatchData			*dispatch_data;
 	struct MainDispatchData *mainDispatchData;
 
-	struct SchedulerData			*scheduler_data;
-
     /* CDB: EXPLAIN ANALYZE statistics */
     struct CdbExplain_ShowStatCtx  *showstatctx;
         
@@ -1633,6 +1631,7 @@ typedef struct IndexScanState
         ExprContext *iss_RuntimeContext;
         Relation        iss_RelationDesc;
         struct IndexScanDescData *iss_ScanDesc;
+        struct OrcScanDescData *scandesc;
 
     	/*
     	 * tableOid is the oid of the partition or relation on which
@@ -1889,6 +1888,13 @@ typedef struct ExternalScanState
 	List *indexqual;
 	char *indexname;
 	ScanDirection indexorderdir;
+	List *indexqualorig;
+	ScanKey iss_ScanKeys;
+	int iss_NumScanKeys;
+	IndexRuntimeKeyInfo *iss_RuntimeKeys;
+	int iss_NumRuntimeKeys;
+	ExprContext *iss_RuntimeContext;
+	Relation iss_RelationDesc;
 } ExternalScanState;
 
 /* ----------------

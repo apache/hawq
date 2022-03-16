@@ -734,6 +734,29 @@ DATA(insert OID = 6995 ( gp_global_sequence	    PGNSP PGUID -1 f c t \054 5096 0
 /* relation id: 5006 - gp_configuration_history 20101104 */
 DATA(insert OID = 6434 ( gp_configuration_history	    PGNSP PGUID -1 f c t \054 5006 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define GP_CONFIGURATION_HISTORY_RELTYPE_OID 6434
+/* relation id: 4850 - skylon_vlabel 20200224 */
+DATA(insert OID = 4870 ( skylon_vlabel     PGNSP PGUID -1 f c t \054 4850 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_VLABEL_RELTYPE_OID 4870
+/* relation id: 4851 - skylon_elabel 20200224 */
+DATA(insert OID = 4871 ( skylon_elabel     PGNSP PGUID -1 f c t \054 4851 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_ELABEL_RELTYPE_OID 4871
+/* relation id: 4852 - skylon_vlabel_attribute 20200224 */
+DATA(insert OID = 4872 ( skylon_vlabel_attribute     PGNSP PGUID -1 f c t \054 4852 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_VLABEL_ATTRIBUTE_RELTYPE_OID 4872
+/* relation id: 4853 - skylon_elabel_attribute 20200224 */
+DATA(insert OID = 4873 ( skylon_elabel_attribute     PGNSP PGUID -1 f c t \054 4853 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_ELABEL_ATTRIBUTE_RELTYPE_OID 4873
+/* relation id: 4854 - skylon_graph_vlabel 20200224 */
+DATA(insert OID = 4874 ( skylon_graph_vlabel     PGNSP PGUID -1 f c t \054 4854 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_GRAPH_VLABEL_RELTYPE_OID 4874
+/* relation id: 4855 - skylon_graph_elabel 20200224 */
+DATA(insert OID = 4875 ( skylon_graph_elabel     PGNSP PGUID -1 f c t \054 4855 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_GRAPH_ELABEL_RELTYPE_OID 4875
+/* relation id: 4856 - skylon_graph_elabel 20200224 */
+DATA(insert OID = 4876 ( skylon_graph     PGNSP PGUID -1 f c t \054 4856 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_GRAPH_RELTYPE_OID 4876
+DATA(insert OID = 4877 ( skylon_index     PGNSP PGUID -1 f c t \054 4857 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));
+#define SKYLON_INDEX_RELTYPE_OID 4877
 /* relation id: 5029 - gp_db_interfaces 20101104 */
 DATA(insert OID = 6436 ( gp_db_interfaces	    PGNSP PGUID -1 f c t \054 5029 0 record_in record_out record_recv record_send - d x f 0 -1 0 _null_ _null_ ));	
 #define GP_DB_INTERFACES_RELTYPE_OID 6436

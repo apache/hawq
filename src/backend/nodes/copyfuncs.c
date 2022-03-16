@@ -238,6 +238,7 @@ _copyPlannedStmt(PlannedStmt *from)
 	COPY_SCALAR_FIELD(planner_segments);
 
 	COPY_LOCATION_FIELD(originNodeType);
+	COPY_NODE_FIELD(graphEntry);
 
 	return newnode;
 }
@@ -543,6 +544,8 @@ copyIndexScanFields(const IndexScan *from, IndexScan *newnode)
 	{
 		Assert(newnode->logicalIndexInfo == NULL);
 	}
+	COPY_SCALAR_FIELD(indexonly);
+	COPY_NODE_FIELD(idxColummns);
 }
 
 /*
@@ -602,8 +605,11 @@ _copyMagmaIndexScan(MagmaIndexScan *from)
 	COPY_SCALAR_FIELD(rejLimitInRows);
 	COPY_SCALAR_FIELD(fmterrtbl);
 	COPY_STRING_FIELD(indexname);
-	COPY_SCALAR_FIELD(indexorderdir);
+	COPY_NODE_FIELD(indexqual);
 	COPY_NODE_FIELD(indexqualorig);
+	COPY_NODE_FIELD(indexstrategy);
+	COPY_NODE_FIELD(indexsubtype);
+	COPY_SCALAR_FIELD(indexorderdir);
 	COPY_NODE_FIELD(errAosegnos);
 	COPY_NODE_FIELD(err_aosegfileinfos);
 	COPY_SCALAR_FIELD(encoding);
@@ -629,7 +635,10 @@ _copyMagmaIndexOnlyScan(MagmaIndexOnlyScan *from)
 	COPY_SCALAR_FIELD(rejLimitInRows);
 	COPY_SCALAR_FIELD(fmterrtbl);
 	COPY_STRING_FIELD(indexname);
+	COPY_NODE_FIELD(indexqual);
 	COPY_NODE_FIELD(indexqualorig);
+	COPY_NODE_FIELD(indexstrategy);
+	COPY_NODE_FIELD(indexsubtype);
 	COPY_SCALAR_FIELD(indexorderdir);
 	COPY_NODE_FIELD(errAosegnos);
 	COPY_NODE_FIELD(err_aosegfileinfos);
@@ -2160,6 +2169,7 @@ _copyRangeTblEntry(RangeTblEntry *from)
 	COPY_SCALAR_FIELD(forceDistRandom);
     COPY_NODE_FIELD(pseudocols);                /*CDB*/
 
+	COPY_STRING_FIELD(graphName);
 	return newnode;
 }
 
@@ -2723,6 +2733,7 @@ _copyQuery(Query *from)
 	}
 	else
 		newnode->intoPolicy = NULL;
+	COPY_NODE_FIELD(graphEntry);
 
 	return newnode;
 }
@@ -3379,7 +3390,15 @@ _copyIndexStmt(IndexStmt *from)
 	COPY_SCALAR_FIELD(concurrent);
 	COPY_NODE_FIELD(idxOids);
 	COPY_SCALAR_FIELD(do_part);
-
+	COPY_SCALAR_FIELD(magma);
+	COPY_SCALAR_FIELD(relationOid);
+	COPY_NODE_FIELD(allidxinfos);
+	COPY_NODE_FIELD(columnsToRead);
+	COPY_NODE_FIELD(contextdisp);
+	COPY_NODE_FIELD(graphele);
+	COPY_NODE_FIELD(graphIndexAttnum);
+	COPY_NODE_FIELD(graphIncludeAttnum);
+	COPY_SCALAR_FIELD(reverse);
 	return newnode;
 }
 
@@ -4401,6 +4420,15 @@ _copyVirtualSegmentNode(const VirtualSegmentNode *from)
 	return newnode;
 }
 
+static GraphEntry *
+_copyGraphEntry(const GraphEntry *from)
+{
+  GraphEntry *newnode = makeNode(GraphEntry);
+  newnode->relid = from->relid;
+  newnode->requiredPerms = from->requiredPerms;
+  return newnode;
+}
+
 /* ****************************************************************
  *					pg_list.h copy functions
  * ****************************************************************
@@ -5314,6 +5342,9 @@ copyObject(void *from)
 		case T_VirtualSegmentNode:
 			retval = _copyVirtualSegmentNode(from);
 			break;
+		case T_GraphEntry:
+		  retval = _copyGraphEntry(from);
+		  break;
 		default:
 			elog(ERROR, "unrecognized node type: %d", (int) nodeTag(from));
 			retval = from;		/* keep compiler quiet */

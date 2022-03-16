@@ -874,7 +874,7 @@ standard_planner(Query *parse, int cursorOptions, ParamListInfo boundParams)
 	result->queryPartsMetadata = NIL;
 	result->numSelectorsPerScanId = NIL;
 	result->hiveUrl = NULL;
-	
+	result->graphEntry = parse->graphEntry;
 	Assert(result->utilityStmt == NULL || IsA(result->utilityStmt, DeclareCursorStmt));
 	
 	if (Gp_role == GP_ROLE_DISPATCH)

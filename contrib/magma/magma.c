@@ -174,7 +174,7 @@ typedef struct MagmaTidC {
   uint16_t rangeid;
 } MagmaTidC;
 
-typedef struct GlobalFormatUserData {
+typedef struct MagmaFormatUserData {
   MagmaFormatC *fmt;
   char *dbname;
   char *schemaname;
@@ -196,9 +196,11 @@ typedef struct GlobalFormatUserData {
 
   // for insert/update/delete
   TimestampType *colTimestamp;
-} GlobalFormatUserData;
 
-static MagmaClientC* global_magma_client;
+  bool isFirstRescan;
+} MagmaFormatUserData;
+
+static MagmaClientC *magma_client_instance;
 
 /*
  * Utility functions for magma in pluggable storage
@@ -225,15 +227,15 @@ static MagmaFormatC *create_magma_formatter_instance(List *fmt_opts_defelem,
 
 static MagmaClientC *create_magma_client_instance();
 static void init_magma_format_user_data_for_read(
-    TupleDesc tup_desc, GlobalFormatUserData *user_data);
+    TupleDesc tup_desc, MagmaFormatUserData *user_data);
 static void init_magma_format_user_data_for_write(
-    TupleDesc tup_desc, GlobalFormatUserData *user_data, Relation relation);
+    TupleDesc tup_desc, MagmaFormatUserData *user_data, Relation relation);
 
 static void build_options_in_json(char *serializeSchema, int serializeSchemaLen,
                                   List *fmt_opts_defelem, int encoding, int rangeNum,
                                   char *formatterName, char **json_str);
 static void build_magma_tuple_descrition_for_read(
-    Plan *plan, Relation relation, GlobalFormatUserData *user_data, bool skipTid);
+    Plan *plan, Relation relation, MagmaFormatUserData *user_data, bool skipTid);
 
 static void magma_scan_error_callback(void *arg);
 
@@ -256,7 +258,7 @@ static void getHostNameByIp(const char *ipaddr, char *hostname);
 
 static void magma_clear(PlugStorage ps, bool clearSlot) {
   FileScanDesc fsd = ps->ps_file_scan_desc;
-  GlobalFormatUserData *user_data = (GlobalFormatUserData *)(fsd->fs_ps_user_data);
+  MagmaFormatUserData *user_data = (MagmaFormatUserData *)(fsd->fs_ps_user_data);
   TupleTableSlot *slot = ps->ps_tuple_table_slot;
 
   if (user_data->fmt) {
@@ -1120,6 +1122,8 @@ Datum magma_beginscan(PG_FUNCTION_ARGS) {
   file_scan_desc->fs_serializeSchema =
       pnstrdup(serializeSchema, serializeSchemaLen);
   file_scan_desc->fs_serializeSchemaLen = serializeSchemaLen;
+  file_scan_desc->fs_ps_magma_splits = ps->ps_magma_splits;
+  file_scan_desc->fs_ps_magma_skip_tid = ps->ps_magma_skip_tid;
 
   /* Setup scan functions */
   get_magma_scan_functions(formatterName, file_scan_desc);
@@ -1179,7 +1183,8 @@ Datum magma_beginscan(PG_FUNCTION_ARGS) {
   /* currentSliceId == ps->ps_scan_state->ps.state->currentSliceIdInPlan */
   if (AmISegment()) {
     /* Initialize user data */
-    GlobalFormatUserData *user_data = palloc0(sizeof(GlobalFormatUserData));
+    MagmaFormatUserData *user_data = palloc0(sizeof(MagmaFormatUserData));
+    user_data->isFirstRescan = true;
     if (formatterName != NULL &&
         (strncasecmp(formatterName, "magmatp", sizeof("magmatp") - 1) == 0)) {
       user_data->isMagmatp = true;
@@ -1347,6 +1352,8 @@ void init_common_plan_context(CommonPlanContext *ctx) {
   ctx->scanReadStatsOnly = false;
   ctx->parent = NULL;
   ctx->exprBufStack = NIL;
+  ctx->isConvertingIndexQual = false;
+  ctx->idxColumns = NIL;
 }
 
 void free_common_plan_context(CommonPlanContext *ctx) {
@@ -1360,8 +1367,6 @@ void free_common_plan_context(CommonPlanContext *ctx) {
 Datum magma_getnext_init(PG_FUNCTION_ARGS) {
   checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
-  // PlanState *plan_state = ps->ps_plan_state;
-  // ExternalScanState *ext_scan_state = ps->ps_ext_scan_state;
 
   ExternalSelectDesc ext_select_desc = NULL;
   /*
@@ -1392,8 +1397,8 @@ Datum magma_getnext(PG_FUNCTION_ARGS) {
   checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(fsd->fs_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(fsd->fs_ps_user_data);
   TupleTableSlot *slot = ps->ps_tuple_table_slot;
   bool *nulls = slot_get_isnull(slot);
   memset(nulls, true, user_data->numberOfColumns);
@@ -1508,80 +1513,123 @@ Datum magma_getnext(PG_FUNCTION_ARGS) {
 Datum magma_rescan(PG_FUNCTION_ARGS) {
   checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
+  ScanState *scan_state = ps->ps_scan_state;
   FileScanDesc fsd = ps->ps_file_scan_desc;
   MagmaSnapshot *snapshot = &(ps->ps_snapshot);
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(fsd->fs_ps_user_data);
-
-  if (user_data == NULL) {
-    /* 1 Initialize user data */
-    user_data = palloc0(sizeof(GlobalFormatUserData));
-
-    if (fsd->fs_formatter_name != NULL &&
-        (strncasecmp(fsd->fs_formatter_name, "magmatp",
-                     sizeof("magmatp") - 1) == 0)) {
-      user_data->isMagmatp = true;
-    } else {
-      user_data->isMagmatp = false;
-    }
-
-    init_magma_format_user_data_for_read(fsd->fs_tupDesc, user_data);
-
-    Relation rel = fsd->fs_rd;
-    ExtTableEntry *ete = GetExtTableEntry(RelationGetRelid(rel));
-
-    int formatterType = ExternalTableType_Invalid;
-
-    char *formatterName = NULL;
-    getExternalTableTypeStr(ete->fmtcode, ete->fmtopts, &formatterType,
-                            &formatterName);
-
-    bool isexternal = false;
-    char *serializeSchema = fsd->fs_serializeSchema;
-    int serializeSchemaLen = fsd->fs_serializeSchemaLen;
-    get_magma_category_info(ete->fmtopts, &isexternal);
-
-    user_data->fmt = create_magma_formatter_instance(
-        NIL, serializeSchema, serializeSchemaLen, PG_UTF8, formatterName, 0);
-
-    /* 4 Build tuple description */
-    Plan *plan = fsd->fs_ps_plan;
-    build_magma_tuple_descrition_for_read(plan, fsd->fs_rd, user_data, ps->ps_magma_skip_tid);
-
-    /* 4.1 Build plan */
-    if (AmISegment() &&
-        currentSliceId == ps->ps_scan_state->ps.state->currentSliceIdInPlan) {
-      CommonPlanContext ctx;
-      init_common_plan_context(&ctx);
-      plan->plan_parent_node_id = -1;
-      convert_extscan_to_common_plan(plan, fsd->fs_ps_scan_state->splits,
-                                     fsd->fs_rd, &ctx);
-      int32_t size = 0;
-      char *planstr = univPlanSerialize(ctx.univplan, &size, false);
-
-      /* 5 Save user data */
-      fsd->fs_ps_user_data = (void *)user_data;
-
-      /* 6 Begin scan with the formatter */
-      if (currentSliceId == ps->ps_scan_state->ps.state->currentSliceIdInPlan) {
-        bool enableShm = (strcasecmp(magma_enable_shm, "ON") == 0);
-        MagmaFormatBeginScanMagmaFormatC(user_data->fmt, user_data->colToReads,
-                                         snapshot, planstr, size,
-                                         enableShm, ps->ps_magma_skip_tid,
-                                         magma_shm_limit_per_block * 1024);
-        MagmaFormatCatchedError *e =
-            MagmaFormatGetErrorMagmaFormatC(user_data->fmt);
-
-        if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
-          elog(ERROR, "magma_scan: failed to beginscan: %s(%d)", e->errMessage,
-               e->errCode);
-        }
-      }
-
-      free_common_plan_context(&ctx);
+  MagmaRuntimeKeys runtimeKeys;
+  Assert(ps->num_run_time_keys >= 0);
+  if (ps->num_run_time_keys == 0) {
+    runtimeKeys.num = 0;
+    runtimeKeys.keys = NULL;
+  } else {
+    Assert(ps->runtime_key_info != NULL);
+    runtimeKeys.num = ps->num_run_time_keys;
+    runtimeKeys.keys = palloc0(ps->num_run_time_keys * sizeof(MagmaRuntimeKey));
+    for (int i = 0; i < ps->num_run_time_keys; ++i) {
+      ScanKey scan_key = ps->runtime_key_info[i].scan_key;
+      runtimeKeys.keys[i].flag = scan_key->sk_flags;
+      runtimeKeys.keys[i].attnoold = scan_key->sk_attnoold;
+      runtimeKeys.keys[i].value =
+          OutputFunctionCall(&scan_key->sk_out_func, scan_key->sk_argument);
     }
   }
+
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(fsd->fs_ps_user_data);
+  if (user_data != NULL) {
+    // There are 2 cases that user_data is not null:
+    // 1. If this is the first rescan, at this point, we have done
+    // magma_beginscan() and haven't done magma_getnext() yet.
+    // We don't need to create user_data from scratch, just use it.
+    if (user_data->isFirstRescan) {
+      user_data->isFirstRescan = false;
+      MagmaFormatReScanMagmaFormatC(user_data->fmt, &runtimeKeys);
+      if (runtimeKeys.keys) {
+        pfree(runtimeKeys.keys);
+      }
+      PG_RETURN_VOID();
+    }
+
+    // 2. Otherwise is not the first rescan, we should do magma_clear() here.
+    // This case happens with the Nested Loop Exists Join. In that case, as long
+    // as we can get a piece of data in magma_getnext(), we will start a new
+    // rescan. Therefore, we didn't do mamga_clear() in magma_getnext(), which
+    // resulted in the dirty user_data not being cleared.
+    // We don't reuse the user_data since that would make the code complex, just
+    // clear it and create a new one below.
+    magma_clear(ps, true);
+  }
+
+  /* Initialize user data */
+  user_data = palloc0(sizeof(MagmaFormatUserData));
+  if (fsd->fs_formatter_name != NULL &&
+      (strncasecmp(fsd->fs_formatter_name, "magmatp", sizeof("magmatp") - 1) == 0)) {
+    user_data->isMagmatp = true;
+  } else {
+    user_data->isMagmatp = false;
+  }
+
+  /* the number of ranges is dynamic for magma table */
+  int32_t nRanges = 0;
+  ListCell *lc_split = NULL;
+  foreach (lc_split, fsd->fs_ps_magma_splits) {
+    List *split = (List *)lfirst(lc_split);
+    nRanges += list_length(split);
+  }
+
+  init_magma_format_user_data_for_read(fsd->fs_tupDesc, user_data);
+
+  /* Create formatter instance */
+  user_data->fmt = create_magma_formatter_instance(
+      NIL, fsd->fs_serializeSchema, fsd->fs_serializeSchemaLen, PG_UTF8, fsd->fs_formatter_name, nRanges);
+
+  /* Prepare database, schema, and table information */
+  char *dbname = database;
+  char *schemaname = getNamespaceNameByOid(RelationGetNamespace(fsd->fs_rd));
+  Assert(schemaname != NULL);
+  char *tablename = RelationGetRelationName(fsd->fs_rd);
+
+  MagmaFormatC_SetupTarget(user_data->fmt, dbname, schemaname, tablename);
+  MagmaFormatC_SetupTupDesc(user_data->fmt, user_data->numberOfColumns,
+                            user_data->colNames, user_data->colDatatypes,
+                            user_data->colDatatypeMods,
+                            user_data->colIsNulls);
+
+  /* Build tuple description */
+  Plan *plan = fsd->fs_ps_plan;
+  build_magma_tuple_descrition_for_read(plan, fsd->fs_rd, user_data, fsd->fs_ps_magma_skip_tid);
+
+  /* Build plan */
+  CommonPlanContext ctx;
+  init_common_plan_context(&ctx);
+  plan->plan_parent_node_id = -1;
+  convert_extscan_to_common_plan(plan, scan_state->splits,
+                                 fsd->fs_rd, &ctx);
+  int32_t size = 0;
+  char *planstr = univPlanSerialize(ctx.univplan, &size, false);
+
+  /* Save user data */
+  fsd->fs_ps_user_data = (void *)user_data;
+
+  /* Begin scan with the formatter */
+  bool enableShm = (strcasecmp(magma_enable_shm, "ON") == 0);
+  MagmaFormatBeginScanMagmaFormatC(user_data->fmt, user_data->colToReads,
+                                   snapshot, planstr, size,
+                                   enableShm, fsd->fs_ps_magma_skip_tid,
+                                   magma_shm_limit_per_block * 1024);
+  MagmaFormatCatchedError *e = MagmaFormatGetErrorMagmaFormatC(user_data->fmt);
+  if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
+    elog(ERROR, "magma_scan: failed to beginscan: %s(%d)", e->errMessage,
+         e->errCode);
+  }
+
+  MagmaFormatReScanMagmaFormatC(user_data->fmt, &runtimeKeys);
+  if (runtimeKeys.keys) {
+    pfree(runtimeKeys.keys);
+  }
+
+  free_common_plan_context(&ctx);
 
   PG_RETURN_VOID();
 }
@@ -1595,7 +1643,7 @@ Datum magma_endscan(PG_FUNCTION_ARGS) {
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
 
-  GlobalFormatUserData *user_data = (GlobalFormatUserData *)(fsd->fs_ps_user_data);
+  MagmaFormatUserData *user_data = (MagmaFormatUserData *)(fsd->fs_ps_user_data);
 
   // free memory in endscan, for some subquery scenarios "getnext" might not be called
   if (user_data != NULL) {
@@ -1662,8 +1710,8 @@ Datum magma_stopscan(PG_FUNCTION_ARGS) {
   checkOushuDbExtensiveFunctionSupport(__func__);
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   FileScanDesc fsd = ps->ps_file_scan_desc;
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(fsd->fs_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(fsd->fs_ps_user_data);
   TupleTableSlot *tts = ps->ps_tuple_table_slot;
 
   if (!user_data) PG_RETURN_VOID();
@@ -1855,8 +1903,8 @@ Datum magma_begindelete(PG_FUNCTION_ARGS) {
   char *schema = getNamespaceNameByOid(namespaceOid);
   char *table = RelationGetRelationName(relation);
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)palloc0(sizeof(GlobalFormatUserData));
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)palloc0(sizeof(MagmaFormatUserData));
 
   if (formatterName != NULL &&
       (strncasecmp(formatterName, "magmatp", sizeof("magmatp") - 1) == 0)) {
@@ -1938,8 +1986,8 @@ Datum magma_delete(PG_FUNCTION_ARGS) {
   /* It may be memtuple, we need to transfer it to virtual tuple */
   slot_getallattrs(tts);
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(edd->ext_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(edd->ext_ps_user_data);
 
   user_data->colTid.rangeid = DatumGetUInt16(edd->ext_rangeId);
   user_data->colTid.rowid = DatumGetUInt64(edd->ext_rowId);
@@ -2105,8 +2153,8 @@ Datum magma_enddelete(PG_FUNCTION_ARGS) {
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc edd = ps->ps_ext_delete_desc;
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(edd->ext_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(edd->ext_ps_user_data);
 
   MagmaFormatEndDeleteMagmaFormatC(user_data->fmt);
 
@@ -2297,8 +2345,8 @@ Datum magma_beginupdate(PG_FUNCTION_ARGS) {
   char *schema = getNamespaceNameByOid(namespaceOid);
   char *table = RelationGetRelationName(relation);
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)palloc0(sizeof(GlobalFormatUserData));
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)palloc0(sizeof(MagmaFormatUserData));
 
   if (formatterName != NULL &&
       (strncasecmp(formatterName, "magmatp", sizeof("magmatp") - 1) == 0)) {
@@ -2383,8 +2431,8 @@ Datum magma_update(PG_FUNCTION_ARGS) {
   /* It may be memtuple, we need to transfer it to virtual tuple */
   slot_getallattrs(tts);
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(eud->ext_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(eud->ext_ps_user_data);
 
   user_data->colTid.rangeid = DatumGetUInt16(eud->ext_rangeId);
   user_data->colTid.rowid = DatumGetUInt64(eud->ext_rowId);
@@ -2559,8 +2607,8 @@ Datum magma_endupdate(PG_FUNCTION_ARGS) {
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc eud = ps->ps_ext_update_desc;
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(eud->ext_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(eud->ext_ps_user_data);
 
   int updateCount = MagmaFormatEndUpdateMagmaFormatC(user_data->fmt);
   ps->ps_update_count = updateCount;
@@ -2780,8 +2828,8 @@ Datum magma_insert_init(PG_FUNCTION_ARGS) {
   char *schema = getNamespaceNameByOid(namespaceOid);
   char *table = RelationGetRelationName(relation);
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)palloc0(sizeof(GlobalFormatUserData));
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)palloc0(sizeof(MagmaFormatUserData));
 
   if (formatterName != NULL &&
       (strncasecmp(formatterName, "magmatp", sizeof("magmatp") - 1) == 0)) {
@@ -2865,8 +2913,8 @@ Datum magma_insert(PG_FUNCTION_ARGS) {
   ExternalInsertDesc eid = ps->ps_ext_insert_desc;
   TupleTableSlot *tts = ps->ps_tuple_table_slot;
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(eid->ext_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(eid->ext_ps_user_data);
 
   user_data->colValues = slot_get_values(tts);
   user_data->colIsNulls = slot_get_isnull(tts);
@@ -3050,8 +3098,8 @@ Datum magma_insert_finish(PG_FUNCTION_ARGS) {
   PlugStorage ps = (PlugStorage)(fcinfo->context);
   ExternalInsertDesc eid = ps->ps_ext_insert_desc;
 
-  GlobalFormatUserData *user_data =
-      (GlobalFormatUserData *)(eid->ext_ps_user_data);
+  MagmaFormatUserData *user_data =
+      (MagmaFormatUserData *)(eid->ext_ps_user_data);
 
   MagmaFormatEndInsertMagmaFormatC(user_data->fmt);
 
@@ -3159,7 +3207,6 @@ Datum magma_transaction(PG_FUNCTION_ARGS) {
       break;
     case PS_TXN_CMD_GET_SNAPSHOT: {
       MagmaClientC_CleanupTableInfo(client);
-      int magmaTableFullNamesSize = list_length(ps->magma_talbe_full_names);
       int i = 0;
       ListCell *lc;
       foreach (lc, ps->magma_talbe_full_names) {
@@ -3186,7 +3233,6 @@ Datum magma_transaction(PG_FUNCTION_ARGS) {
     }
     case PS_TXN_CMD_GET_TRANSACTIONID: {
       MagmaClientC_CleanupTableInfo(client);
-      int magmaTableFullNamesSize = list_length(ps->magma_talbe_full_names);
       int i = 0;
       ListCell *lc;
       foreach (lc, ps->magma_talbe_full_names) {
@@ -3410,22 +3456,22 @@ static MagmaFormatC *create_magma_formatter_instance(List *fmt_opts_defelem,
 }
 
 static MagmaClientC *create_magma_client_instance() {
-  if (global_magma_client != NULL) {
-    MagmaClientC_ResetMagmaClient4Reuse(&global_magma_client);
-    return global_magma_client;
+  if (magma_client_instance != NULL) {
+    MagmaClientC_ResetMagmaClient4Reuse(&magma_client_instance);
+    return magma_client_instance;
   }
 
-  global_magma_client = MagmaClientC_NewMagmaClient(magma_nodes_url);
-  MagmaResult *result = MagmaClientC_GetResult(global_magma_client);
+  magma_client_instance = MagmaClientC_NewMagmaClient(magma_nodes_url);
+  MagmaResult *result = MagmaClientC_GetResult(magma_client_instance);
   if (result->level == MAGMA_ERROR) {
-    MagmaClientC_FreeMagmaClient(&global_magma_client);
+    MagmaClientC_FreeMagmaClient(&magma_client_instance);
     elog(ERROR, "%s", result->message);
   }
-  return global_magma_client;
+  return magma_client_instance;
 }
 
 static void init_magma_format_user_data_for_read(
-    TupleDesc tup_desc, GlobalFormatUserData *user_data) {
+    TupleDesc tup_desc, MagmaFormatUserData *user_data) {
   user_data->numberOfColumns = tup_desc->natts;
   user_data->colNames = palloc0(sizeof(char *) * user_data->numberOfColumns);
   user_data->colDatatypes = palloc0(sizeof(int) * user_data->numberOfColumns);
@@ -3452,7 +3498,7 @@ static void init_magma_format_user_data_for_read(
 }
 
 static void init_magma_format_user_data_for_write(
-    TupleDesc tup_desc, GlobalFormatUserData *user_data, Relation relation) {
+    TupleDesc tup_desc, MagmaFormatUserData *user_data, Relation relation) {
   user_data->numberOfColumns = tup_desc->natts;
   user_data->colNames = palloc0(sizeof(char *) * user_data->numberOfColumns);
   user_data->colDatatypes = palloc0(sizeof(int) * user_data->numberOfColumns);
@@ -3475,7 +3521,7 @@ static void init_magma_format_user_data_for_write(
 }
 
 static void build_magma_tuple_descrition_for_read(
-    Plan *plan, Relation relation, GlobalFormatUserData *user_data, bool skipTid) {
+    Plan *plan, Relation relation, MagmaFormatUserData *user_data, bool skipTid) {
   user_data->colToReads = palloc0(sizeof(bool) * user_data->numberOfColumns);
 
   for (int i = 0; i < user_data->numberOfColumns; ++i)

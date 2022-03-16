@@ -15,8 +15,16 @@
 
 #include "postgres.h"
 
+#include "catalog/catquery.h"
 #include "catalog/namespace.h"
 #include "catalog/pg_type.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph_elabel.h"
 #include "commands/dbcommands.h"
 #include "mb/pg_wchar.h"
 #include "miscadmin.h"
@@ -40,6 +48,10 @@
 #include "utils/lsyscache.h"
 
 bool		Transform_null_equals = false;
+
+extern char *graphVertexTableName(char *gname,char *vname);
+
+extern char *graphEdgeTableName(char *gname,char *ename);
 
 static Node *transformParamRef(ParseState *pstate, ParamRef *pref);
 static Node *transformAExprOp(ParseState *pstate, A_Expr *a);
@@ -173,6 +185,7 @@ transformExpr(ParseState *pstate, Node *expr)
 			{
 				A_Expr	   *a = (A_Expr *) expr;
 
+				a->lexpr;
 				switch (a->kind)
 				{
 					case AEXPR_OP:
@@ -643,6 +656,7 @@ transformIndirection(ParseState *pstate, Node *basenode, List *indirection)
 
 	return result;
 }
+extern bool parseAndTransformAsGraph(ParseState *pstate, RangeVar *rangeVar);
 
 static Node *
 transformColumnRef(ParseState *pstate, ColumnRef *cref)
@@ -768,12 +782,29 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 				char	   *name1 = strVal(linitial(cref->fields));
 				char	   *name2 = strVal(lsecond(cref->fields));
 				char	   *name3 = strVal(lthird(cref->fields));
+				char     *graphName = name1 ? pstrdup(name1) : NULL;
+				RangeVar *rangeVar = makeNode(RangeVar);
+				rangeVar->catalogname = NULL;
+				rangeVar->schemaname = name1;
+				rangeVar->relname = name2;
+				int isGraph = parseAndTransformAsGraph(pstate, rangeVar);
+				if(isGraph) {
+				  name1 = rangeVar->schemaname;
+				  name2 = rangeVar->relname;
+				}
 
 				/* Whole-row reference? */
 				if (strcmp(name3, "*") == 0)
 				{
 					node = transformWholeRowRef(pstate, NULL /*catalogname*/, name1, name2,
 												cref->location);
+					if (node != NULL) {
+						RangeTblEntry *rte =  GetRTEByRangeTablePosn(pstate,
+								((Var*)node)->varno,
+								((Var*)node)->varlevelsup);
+						if(isGraph)
+						  rte->graphName = graphName;
+					}
 					break;
 				}
 
@@ -791,6 +822,13 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 											 NIL, false, false, false, true, NULL,
 											 cref->location, NULL);
 				}
+				if (node != NULL) {
+					RangeTblEntry *rte =  GetRTEByRangeTablePosn(pstate,
+									((Var*)node)->varno,
+									((Var*)node)->varlevelsup);
+					if(isGraph)
+					  rte->graphName = graphName;
+				}
 				break;
 			}
 		case 4:
@@ -799,7 +837,16 @@ transformColumnRef(ParseState *pstate, ColumnRef *cref)
 				char	   *name2 = strVal(lsecond(cref->fields));
 				char	   *name3 = strVal(lthird(cref->fields));
 				char	   *name4 = strVal(lfourth(cref->fields));
-
+        RangeVar *rangeVar = makeNode(RangeVar);
+        rangeVar->catalogname = name1;
+        rangeVar->schemaname = name2;
+        rangeVar->relname = name3;
+        bool isGraph = parseAndTransformAsGraph(pstate, rangeVar);
+        if(isGraph) {
+          name1 = rangeVar->catalogname;
+          name2 = rangeVar->schemaname;
+          name3 = rangeVar->relname;
+        }
 				/* Whole-row reference? */
 				if (strcmp(name4, "*") == 0)
 				{

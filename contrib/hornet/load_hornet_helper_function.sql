@@ -1,3 +1,5 @@
+begin;
+
 DROP SCHEMA IF EXISTS hornet_helper CASCADE;
 CREATE SCHEMA hornet_helper;
 SET SEARCH_PATH = hornet_helper;
@@ -194,3 +196,23 @@ $$ LANGUAGE PLPGSQL;
 drop function if exists is_supported_proc_in_NewQE(oid);
 
 create function is_supported_proc_in_NewQE(oid) returns boolean as '$libdir/hornet','is_supported_proc_in_NewQE'language c immutable;
+
+
+
+drop function if exists orc_tid_scan(anyelement, text, bigint, int[]);
+create function orc_tid_scan(anyelement, text, bigint, int[]) returns anyelement
+as '$libdir/hornet','orc_url_tid_scan' language c stable;
+
+drop function if exists orc_tid_scan(anyelement, text, bigint);
+create function orc_tid_scan(anyelement, text, bigint) returns anyelement
+as '$libdir/hornet','orc_url_tid_scan' language c stable;
+
+drop function if exists orc_tid_scan(anyelement, int, bigint, int[]);
+create function orc_tid_scan(anyelement, int, bigint, int[]) returns anyelement
+as '$libdir/hornet','orc_segno_tid_scan' language c stable;
+
+drop function if exists orc_tid_scan(anyelement, int, bigint);
+create function orc_tid_scan(anyelement, int, bigint) returns anyelement
+as '$libdir/hornet','orc_segno_tid_scan' language c stable;
+
+commit;

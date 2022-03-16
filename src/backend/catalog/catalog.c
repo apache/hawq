@@ -14,7 +14,6 @@
  *
  *-------------------------------------------------------------------------
  */
-
 #include "postgres.h"
 
 #include <fcntl.h>
@@ -50,6 +49,15 @@
 #include "catalog/gp_version.h"
 #include "catalog/toasting.h"
 #include "catalog/gp_policy.h"
+
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_index.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
 
 #include "miscadmin.h"
 #include "storage/fd.h"
@@ -826,6 +834,20 @@ relationId == GpSanConfigRelationId ||
 relationId == GpConfigurationRelationId || 
 /* relation id: 5006 - gp_configuration_history 20101104 */
 relationId == GpConfigHistoryRelationId || 
+///* relation id: 4850 - pg_vlabel 20200224*/
+//relationId == VlabelRelationId ||
+///* relation id: 4851 - pg_elabel 20200224*/
+//relationId == ElabelRelationId ||
+///* relation id: 4852 - pg_vlabel_attribute 20200224*/
+//relationId == VlabelAttrRelationId ||
+///* relation id: 4853 - pg_elabel_attribute 20200224*/
+//relationId == ElabelAttrRelationId ||
+///* relation id: 4854 - pg_graph_vlabel 20200224*/
+//relationId == GraphVlabelRelationId ||
+///* relation id: 4855 - pg_graph_elabel 20200224*/
+//relationId == GraphElabelRelationId ||
+///* relation id: 4856 - pg_graph 20200224*/
+//relationId == GraphRelationId ||
 /* relation id: 5029 - gp_db_interfaces 20101104 */
 relationId == GpDbInterfacesRelationId || 
 /* relation id: 5030 - gp_interfaces 20101104 */

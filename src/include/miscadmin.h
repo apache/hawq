@@ -207,8 +207,6 @@ extern PGDLLIMPORT pg_time_t MyStartTime;
 extern PGDLLIMPORT struct Port *MyProcPort;
 typedef struct ExecutorC ExecutorC;
 extern ExecutorC	*MyNewExecutor;
-typedef struct SchedulerC SchedulerC;
-extern SchedulerC *MyScheduler;
 typedef struct CachedResultC CachedResultC;
 extern CachedResultC *MyCachedResult;
 extern long MyCancelKey;

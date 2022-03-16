@@ -44,6 +44,16 @@ FormatAOSegmentFileName(
 							char *filepathname);
 
 extern void
+FormatAOSegmentIndexFileName(
+              char *basepath,
+              int segno,
+              int idxId,
+              int col,
+              int numCols,
+              int32 *fileSegNo,
+              char *filepathname);
+
+extern void
 MakeAOSegmentFileName(
 							Relation rel, 
 							int segno, 

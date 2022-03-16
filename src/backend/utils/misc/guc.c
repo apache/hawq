@@ -245,7 +245,6 @@ static const char *assign_timezone_abbreviations(const char *newval, bool doit, 
 static const char *assign_new_interconnect_type(const char *newval, bool doit,GucSource source);
 static const char *assign_new_executor_mode(const char *newval, bool doit, GucSource source);
 static const char *assign_new_executor_runtime_filter_mode(const char *newval, bool doit, GucSource source);
-static const char *assign_new_scheduler_mode(const char *newval, bool doit, GucSource source);
 static const char *assign_switch_mode(const char *newval, bool doit, GucSource source);
 
 static bool assign_tcp_keepalives_idle(int newval, bool doit, GucSource source);
@@ -675,7 +674,7 @@ bool		enable_magma_seqscan = true;
 bool		enable_magma_bitmapscan = false;
 bool		enable_magma_indexonlyscan = false;
 bool		enable_orc_indexscan = false;
-bool		enable_orc_indexonlyscan = false;
+bool		enable_orc_indexonlyscan = true;
 bool		force_bitmap_table_scan = false;
 bool		enable_tidscan = true;
 bool		enable_sort = true;
@@ -1159,7 +1158,7 @@ static struct config_bool ConfigureNamesBool[] =
 			NULL
 		},
 		&enable_orc_indexonlyscan,
-		false, NULL, NULL
+		true, NULL, NULL
 	},
 	{
 		{"enable_orc_indexscan", PGC_USERSET, QUERY_TUNING_METHOD,
@@ -3741,7 +3740,7 @@ static struct config_bool ConfigureNamesBool[] =
 			GUC_NO_SHOW_ALL | GUC_NOT_IN_SAMPLE
 		},
 		&optimizer_enable_indexjoin,
-		true, NULL, NULL
+		false, NULL, NULL
 	},
 	{
 		{"optimizer_enable_motions_masteronly_queries", PGC_USERSET, DEVELOPER_OPTIONS,
@@ -7537,16 +7536,6 @@ static struct config_string ConfigureNamesString[] =
 		},
 		&new_executor_enable_external_sort_mode,
 		"AUTO", assign_new_executor_mode, NULL
-	},
-
-	{
-		{"new_scheduler", PGC_USERSET, EXTERNAL_TABLES,
-			gettext_noop("Enable the new scheduler."),
-			gettext_noop("Valid values are \"OFF\" and \"ON\"."),
-			GUC_NOT_IN_SAMPLE | GUC_NO_SHOW_ALL
-		},
-		&new_scheduler_mode,
-		"OFF", assign_new_scheduler_mode, NULL
 	},
 
 	{
@@ -14046,14 +14035,6 @@ static const char *assign_new_executor_runtime_filter_mode(const char *newval, b
 		if (pg_strcasecmp(newval, new_executor_runtime_filter_mode_local) != 0
 				&& pg_strcasecmp(newval, new_executor_runtime_filter_mode_global) != 0
 				&& pg_strcasecmp(newval, new_executor_mode_off) != 0) {
-			return NULL;			/* fail */
-		}
-		return newval;				/* OK */
-}
-
-static const char *assign_new_scheduler_mode(const char *newval, bool doit, GucSource source) {
-		if (pg_strcasecmp(newval, new_scheduler_mode_on) != 0
-				&& pg_strcasecmp(newval, new_scheduler_mode_off) != 0) {
 			return NULL;			/* fail */
 		}
 		return newval;				/* OK */

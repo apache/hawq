@@ -663,6 +663,8 @@ outIndexScanFields(StringInfo str, IndexScan *node)
 	{
 		Assert(node->logicalIndexInfo == NULL);
 	}
+	WRITE_BOOL_FIELD(indexonly);
+	WRITE_NODE_FIELD(idxColummns);
 }
 
 static void
@@ -2292,10 +2294,16 @@ _outIndexStmt(StringInfo str, IndexStmt *node)
 	WRITE_OID_FIELD(constrOid);
 	WRITE_BOOL_FIELD(concurrent);
 	WRITE_NODE_FIELD(idxOids);
+	WRITE_BOOL_FIELD(do_part);
+	WRITE_BOOL_FIELD(magma);
 	WRITE_OID_FIELD(relationOid);
 	WRITE_NODE_FIELD(allidxinfos);
 	WRITE_NODE_FIELD(columnsToRead);
 	WRITE_NODE_FIELD(contextdisp);
+	WRITE_NODE_FIELD(graphele);
+	WRITE_NODE_FIELD(graphIndexAttnum);
+	WRITE_NODE_FIELD(graphIncludeAttnum);
+	WRITE_BOOL_FIELD(reverse);
 }
 
 static void
@@ -3711,6 +3719,7 @@ _outRangeTblEntry(StringInfo str, RangeTblEntry *node)
 
 	WRITE_BOOL_FIELD(forceDistRandom);
     WRITE_NODE_FIELD(pseudocols);                                       /*CDB*/
+	WRITE_STRING_FIELD(graphName);
 }
 
 static void

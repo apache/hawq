@@ -322,6 +322,51 @@ static const SchemaQuery Query_for_list_of_tables = {
 	NULL
 };
 
+static const SchemaQuery Query_for_list_of_graphs = {
+  /* catname */
+  "pg_catalog.pg_class c",
+  /* selcondition */
+  "c.relname IN (SELECT graphname FROM skylon_graph)",  /* GPDB: x is obsolete, used only on very old GPDB systems */
+  /* viscondition */
+  "pg_catalog.pg_table_is_visible(c.oid)",
+  /* namespace */
+  "c.relnamespace",
+  /* result */
+  "pg_catalog.quote_ident(c.relname)",
+  /* qualresult */
+  NULL
+};
+
+static const SchemaQuery Query_for_list_of_vertices = {
+  /* catname */
+  "pg_catalog.pg_class c",
+  /* selcondition */
+  "c.relname IN (SELECT vlabelname FROM skylon_vlabel)",
+  /* viscondition */
+  "pg_catalog.pg_table_is_visible(c.oid)",
+  /* namespace */
+  "c.relnamespace",
+  /* result */
+  "pg_catalog.quote_ident(c.relname)",
+  /* qualresult */
+  NULL
+};
+
+static const SchemaQuery Query_for_list_of_edges = {
+  /* catname */
+  "pg_catalog.pg_class c",
+  /* selcondition */
+  "c.relname IN (SELECT elabelname FROM skylon_elabel)",
+  /* viscondition */
+  "pg_catalog.pg_table_is_visible(c.oid)",
+  /* namespace */
+  "c.relnamespace",
+  /* result */
+  "pg_catalog.quote_ident(c.relname)",
+  /* qualresult */
+  NULL
+};
+
 static const SchemaQuery Query_for_list_of_tisv = {
 	/* catname */
 	"pg_catalog.pg_class c",
@@ -557,8 +602,10 @@ static const pgsql_thing_t words_after_create[] = {
 	{"CONFIGURATION", Query_for_list_of_ts_configurations, NULL, true},
 	{"DATABASE", Query_for_list_of_databases},
 	{"DICTIONARY", Query_for_list_of_ts_dictionaries, NULL, true},
+	{"EDGE", NULL, &Query_for_list_of_edges},
 	{"FOREIGN DATA WRAPPER", NULL, NULL},
 	{"FUNCTION", NULL, &Query_for_list_of_functions},
+	{"GRAPH", NULL, &Query_for_list_of_graphs},
 	{"GROUP", Query_for_list_of_roles},
 	{"LANGUAGE", Query_for_list_of_languages},
 	{"INDEX", NULL, &Query_for_list_of_indexes},
@@ -578,6 +625,7 @@ static const pgsql_thing_t words_after_create[] = {
 	{"UNIQUE", NULL, NULL},		/* for CREATE UNIQUE INDEX ... */
 	{"USER", Query_for_list_of_roles},
 	{"USER MAPPING FOR", NULL, NULL},
+	{"VERTEX", NULL, &Query_for_list_of_vertices},
 	{"VIEW", NULL, &Query_for_list_of_views},
 	{NULL, NULL, NULL, false}	/* end of list */
 };
@@ -2531,7 +2579,7 @@ _complete_from_query(int is_schema_query, const char *text, int state)
 			if (strcmp(completion_squery->catname,
 					   "pg_catalog.pg_class c") == 0 &&
 				strncmp(text, "pg_", 3) != 0 &&
-				strncmp(text, "gp_", 3) != 0)
+				strncmp(text, "gp_", 3) != 0 && strncmp(text, "skylon_", 3) != 0)
 			{
 				appendPQExpBuffer(&query_buffer,
 								  " AND c.relnamespace <> (SELECT oid FROM"
@@ -2553,6 +2601,43 @@ _complete_from_query(int is_schema_query, const char *text, int state)
 			" WHERE substring(pg_catalog.quote_ident(nspname) || '.',1,%d) ="
 							  " substring('%s',1,pg_catalog.length(pg_catalog.quote_ident(nspname))+1)) > 1",
 							  string_length, e_text);
+
+      /*
+       * Add in matching graph names, but only if there is more than
+       * one potential match among graph names.
+       */
+
+      appendPQExpBuffer(&query_buffer, "\nUNION\n"
+               "SELECT pg_catalog.quote_ident(n.graphname) || '.' "
+                "FROM pg_catalog.skylon_graph n "
+                "WHERE substring(pg_catalog.quote_ident(n.graphname) || '.',1,%d)='%s'",
+                string_length, e_text);
+      appendPQExpBuffer(&query_buffer,
+                " AND (SELECT pg_catalog.count(*)"
+                " FROM pg_catalog.skylon_graph"
+      " WHERE substring(pg_catalog.quote_ident(graphname) || '.',1,%d) ="
+                " substring('%s',1,pg_catalog.length(pg_catalog.quote_ident(graphname))+1)) > 1",
+                string_length, e_text);
+
+      /*
+       * Add in matching qualified names, but only if there is exactly
+       * one graph matching the input-so-far.
+       */
+      appendPQExpBuffer(&query_buffer, "\nUNION\n"
+           "SELECT pg_catalog.quote_ident(n.graphname) || '.' || v.vlabelname "
+                "FROM pg_catalog.skylon_graph_vlabel v, pg_catalog.skylon_graph n "
+                "WHERE v.graphname = n.graphname AND v.schemaname = n.schemaname ",
+                qualresult,
+                completion_squery->catname,
+                completion_squery->namespace);
+
+      appendPQExpBuffer(&query_buffer, "\nUNION\n"
+           "SELECT pg_catalog.quote_ident(n.graphname) || '.' || e.elabelname "
+                "FROM pg_catalog.skylon_graph_elabel e, pg_catalog.skylon_graph n "
+                "WHERE e.graphname = n.graphname AND e.schemaname = n.schemaname ",
+                qualresult,
+                completion_squery->catname,
+                completion_squery->namespace);
 
 			/*
 			 * Add in matching qualified names, but only if there is exactly

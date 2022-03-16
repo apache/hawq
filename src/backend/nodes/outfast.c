@@ -483,6 +483,7 @@ _outPlannedStmt(StringInfo str, PlannedStmt *node)
 
 	WRITE_STRING_FIELD(hiveUrl);
 	WRITE_ENUM_FIELD(originNodeType, NodeTag);
+	WRITE_NODE_FIELD(graphEntry);
 }
 
 static void
@@ -612,7 +613,10 @@ _outMagmaIndexScan(StringInfo str, MagmaIndexScan *node)
 	WRITE_NODE_TYPE("MAGMAINDEXSCAN");
 	_outScanInfo(str, (Scan *) node);
 	WRITE_STRING_FIELD(indexname);
+	WRITE_LIST_FIELD(indexqual);
 	WRITE_LIST_FIELD(indexqualorig);
+	WRITE_LIST_FIELD(indexstrategy);
+	WRITE_LIST_FIELD(indexsubtype);
 	WRITE_ENUM_FIELD(indexorderdir, ScanDirection);
 	if (print_variable_fields) {
 	WRITE_NODE_FIELD(uriList);
@@ -640,7 +644,10 @@ _outMagmaIndexOnlyScan(StringInfo str, MagmaIndexOnlyScan *node)
 	WRITE_BOOL_FIELD(rejLimitInRows);
 	WRITE_OID_FIELD(fmterrtbl);
 	WRITE_STRING_FIELD(indexname);
+	WRITE_LIST_FIELD(indexqual);
 	WRITE_LIST_FIELD(indexqualorig);
+	WRITE_LIST_FIELD(indexstrategy);
+	WRITE_LIST_FIELD(indexsubtype);
 	WRITE_ENUM_FIELD(indexorderdir, ScanDirection);
 	WRITE_NODE_FIELD(errAosegnos);
 	WRITE_NODE_FIELD(err_aosegfileinfos);
@@ -706,6 +713,8 @@ outIndexScanFields(StringInfo str, IndexScan *node)
 	{
 		Assert(node->logicalIndexInfo == NULL);
 	}
+	WRITE_BOOL_FIELD(indexonly);
+	WRITE_LIST_FIELD(idxColummns);
 }
 
 static void
@@ -2362,6 +2371,7 @@ _outIndexStmt(StringInfo str, IndexStmt *node)
 	WRITE_STRING_FIELD(accessMethod);
 	WRITE_STRING_FIELD(tableSpace);
 	WRITE_NODE_FIELD(indexParams);
+	WRITE_NODE_FIELD(indexIncludingParams);
 	WRITE_NODE_FIELD(options);
 
 	WRITE_NODE_FIELD(whereClause);
@@ -2374,10 +2384,16 @@ _outIndexStmt(StringInfo str, IndexStmt *node)
 	WRITE_OID_FIELD(constrOid);
 	WRITE_BOOL_FIELD(concurrent);
 	WRITE_NODE_FIELD(idxOids);
+	WRITE_BOOL_FIELD(do_part);
+	WRITE_BOOL_FIELD(magma);
 	WRITE_OID_FIELD(relationOid);
 	WRITE_NODE_FIELD(allidxinfos);
 	WRITE_NODE_FIELD(columnsToRead);
 	WRITE_NODE_FIELD(contextdisp);
+	WRITE_NODE_FIELD(graphele);
+	WRITE_NODE_FIELD(graphIndexAttnum);
+	WRITE_NODE_FIELD(graphIncludeAttnum);
+	WRITE_BOOL_FIELD(reverse);
 }
 
 static void
@@ -3303,6 +3319,7 @@ _outQuery(StringInfo str, Query *node)
 	WRITE_NODE_FIELD(result_aosegnos);
 	WRITE_NODE_FIELD(returningLists);
 	WRITE_NODE_FIELD(contextdisp);
+	WRITE_NODE_FIELD(graphEntry);
 	/* Don't serialize policy */
 }
 
@@ -3519,6 +3536,7 @@ _outRangeTblEntry(StringInfo str, RangeTblEntry *node)
 	WRITE_OID_FIELD(checkAsUser);
 
 	WRITE_BOOL_FIELD(forceDistRandom);
+	WRITE_STRING_FIELD(graphName);
 }
 
 static void
@@ -4009,6 +4027,14 @@ _outQueryResource(StringInfo str, QueryResource *node)
 	WRITE_INT_ARRAY(segment_vcore_agg, numSegments, int);
 	WRITE_INT_ARRAY(segment_vcore_writer, numSegments, int);
 	WRITE_INT64_FIELD(master_start_time);
+}
+
+static void
+_outGraphEntry(StringInfo str, GraphEntry *node)
+{
+  WRITE_NODE_TYPE("GraphEntry");
+  WRITE_OID_FIELD(relid);
+  WRITE_UINT_FIELD(requiredPerms);
 }
 
 /*
@@ -4867,6 +4893,10 @@ _outNode(StringInfo str, void *obj)
 			case T_QueryResource:
 				_outQueryResource(str, obj);
 				break;
+
+			case T_GraphEntry:
+        _outGraphEntry(str, obj);
+        break;
 
 			default:
 				elog(ERROR, "could not serialize unrecognized node type: %d",

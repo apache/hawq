@@ -55,7 +55,7 @@ void checkOushuDbExtensiveFunctionSupport(char functionString[]) {
 
 PlanState *newExecutorPlanStateReference = NULL;
 
-void exec_mpp_query_new(const char *plan, int len, int stageNo, bool setDisplay,
+void exec_mpp_query_new(void *dispatchData, const char *plan, int len, int stageNo, bool setDisplay,
                         DestReceiver *dest, PlanState *planstate) {
   checkOushuDbExtensiveFeatureSupport("New Executor");
   Assert(MyNewExecutor != NULL);
@@ -65,7 +65,7 @@ void exec_mpp_query_new(const char *plan, int len, int stageNo, bool setDisplay,
   sprintf(queryId, "QID%d_%d", gp_session_id, gp_command_count);
   int vsegNum = GetQEGangNum();
   int rangeNum = 0;
-  ExecutorNewWorkHorse(MyNewExecutor, plan, len, queryId, stageNo, GetQEIndex(),
+  ExecutorNewWorkHorse(MyNewExecutor, dispatchData, plan, len, queryId, stageNo, GetQEIndex(),
                        vsegNum, DateStyle, DateOrder, &rangeNum);
   MyExecutorSetJumpHashMap(MyNewExecutor, get_jump_hash_map(rangeNum),
                            JUMP_HASH_MAP_LENGTH);
@@ -95,6 +95,10 @@ void exec_mpp_query_new(const char *plan, int len, int stageNo, bool setDisplay,
     ExecutorFreeWorkHorse(MyNewExecutor);
   }
   newExecutorPlanStateReference = NULL;
+}
+
+void teardownNewInterconnect() {
+  ExecutorTearDownInterconnect(MyNewExecutor);
 }
 
 MyNewExecutorTupState *makeMyNewExecutorTupState(TupleDesc tupdesc) {
@@ -142,7 +146,7 @@ MyNewExecutorTupState *makeMyNewExecutorTupState(TupleDesc tupdesc) {
   return state;
 }
 
-void beginMyNewExecutor(const char *plan, int len, int stageNo,
+void beginMyNewExecutor(void *dispatchData, const char *plan, int len, int stageNo,
                         PlanState *planstate) {
   Assert(MyNewExecutor != NULL);
   newExecutorPlanStateReference = planstate;
@@ -151,7 +155,7 @@ void beginMyNewExecutor(const char *plan, int len, int stageNo,
   sprintf(queryId, "QID%d_%d", gp_session_id, gp_command_count);
   int vsegNum = GetQEGangNum();
   int rangeNum = 0;
-  ExecutorNewWorkHorse(MyNewExecutor, plan, len, queryId, stageNo, GetQEIndex(),
+  ExecutorNewWorkHorse(MyNewExecutor, dispatchData, plan, len, queryId, stageNo, GetQEIndex(),
                        vsegNum, DateStyle, DateOrder, &rangeNum);
   MyExecutorSetJumpHashMap(MyNewExecutor, get_jump_hash_map(rangeNum),
                            JUMP_HASH_MAP_LENGTH);

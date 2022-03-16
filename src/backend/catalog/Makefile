@@ -16,6 +16,7 @@ OBJS = catalog.o dependency.o heap.o index.o indexing.o namespace.o aclchk.o \
        pg_exttable.o pg_extprotocol.o pg_filesystem.o pg_largeobject.o pg_namespace.o \
        pg_operator.o pg_proc.o pg_proc_callback.o pg_shdepend.o \
        pg_type.o toasting.o aoseg.o \
+       skylon_vlabel_attribute.o skylon_vlabel.o skylon_elabel_attribute.o skylon_elabel.o skylon_graph.o skylon_graph_vlabel.o skylon_graph_elabel.o skylon_index.o \
        pg_attribute_encoding.o pg_compression.o quicklz_compression.o
 
 SUBDIRS = caql core external
@@ -108,6 +109,7 @@ POSTGRES_BKI_SRCS := $(addprefix $(top_srcdir)/src/include/catalog/,\
 	pg_database.h pg_tablespace.h pg_pltemplate.h \
 	pg_authid.h pg_auth_members.h pg_shdepend.h pg_shdescription.h pg_resqueue.h \
 	gp_configuration.h gp_policy.h gp_version.h \
+	skylon_vlabel.h skylon_elabel.h skylon_vlabel_attribute.h skylon_elabel_attribute.h skylon_graph_vlabel.h skylon_graph_elabel.h skylon_graph.h skylon_index.h \
 	gp_segment_config.h gp_san_config.h \
 	gp_verification_history.h \
 	pg_window.h \

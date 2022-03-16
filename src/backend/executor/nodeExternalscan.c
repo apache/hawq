@@ -36,6 +36,7 @@
 #include "postgres.h"
 #include "fmgr.h"
 
+#include "access/genam.h"
 #include "access/fileam.h"
 #include "access/filesplit.h"
 #include "access/heapam.h"
@@ -44,6 +45,8 @@
 #include "cdb/cdbvars.h"
 #include "cdb/cdbdatalocality.h"
 #include "executor/execdebug.h"
+#include "executor/execIndexscan.h"
+#include "executor/nodeIndexscan.h"
 #include "executor/nodeExternalscan.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
@@ -66,7 +69,6 @@ static TupleTableSlot *
 ExternalNext(ExternalScanState *node)
 {
 	FileScanDesc scandesc;
-	Index scanrelid;
 	EState *estate = NULL;
 	ScanDirection direction;
 	TupleTableSlot *slot = NULL;
@@ -78,7 +80,6 @@ ExternalNext(ExternalScanState *node)
 	 */
 	estate = node->ss.ps.state;
 	scandesc = node->ess_ScanDesc;
-	scanrelid = ((ExternalScan *) node->ss.ps.plan)->scan.scanrelid;
 	direction = estate->es_direction;
 	slot = node->ss.ss_ScanTupleSlot;
 
@@ -368,6 +369,53 @@ ExecInitExternalScan(ExternalScan *node, EState *estate, int eflags)
 
 	ExecAssignScanType(&externalstate->ss, RelationGetDescr(currentRelation));
 
+	if (IsA(node, MagmaIndexScan) || IsA(node, MagmaIndexOnlyScan))
+	{
+	        /*
+	         * Unlike ExecInitIndexScan(which is used by the heap table and is only executed on QD),
+	         * we can't call index_open to get iss_RelationDesc, because QE will also run here, and
+	         * index did not dispatch, so we set iss_RelationDesc to NULL.
+	         *
+	         * We have disabled the path that requires iss_RelationDesc, so there is no problem with doing so.
+	         * See also: best_inner_indexscan().
+	         */
+                externalstate->iss_RelationDesc = NULL;
+
+                /*
+                 * build the index scan keys from the index qualification
+                 */
+                ExecIndexBuildScanKeys((PlanState *) externalstate,
+                                       externalstate->iss_RelationDesc,
+                                       node->indexqual,
+                                       node->indexstrategy,
+                                       node->indexsubtype,
+                                       &externalstate->iss_ScanKeys,
+                                       &externalstate->iss_NumScanKeys,
+                                       &externalstate->iss_RuntimeKeys,
+                                       &externalstate->iss_NumRuntimeKeys,
+                                       NULL,        /* no ArrayKeys */
+                                       NULL);
+
+                /*
+                 * If we have runtime keys, we need an ExprContext to evaluate them. The
+                 * node's standard context won't do because we want to reset that context
+                 * for every tuple.  So, build another context just like the other one...
+                 * -tgl 7/11/00
+                 */
+                if (externalstate->iss_NumRuntimeKeys != 0)
+                {
+                	ExprContext *stdecontext = externalstate->ss.ps.ps_ExprContext;
+
+                	ExecAssignExprContext(estate, &externalstate->ss.ps);
+                	externalstate->iss_RuntimeContext = externalstate->ss.ps.ps_ExprContext;
+                	externalstate->ss.ps.ps_ExprContext = stdecontext;
+                }
+                else
+                {
+                	externalstate->iss_RuntimeContext = NULL;
+                }
+	}
+
 	/*
 	 * Initialize result tuple type and projection info.
 	 */
@@ -497,11 +545,48 @@ void
 ExecExternalReScan(ExternalScanState *node, ExprContext *exprCtxt)
 {
 	EState	   *estate;
+	ExprContext *econtext;
 	Index		scanrelid;
 	FileScanDesc fileScan;
+	TupleTableSlot *slot = NULL;
 
 	estate = node->ss.ps.state;
+	econtext = node->iss_RuntimeContext;		/* context for runtime keys */
 	scanrelid = ((SeqScan *) node->ss.ps.plan)->scanrelid;
+	slot = node->ss.ss_ScanTupleSlot;
+
+	if (econtext)
+	{
+		/*
+		 * If we are being passed an outer tuple, save it for runtime key
+		 * calc.  We also need to link it into the "regular" per-tuple
+		 * econtext, so it can be used during indexqualorig evaluations.
+		 */
+		if (exprCtxt != NULL)
+		{
+			ExprContext *stdecontext;
+
+			econtext->ecxt_outertuple = exprCtxt->ecxt_outertuple;
+			stdecontext = node->ss.ps.ps_ExprContext;
+			stdecontext->ecxt_outertuple = exprCtxt->ecxt_outertuple;
+		}
+
+		/*
+		 * Reset the runtime-key context so we don't leak memory as each outer
+		 * tuple is scanned.  Note this assumes that we will recalculate *all*
+		 * runtime keys on each call.
+		 */
+		ResetExprContext(econtext);
+	}
+
+	/*
+	 * If we are doing runtime key calculations (ie, the index keys depend on
+	 * data from an outer scan), compute the new key values
+	 */
+	if (node->iss_NumRuntimeKeys != 0)
+		ExecIndexEvalRuntimeKeys(econtext,
+								 node->iss_RuntimeKeys,
+								 node->iss_NumRuntimeKeys);
 
 	/* If this is re-scanning of PlanQual ... */
 	if (estate->es_evTuple != NULL &&
@@ -529,16 +614,13 @@ ExecExternalReScan(ExternalScanState *node, ExprContext *exprCtxt)
 		Assert(fileScan->fs_formatter_name);
 
 		FmgrInfo *rescanFunc = fileScan->fs_ps_scan_funcs.rescan;
+		if (!rescanFunc)
+                        elog(ERROR, "%s_rescan function was not found",
+                               fileScan->fs_formatter_name);
 
-		if (rescanFunc)
-		{
-			InvokePlugStorageFormatReScan(rescanFunc, fileScan);
-		}
-		else
-		{
-			elog(ERROR, "%s_rescan function was not found",
-			            fileScan->fs_formatter_name);
-		}
+		InvokePlugStorageFormatReScan(rescanFunc, fileScan, &(node->ss),
+		    PlugStorageGetTransactionSnapshot(NULL),
+		    node->iss_RuntimeKeys, node->iss_NumRuntimeKeys, slot);
 	}
 }
 

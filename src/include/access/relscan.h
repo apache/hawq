@@ -137,11 +137,11 @@ typedef struct FileScanDescData
 	int    fs_serializeSchemaLen;
 
 	/* current scan information for pluggable format */
-	 PlugStorageScanFuncs fs_ps_scan_funcs;   /* scan functions */
-	 void *fs_ps_user_data;                   /* user data */
-	 struct ScanState *fs_ps_scan_state;      /* support rescan */
-	 Plan *fs_ps_plan;                        /* support rescan */
-
+	PlugStorageScanFuncs  fs_ps_scan_funcs;
+	void                 *fs_ps_user_data;
+	Plan                 *fs_ps_plan;
+	List                 *fs_ps_magma_splits;
+	bool                  fs_ps_magma_skip_tid;
 }	FileScanDescData;
 
 typedef FileScanDescData *FileScanDesc;

@@ -74,6 +74,18 @@ extern void EvaluateDeferredStatements(List *deferredStmts);
 extern void RemoveRelation(const RangeVar *relation, DropBehavior behavior,
 						   DropStmt *stmt /* MPP */, char relkind);
 
+extern void RemoveVlabelByOid(Oid relid);
+
+extern void RemoveVlabel(RangeVar *rel, bool missing_ok);
+
+extern void RemoveElabelByOid(Oid relid);
+
+extern void RemoveElabel(RangeVar *rel, bool missing_ok);
+
+extern void RemoveGraphByOid(Oid relid, bool ifRemoveTable);
+
+extern void RemoveGraph(RangeVar *rel, bool missing_ok, bool ifRemoveTable);
+
 extern bool RelationToRemoveIsTemp(const RangeVar *relation, DropBehavior behavior);
 
 extern void AlterTable(Oid relid, AlterTableStmt *stmt);

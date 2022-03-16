@@ -62,15 +62,19 @@ typedef uint16 StrategyNumber;
  * for the invocation of an access method support procedure.  In this case
  * sk_strategy/sk_subtype are not meaningful, and sk_func may refer to a
  * function that returns something other than boolean.
+ *
+ * Fixme(hwy): Since the sk_attno may change, I added the sk_attnoold. Do we really need sk_attnoold?
  */
 typedef struct ScanKeyData
 {
-	int			sk_flags;		/* flags, see below */
-	AttrNumber	sk_attno;		/* table or index column number */
-	StrategyNumber sk_strategy; /* operator strategy number */
-	Oid			sk_subtype;		/* strategy subtype */
-	FmgrInfo	sk_func;		/* lookup info for function to call */
+	int	        sk_flags;	/* flags, see below */
+	AttrNumber	sk_attno;	/* table or index column number */
+	StrategyNumber  sk_strategy;    /* operator strategy number */
+	Oid		sk_subtype;     /* strategy subtype */
+	FmgrInfo	sk_func;	/* lookup info for function to call */
 	Datum		sk_argument;	/* data to compare */
+	AttrNumber      sk_attnoold;	/* original table or index column number */
+	FmgrInfo        sk_out_func;    /* for evaluating the runtime key in magma parameterized index scan */
 } ScanKeyData;
 
 typedef ScanKeyData *ScanKey;
@@ -133,8 +137,10 @@ extern void ScanKeyEntryInitialize(ScanKey entry,
 					   AttrNumber attributeNumber,
 					   StrategyNumber strategy,
 					   Oid subtype,
-					   RegProcedure procedure,
-					   Datum argument);
+					   RegProcedure opProcedure,
+					   Datum argument,
+					   AttrNumber attributeNumberOld,
+					   RegProcedure outputProcedure);
 extern void ScanKeyEntryInitializeWithInfo(ScanKey entry,
 							   int flags,
 							   AttrNumber attributeNumber,

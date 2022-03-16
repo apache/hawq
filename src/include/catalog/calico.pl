@@ -3515,6 +3515,14 @@ sub more_header
 #include "catalog/pg_tidycat.h"
 
 #include "catalog/gp_configuration.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_index.h"
 #include "catalog/gp_segment_config.h"
 #include "catalog/gp_san_config.h"
 

@@ -85,7 +85,6 @@ OBJS = cdbanalyze.o \
 	   cdbdatalocality.o \
 	   dispatcher.o \
 	   dispatcher_mgt.o \
-	   scheduler.o \
 	   workermgr.o \
 	   executormgr.o \
 	   poolmgr.o \

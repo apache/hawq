@@ -109,7 +109,6 @@ include_directories(${CMAKE_SOURCE_DIR}/hornet/univplan/src)
 include_directories(${CMAKE_SOURCE_DIR}/hornet/magma/src)
 include_directories(${CMAKE_SOURCE_DIR}/hornet/storage/src)
 include_directories(${CMAKE_SOURCE_DIR}/hornet/executor/src)
-include_directories(${CMAKE_SOURCE_DIR}/hornet/scheduler/src)
 include_directories(${CMAKE_BINARY_DIR}/hornet/dbcommon/src)
 include_directories(/opt/dependency/package/include)
 
@@ -124,7 +123,7 @@ add_dependencies(dxltranslators config)
 add_executable(postgres ${cdb_source} ${generate_source})
 target_link_libraries(postgres z bz2 lz4 snappy xml2 curl ldap json-c krb5 yarn thrift) # basic
 target_link_libraries(postgres gpos xerces-c naucrates gpdbcost gpopt dxltranslators) # gp-orca
-target_link_libraries(postgres hdfs3 dbcommon-shared univplan-shared storage-shared magma-client-shared executor-shared scheduler-shared) # hornet
+target_link_libraries(postgres hdfs3 dbcommon-shared univplan-shared storage-shared magma-client-shared storage-magma-format-shared executor-shared) # hornet
 target_link_libraries(postgres dl)
 add_dependencies(postgres config)
 

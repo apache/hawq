@@ -1268,6 +1268,15 @@ _equalIndexStmt(IndexStmt *a, IndexStmt *b)
 	COMPARE_SCALAR_FIELD(concurrent);
 	COMPARE_NODE_FIELD(idxOids);
 	COMPARE_SCALAR_FIELD(do_part);
+	COMPARE_SCALAR_FIELD(magma);
+	COMPARE_SCALAR_FIELD(relationOid);
+	COMPARE_NODE_FIELD(allidxinfos);
+	COMPARE_NODE_FIELD(columnsToRead);
+	COMPARE_NODE_FIELD(contextdisp);
+	COMPARE_NODE_FIELD(graphele);
+	COMPARE_NODE_FIELD(graphIndexAttnum);
+	COMPARE_NODE_FIELD(graphIncludeAttnum);
+	COMPARE_SCALAR_FIELD(reverse);
 
 	return true;
 }

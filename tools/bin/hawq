@@ -236,6 +236,12 @@ def main():
         cmd = 'test -d /usr/local/hawq/share/python2.7 && mv /usr/local/hawq/share/python2.7 /usr/local/hawq/lib'
         result = local_run(cmd)
         print "Install Oushu's Python successfully."
+    elif hawq_command == "backup":
+        cmd = "%s; hawqbackup %s" % (source_hawq_env, sub_args)
+        result = local_run(cmd)
+    elif hawq_command == "restore":
+        cmd = "%s; hawqrestore %s" % (source_hawq_env, sub_args)
+        result = local_run(cmd)
     else:
         print COMMON_HELP
         sys.exit(1)

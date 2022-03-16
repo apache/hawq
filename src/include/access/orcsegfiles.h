@@ -46,7 +46,8 @@ extern void updateOrcFileSegInfo(Relation rel, AppendOnlyEntry *aoEntry,
 
 extern void insertInitialOrcIndexEntry(AppendOnlyEntry *aoEntry, int idxOid, int segNo);
 extern void updateOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid, int segNo, int64 eof);
-extern void deleteOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid);
+extern void deleteOrcIndexFileInfo(Relation rel, AppendOnlyEntry *aoEntry, int idxOid);
+extern void deleteOrcIndexHdfsFiles(Relation rel, int32 segmentFileNum, int32 idx);
 
 extern List *orcGetAllSegFileSplits(AppendOnlyEntry *aoEntry,
                                     Snapshot snapshot);

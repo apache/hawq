@@ -2563,7 +2563,8 @@ _bitmap_doinsert(Relation rel, ItemPointerData ht_ctid, Datum *attdata,
 		scanKey = (ScanKey) (((char *)scanKeys) + attno * sizeof(ScanKeyData));
 
 		ScanKeyEntryInitialize(scanKey, SK_ISNULL, attno + 1, 
-							   BTEqualStrategyNumber, InvalidOid, opfuncid, 0);
+							   BTEqualStrategyNumber, InvalidOid, opfuncid, 0,
+							   InvalidAttrNumber, InvalidOid);
 
 		if (nulls[attno])
 		{

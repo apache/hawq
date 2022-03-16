@@ -725,7 +725,9 @@ _bt_first(IndexScanDesc scan, ScanDirection dir)
 									   InvalidStrategy,
 									   cur->sk_subtype,
 									   cmp_proc,
-									   cur->sk_argument);
+									   cur->sk_argument,
+									   InvalidAttrNumber,
+									   InvalidOid);
 			}
 		}
 	}

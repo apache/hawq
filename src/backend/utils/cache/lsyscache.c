@@ -1675,18 +1675,14 @@ get_relname_relid(const char *relname, Oid relnamespace)
 	Oid			result;
 	int			fetchCount;
 
-	result = caql_getoid_plus(
-			NULL,
-			&fetchCount,
-			NULL,
-			cql("SELECT oid FROM pg_class "
-				" WHERE relname = :1 "
-				" AND relnamespace = :2 ",
-				PointerGetDatum((char *) relname),
-				ObjectIdGetDatum(relnamespace)));
-
-	if (!fetchCount)
-		return InvalidOid;
+	result = caql_getoid_only(
+      NULL,
+      NULL,
+      cql("SELECT oid FROM pg_class "
+        " WHERE relname = :1 "
+        " AND relnamespace = :2 ",
+        CStringGetDatum(relname),
+        ObjectIdGetDatum(relnamespace)));
 
 	return result;
 }
@@ -3651,6 +3647,38 @@ get_relation_keys(Oid relid)
 	heap_close(rel, AccessShareLock);
 
 	return keys;
+}
+
+/*
+ * Is there a index with the given relid
+ */
+bool rel_has_index(Oid relid)
+{
+	if (!rel_is_partitioned(relid))
+		return (caql_getcount(
+				NULL, cql("SELECT COUNT(*) FROM pg_index "
+						" WHERE indrelid = :1 ",
+						ObjectIdGetDatum(relid))) > 0);
+	else
+	{
+		List *children = find_all_inheritors(relid);
+		ListCell *child;
+		foreach (child, children)
+		{
+			Oid myrelid = lfirst_oid(child);
+			bool hasidx = (caql_getcount(
+					NULL, cql("SELECT COUNT(*) FROM pg_index "
+							" WHERE indrelid = :1 ",
+							ObjectIdGetDatum(myrelid))) > 0);
+			if (hasidx)
+			{
+				list_free(children);
+				return true;
+			}
+		}
+		list_free(children);
+		return false;
+	}
 }
 
 /*

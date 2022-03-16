@@ -24,16 +24,20 @@
  */
 #include "postgres.h"
 
+#include "access/filesplit.h"
 #include "access/genam.h"
 #include "access/nbtree.h"
+#include "access/orcam.h"
 #include "cdb/cdbvars.h"
 #include "executor/execdebug.h"
 #include "executor/nodeIndexscan.h"
 #include "nodes/nodeFuncs.h"
+#include "nodes/nodes.h"
 #include "optimizer/clauses.h"
 #include "utils/array.h"
 #include "utils/lsyscache.h"
 #include "utils/memutils.h"
+#include "utils/debugutils.h"
 
 /*
  * Initialize the index scan descriptor if it is not initialized.
@@ -70,6 +74,22 @@ freeScanDesc(IndexScanState *indexstate)
 	}
 }
 
+/* native orc index */
+extern TupleTableSlot *OrcIndexNext(IndexScanState *node)
+{
+	if (node->scandesc == NULL)
+		orcBeginIndexOnlyScan(node, ((IndexScan*)(node->ss.ps.plan))->indexid,
+													((IndexScan*)(node->ss.ps.plan))->idxColummns);
+	TupleTableSlot *slot = orcIndexOnlyScanNext(node);
+
+	if (!TupIsNull(slot))
+	{
+		Gpmon_M_Incr_Rows_Out(GpmonPktFromIndexScanState(node));
+		CheckSendPlanStateGpmonPkt(&node->ss.ps);
+	}
+
+	return slot;
+}
 
 /* ----------------------------------------------------------------
  *		IndexNext
@@ -202,7 +222,10 @@ ExecIndexScan(IndexScanState *node)
 	/*
 	 * use IndexNext as access method
 	 */
-	return ExecScan(&node->ss, (ExecScanAccessMtd) IndexNext);
+	if (!(IsA(node->ss.ps.plan, OrcIndexOnlyScan) || IsA(node->ss.ps.plan, OrcIndexScan)))
+		return ExecScan(&node->ss, (ExecScanAccessMtd) IndexNext);
+	else
+		return ExecScan(&node->ss, (ExecScanAccessMtd) OrcIndexNext);
 }
 
 /* ----------------------------------------------------------------
@@ -222,7 +245,11 @@ ExecIndexReScan(IndexScanState *node, ExprContext *exprCtxt)
 	ExprContext *econtext;
 	Index		scanrelid;
 
-	initScanDesc(node);
+	if (!(IsA(node->ss.ps.plan, OrcIndexOnlyScan) || IsA(node->ss.ps.plan, OrcIndexScan)))
+		initScanDesc(node);
+	else
+		orcBeginIndexOnlyScan(node, ((IndexScan*)(node->ss.ps.plan))->indexid,
+													((IndexScan*)(node->ss.ps.plan))->idxColummns);
 
 	estate = node->ss.ps.state;
 	econtext = node->iss_RuntimeContext;		/* context for runtime keys */
@@ -273,7 +300,10 @@ ExecIndexReScan(IndexScanState *node, ExprContext *exprCtxt)
 	}
 
 	/* reset index scan */
-	index_rescan(node->iss_ScanDesc, node->iss_ScanKeys);
+	if (!(IsA(node->ss.ps.plan, OrcIndexOnlyScan) || IsA(node->ss.ps.plan, OrcIndexScan)))
+		index_rescan(node->iss_ScanDesc, node->iss_ScanKeys);
+	else
+		orcIndexOnlyReScan(node);
 
 	Gpmon_M_Incr(GpmonPktFromIndexScanState(node), GPMON_INDEXSCAN_RESCAN); 
 	CheckSendPlanStateGpmonPkt(&node->ss.ps);
@@ -481,7 +511,10 @@ ExecEndIndexScan(IndexScanState *node)
 	 * close the index relation
 	 */
 	ExecEagerFreeIndexScan(node);
-	index_close(indexRelationDesc, NoLock);
+	if (!(IsA(node->ss.ps.plan, OrcIndexOnlyScan) || IsA(node->ss.ps.plan, OrcIndexScan)))
+		index_close(indexRelationDesc, NoLock);
+	else
+		orcEndIndexOnlyScan(node);
 
 	/*
 	 * close the heap relation.
@@ -594,8 +627,13 @@ ExecInitIndexScan(IndexScan *node, EState *estate, int eflags)
 	 * taking another lock here.  Otherwise we need a normal reader's lock.
 	 */
 	relistarget = ExecRelationIsTargetRelation(estate, node->scan.scanrelid);
-	indexstate->iss_RelationDesc = index_open(node->indexid,
-									 relistarget ? NoLock : AccessShareLock);
+	if (!(IsA(&(node->scan.plan), OrcIndexOnlyScan) || IsA(&(node->scan.plan), OrcIndexScan)))
+		indexstate->iss_RelationDesc = index_open(node->indexid,relistarget ? NoLock : AccessShareLock);
+	else
+	{
+		indexstate->ss.splits = GetFileSplitsOfSegment(estate->es_plannedstmt->scantable_splits,
+																									 currentRelation->rd_id, GetQEIndex());
+	}
 
 	/*
 	 * build the index scan keys from the index qualification

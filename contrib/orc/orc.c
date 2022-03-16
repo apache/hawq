@@ -626,7 +626,6 @@ Datum orc_beginscan(PG_FUNCTION_ARGS)
 		char *token = find_filesystem_credential_with_uri(uri_str);
 		SetToken(uri_str, token);
 	}
-	file_scan_desc->fs_ps_scan_state = scan_state; /* for orc rescan */
 	build_file_splits(uri, scan_state, user_data);
 
 	FreeExternalTableUri(uri);
@@ -671,8 +670,6 @@ Datum orc_beginscan(PG_FUNCTION_ARGS)
 Datum orc_getnext_init(PG_FUNCTION_ARGS)
 {
 	PlugStorage ps = (PlugStorage) (fcinfo->context);
-	PlanState *plan_state = ps->ps_plan_state;
-	ExternalScanState *ext_scan_state = ps->ps_ext_scan_state;
 
 	ExternalSelectDesc ext_select_desc = NULL;
 	/*
@@ -826,6 +823,7 @@ Datum orc_rescan(PG_FUNCTION_ARGS)
 {
 	PlugStorage ps = (PlugStorage) (fcinfo->context);
 	FileScanDesc fsd = ps->ps_file_scan_desc;
+	ScanState *scan_state = ps->ps_scan_state;
 	Relation relation = fsd->fs_rd;
 	TupleDesc tup_desc = RelationGetDescr(relation);
 
@@ -845,7 +843,7 @@ Datum orc_rescan(PG_FUNCTION_ARGS)
 
 		/* 3 Build file splits */
 		Uri *uri = ParseExternalTableUri(fsd->fs_uri);
-		build_file_splits(uri, fsd->fs_ps_scan_state, user_data);
+		build_file_splits(uri, scan_state, user_data);
 
 		/* 4 Build tuple description */
 		Plan *plan = fsd->fs_ps_plan;

@@ -40,6 +40,7 @@
 #include "miscadmin.h" /* work_mem */
 
 #include "access/hd_work_mgr.h"
+#include "catalog/catquery.h"
 #include "catalog/pg_type.h"    /* INT8OID */
 #include "nodes/makefuncs.h"
 #include "executor/execHHashagg.h"
@@ -168,7 +169,10 @@ static MagmaIndexScan *make_magma_indexscan(List *qptlist,
 			   Index scanrelid,
 			   bool indexonly,
 			   Oid indexid,
+			   List *indexqual,
 			   List *indexqualorig,
+			   List *indexstrategy,
+			   List *indexsubtype,
 			   List *urilist,
 			   List *fmtopts,
 			   char fmttype,
@@ -352,8 +356,7 @@ create_scan_plan(CreatePlanContext *ctx, Path *best_path)
 	 */
 	if (use_physical_tlist(ctx, rel))
 	{
-		if (best_path->pathtype == T_MagmaIndexOnlyScan || best_path->pathtype == T_OrcIndexOnlyScan ||
-				best_path->pathtype == T_OrcIndexScan)
+		if (best_path->pathtype == T_MagmaIndexOnlyScan || best_path->pathtype == T_OrcIndexOnlyScan)
 		{
 			/* For index-only scan, the preferred tlist is the index's */
 			tlist = copyObject(((IndexPath *) best_path)->indexinfo->indextlist);
@@ -2279,7 +2282,10 @@ MagmaIndexScan *create_magma_indexscan_plan(
                     baserelid,
                     indexonly,
                     indexoid,
+                    fixed_indexquals,
                     stripped_indexquals,
+                    indexstrategy,
+                    indexsubtype,
                     rel->locationlist,
                     fmtopts,
                     rel->fmttype,
@@ -3834,6 +3840,19 @@ make_indexscan(List *qptlist,
 	IndexScan  *node = makeNode(IndexScan);
 	node->scan.plan.type = pathtype;
 	Plan	   *plan = &node->scan.plan;
+	/* native orc index scan need index columns */
+	if (pathtype == T_OrcIndexScan || pathtype == T_OrcIndexOnlyScan)
+	{
+		cqContext *idxcqCtx = caql_beginscan(NULL, cql("SELECT * FROM pg_index "
+				" WHERE indexrelid = :1 ", ObjectIdGetDatum(indexid)));
+		HeapTuple	ht_idx = caql_getnext(idxcqCtx);
+		Form_pg_index idxrec = (Form_pg_index) GETSTRUCT(ht_idx);
+		for (int i = 0; i < idxrec->indnatts; i++)
+		{
+			node->idxColummns = lappend_oid(node->idxColummns, idxrec->indkey.values[i]);
+		}
+		caql_endscan(idxcqCtx);
+	}
 
 	/* cost should be inserted by caller */
 	plan->targetlist = qptlist;
@@ -3855,7 +3874,12 @@ make_indexscan(List *qptlist,
 
 static MagmaIndexScan *make_magma_indexscan(
 		List *qptlist, List *qpqual, Index scanrelid, bool indexonly,
-		Oid indexid, List *indexqualorig, List *urilist,
+		Oid indexid,
+		List *indexqual,
+		List *indexqualorig,
+		List *indexstrategy,
+		List *indexsubtype,
+		List *urilist,
 		List *fmtopts, char fmttype,
 		int rejectlimit, bool rejectlimitinrows,
 		Oid fmterrtableOid, int encoding, ScanDirection indexscandir)
@@ -3872,7 +3896,10 @@ static MagmaIndexScan *make_magma_indexscan(
 	plan->targetlist = qptlist;
 	plan->qual = qpqual;
 	node->indexname = getIndexNameByOid(indexid);
+	node->indexqual = indexqual;
 	node->indexqualorig = indexqualorig;
+	node->indexstrategy = indexstrategy;
+	node->indexsubtype = indexsubtype;
 	node->indexorderdir = indexscandir;
 	plan->lefttree = NULL;
 	plan->righttree = NULL;

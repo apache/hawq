@@ -295,6 +295,7 @@ _readQuery(const char ** str)
 	READ_NODE_FIELD(result_aosegnos);
 	READ_NODE_FIELD(returningLists);
 	READ_NODE_FIELD(contextdisp);
+	READ_NODE_FIELD(graphEntry);
 	/* policy not serialized */
 
 	READ_DONE();
@@ -765,6 +766,7 @@ _readIndexStmt(const char ** str)
 	READ_STRING_FIELD(accessMethod);
 	READ_STRING_FIELD(tableSpace);
 	READ_NODE_FIELD(indexParams);
+	READ_NODE_FIELD(indexIncludingParams);
 	READ_NODE_FIELD(options);
 	READ_NODE_FIELD(whereClause);
 	READ_NODE_FIELD(rangetable);
@@ -776,11 +778,16 @@ _readIndexStmt(const char ** str)
 	READ_OID_FIELD(constrOid);
 	READ_BOOL_FIELD(concurrent);
 	READ_NODE_FIELD(idxOids);
+	READ_BOOL_FIELD(do_part);
+	READ_BOOL_FIELD(magma);
 	READ_OID_FIELD(relationOid);
 	READ_NODE_FIELD(allidxinfos);
 	READ_NODE_FIELD(columnsToRead);
 	READ_NODE_FIELD(contextdisp);
-
+	READ_NODE_FIELD(graphele);
+	READ_NODE_FIELD(graphIndexAttnum);
+	READ_NODE_FIELD(graphIncludeAttnum);
+	READ_BOOL_FIELD(reverse);
 	READ_DONE();
 }
 
@@ -2032,6 +2039,7 @@ _readRangeTblEntry(const char ** str)
 	READ_OID_FIELD(checkAsUser);
 
 	READ_BOOL_FIELD(forceDistRandom);
+	READ_STRING_FIELD(graphName);
 
 	READ_DONE();
 }
@@ -2975,6 +2983,7 @@ _readPlannedStmt(const char ** str)
 
 	READ_STRING_FIELD(hiveUrl);
 	READ_ENUM_FIELD(originNodeType, NodeTag);
+	READ_NODE_FIELD(graphEntry);
 
 	READ_DONE();
 }
@@ -3208,6 +3217,8 @@ readIndexScanFields(const char ** str, IndexScan *local_node)
 		ALLOCATE_LOCAL(local_node->logicalIndexInfo, LogicalIndexInfo, 1 /* single node allocation  */);
 		readLogicalIndexInfo(str, local_node->logicalIndexInfo);
 	}
+	READ_BOOL_FIELD(indexonly);
+	READ_NODE_FIELD(idxColummns);
 }
 
 /*
@@ -3289,7 +3300,10 @@ _readMagmaIndexScan(const char ** str)
 	READ_LOCALS(MagmaIndexScan);
 	readScanInfo(str, (Scan *)local_node);
 	READ_STRING_FIELD(indexname);
+	READ_NODE_FIELD(indexqual);
 	READ_NODE_FIELD(indexqualorig);
+	READ_NODE_FIELD(indexstrategy);
+	READ_NODE_FIELD(indexsubtype);
 	READ_ENUM_FIELD(indexorderdir, ScanDirection);
 	READ_NODE_FIELD(uriList);
 	READ_NODE_FIELD(fmtOpts);
@@ -3316,7 +3330,10 @@ _readMagmaIndexOnlyScan(const char ** str)
 	READ_BOOL_FIELD(rejLimitInRows);
 	READ_OID_FIELD(fmterrtbl);
 	READ_STRING_FIELD(indexname);
+	READ_NODE_FIELD(indexqual);
 	READ_NODE_FIELD(indexqualorig);
+	READ_NODE_FIELD(indexstrategy);
+	READ_NODE_FIELD(indexsubtype);
 	READ_ENUM_FIELD(indexorderdir, ScanDirection);
 	READ_NODE_FIELD(errAosegnos);
 	READ_NODE_FIELD(err_aosegfileinfos);
@@ -4247,6 +4264,16 @@ _readResultRelSegFileInfo(const char **str)
 	READ_DONE();
 }
 
+static GraphEntry *
+_readGraphEntry(const char **str) {
+  READ_LOCALS(GraphEntry);
+
+  READ_OID_FIELD(relid);
+  READ_UINT_FIELD(requiredPerms);
+
+  READ_DONE();
+}
+
 static QueryResource *
 _readQueryResource(const char **str)
 {
@@ -5052,6 +5079,10 @@ readNodeBinary(const char ** str)
 		case T_QueryResource:
 			return_value = _readQueryResource(str);
 			break;
+
+		case T_GraphEntry:
+      return_value = _readGraphEntry(str);
+      break;
 
 		default:
 			return_value = NULL; /* keep the compiler silent */

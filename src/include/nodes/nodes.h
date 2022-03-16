@@ -241,6 +241,7 @@ typedef enum NodeTag
 	T_PartBoundExpr,
 	T_PartBoundInclusionExpr,
 	T_PartBoundOpenExpr,
+	T_GraphEntry,
 
 	/*
 	 * TAGS FOR EXPRESSION STATE NODES (execnodes.h)
@@ -473,6 +474,9 @@ typedef enum NodeTag
 	T_AlterRewriteNewConstraint,
 	T_AlterRewriteNewColumnValue,
 	T_SharedStorageOpStmt,
+	T_CreateVlabelStmt,
+	T_CreateElabelStmt,
+	T_CreateGraphStmt,
 	/**/
 	
 	T_A_Expr = 850,

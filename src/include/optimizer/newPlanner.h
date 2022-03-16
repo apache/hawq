@@ -47,10 +47,6 @@ extern const char *new_executor_runtime_filter_mode;
 extern const char *new_executor_runtime_filter_mode_local;
 extern const char *new_executor_runtime_filter_mode_global;
 
-extern const char *new_scheduler_mode_on;
-extern const char *new_scheduler_mode_off;
-extern char *new_scheduler_mode;
-
 extern int new_interconnect_type;
 extern const char *show_new_interconnect_type();
 
@@ -63,16 +59,18 @@ typedef struct CommonPlanContext {
   plan_tree_base_prefix base;
   UnivPlanC *univplan;
   bool convertible;
-  bool enforceNewScheduler;
-  bool querySelect; // flag of query statement
-  bool isMagma; // flag to indicate whether there is a magma table in the plan
+  bool querySelect;  // flag of query statement
+  bool isMagma;  // flag to indicate whether there is a magma table in the plan
   int magmaRelIndex;
   PlannedStmt *stmt;
   bool setDummyTListRef;
   bool scanReadStatsOnly;
-  Expr *parent;       // used for T_Var, T_Const
-  List *exprBufStack; // used for T_Case
-  int rangeNum;       // magma range num
+  Expr *parent;                // used for T_Var, T_Const
+  List *exprBufStack;          // used for T_Case
+  int rangeNum;                // magma range num
+  bool isConvertingIndexQual;  // flag to indicate if we are doing indexqual
+                               // conversion
+  List *idxColumns;            // orc index columns info
 } CommonPlanContext;
 
 extern bool can_convert_common_plan(QueryDesc *queryDesc,
@@ -85,6 +83,8 @@ extern void convert_extscan_to_common_plan(Plan *node, List *splits,
                                            CommonPlanContext *ctx);
 extern void *convert_orcscan_qual_to_common_plan(Plan *node,
                                                  CommonPlanContext *ctx);
+extern void *convert_orcscan_indexqualorig_to_common_plan(
+    Plan *node, CommonPlanContext *ctx, List *idxColumns);
 extern void convert_querydesc_to_common_plan(QueryDesc *queryDesc,
                                              CommonPlanContext *ctx);
 extern void planner_init_common_plan_context(PlannedStmt *stmt,

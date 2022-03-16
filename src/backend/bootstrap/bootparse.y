@@ -67,6 +67,14 @@
 #include "catalog/pg_type.h"
 #include "catalog/pg_user_mapping.h"
 #include "catalog/pg_tidycat.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_index.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
 #include "catalog/toasting.h"
 #include "commands/defrem.h"
 #include "miscadmin.h"
@@ -319,6 +327,36 @@ Boot_CreateStmt:
 /* relation id: 5006 - gp_configuration_history 20101104 */
 							case GpConfigHistoryRelationId:
 								typid = GP_CONFIGURATION_HISTORY_RELTYPE_OID;
+								break;
+/* relation id: 4850 - skylon_vlabel 20190603 */
+							case VlabelRelationId:
+								typid = SKYLON_VLABEL_RELTYPE_OID;
+/* relation id: 4851 - skylon_elabel 20200224 */
+							case ElabelRelationId:
+								typid = SKYLON_ELABEL_RELTYPE_OID;
+/* relation id: 4852 - skylon_vlabel_attribute 20200224 */
+							case VlabelAttrRelationId:
+								typid = SKYLON_VLABEL_ATTRIBUTE_RELTYPE_OID;
+								break;
+/* relation id: 4853 - skylon_elabel_attribute 20200224 */
+							case ElabelAttrRelationId:
+								typid = SKYLON_ELABEL_ATTRIBUTE_RELTYPE_OID;
+								break;
+/* relation id: 4854 - skylon_graph_vlabel 20200224 */
+							case GraphVlabelRelationId:
+								typid = SKYLON_GRAPH_VLABEL_RELTYPE_OID;
+								break;
+/* relation id: 4855 - skylon_graph_elabel 20200224 */
+							case GraphElabelRelationId:
+								typid = SKYLON_GRAPH_ELABEL_RELTYPE_OID;
+								break;
+/* relation id: 4856 - skylon_graph 20200224 */
+							case GraphRelationId:
+								typid = SKYLON_GRAPH_RELTYPE_OID;
+								break;
+/* relation id: 4857 - skylon_index 20200821 */
+							case SkylonIndexRelationId:
+								typid = SKYLON_INDEX_RELTYPE_OID;
 								break;
 /* relation id: 5029 - gp_db_interfaces 20101104 */
 							case GpDbInterfacesRelationId:

@@ -46,7 +46,7 @@
  * value use for calculate random get page cost which needed
  * by planner.
  */
-#define DEFAULT_RANDOM_PAGE_COST  25.0
+#define DEFAULT_RANDOM_PAGE_COST  4.0
 #define DEFAULT_CPU_TUPLE_COST	0.01
 #define DEFAULT_CPU_INDEX_TUPLE_COST 0.005
 #define DEFAULT_CPU_OPERATOR_COST  0.0025

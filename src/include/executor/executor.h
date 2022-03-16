@@ -519,9 +519,12 @@ extern ResultRelInfo *values_get_partition(Datum *values, bool *nulls,
 extern void SendAOTupCounts(EState *estate);
 
 extern PlanState* newExecutorPlanStateReference;
-extern void exec_mpp_query_new(const char *plan, int len, int stageNo,
+extern void exec_mpp_query_new(void *dispatchData, const char *plan, int len, int stageNo,
                                bool setDisplay, DestReceiver *dest,
                                PlanState *planstate);
+
+extern void teardownNewInterconnect();
+
 typedef struct MyNewExecutorTupState {
   TupleTableSlot *slot;
   bool hasTuple;
@@ -542,7 +545,7 @@ typedef struct MyNewExecutorTupState {
 } MyNewExecutorTupState;
 extern MyNewExecutorTupState *makeMyNewExecutorTupState(TupleDesc tupdesc);
 // get one TupleTableSlot each call
-extern void beginMyNewExecutor(const char *plan, int len, int stageNo,
+extern void beginMyNewExecutor(void *dispatchData, const char *plan, int len, int stageNo,
                                PlanState *planstate);
 extern void execMyNewExecutor(MyNewExecutorTupState *newExecutorState);
 extern void endMyNewExecutor(MyNewExecutorTupState **newExecutorState);

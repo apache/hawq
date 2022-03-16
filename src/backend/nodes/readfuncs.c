@@ -909,6 +909,7 @@ _readIndexStmt(void)
 	READ_STRING_FIELD(accessMethod);
 	READ_STRING_FIELD(tableSpace);
 	READ_NODE_FIELD(indexParams);
+	READ_NODE_FIELD(indexIncludingParams);
 	READ_NODE_FIELD(options);
 	READ_NODE_FIELD(whereClause);
 	READ_NODE_FIELD(rangetable);
@@ -920,7 +921,16 @@ _readIndexStmt(void)
 	READ_OID_FIELD(constrOid);
 	READ_BOOL_FIELD(concurrent);
 	READ_NODE_FIELD(idxOids);
-
+	READ_BOOL_FIELD(do_part);
+	READ_BOOL_FIELD(magma);
+	READ_OID_FIELD(relationOid);
+	READ_NODE_FIELD(allidxinfos);
+	READ_NODE_FIELD(columnsToRead);
+	READ_NODE_FIELD(contextdisp);
+	READ_NODE_FIELD(graphele);
+	READ_NODE_FIELD(graphIndexAttnum);
+	READ_NODE_FIELD(graphIncludeAttnum);
+	READ_BOOL_FIELD(reverse);
 	READ_DONE();
 }
 

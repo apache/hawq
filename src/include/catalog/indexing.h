@@ -391,6 +391,27 @@ DECLARE_UNIQUE_INDEX(pg_resqueue_oid_index, 6027, on pg_resqueue using btree(oid
 DECLARE_UNIQUE_INDEX(pg_resqueue_rsqname_index, 6028, on pg_resqueue using btree(rsqname name_ops));
 #define ResQueueRsqnameIndexId	6028
 
+//DECLARE_UNIQUE_INDEX(pg_vlabel_name_index, 4860, on pg_vlabel using btree(vlabelname name_ops));
+//#define VlabelNameIndexId  4860
+//
+//DECLARE_UNIQUE_INDEX(pg_elabel_name_index, 4861, on pg_elabel using btree(elabelname name_ops));
+//#define ElabelNameIndexId  4861
+//
+//DECLARE_UNIQUE_INDEX(pg_vlabel_attribute_vname_attnam_index, 4862, on pg_vlabel_attribute using btree(vlabelname name_ops,attrname name_ops));
+//#define VlabelAttributeVnameAttnamIndexId  4862
+//
+//DECLARE_UNIQUE_INDEX(pg_elabel_attribute_ename_attnam_index, 4863, on pg_elabel_attribute using btree(elabelname name_ops,attrname name_ops));
+//#define ElabelAttributeEnameAttnamIndexId  4863
+//
+//DECLARE_UNIQUE_INDEX(pg_graph_vlabel_gnam_vnam_index, 4864, on pg_graph_vlabel using btree(graphname name_ops,vlabelname name_ops));
+//#define GraphVlabelGnameVnamIndexId  4864
+//
+//DECLARE_UNIQUE_INDEX(pg_graph_elabel_gnam_enam_index, 4865, on pg_graph_elabel using btree(graphname name_ops,elabelname name_ops));
+//#define GraphElabelGnameEnamIndexId  4865
+//
+//DECLARE_UNIQUE_INDEX(pg_graph_gnam_snam_index, 4866, on pg_graph using btree(graphname name_ops,schemaname name_ops));
+//#define GraphGnameSnamIndexId  4866
+
 /* TIDYCAT_END_CODEGEN */
 
 /* last step of initialization script: build the indexes declared above */

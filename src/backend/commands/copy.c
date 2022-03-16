@@ -157,6 +157,8 @@ static int calculate_virtual_segment_number(List* candidateRelations);
 
 static bool checkMultibytesDelimFound(const char *ptr, const char *delim);
 
+extern bool parseAndTransformAsGraph(ParseState *pstate, RangeVar *rangeVar);
+
 /* ==========================================================================
  * The follwing macros aid in major refactoring of data processing code (in
  * CopyFrom(+Dispatch)). We use macros because in some cases the code must be in
@@ -993,6 +995,8 @@ DoCopy(const CopyStmt *stmt, const char *queryString)
 
 	/* Allocate workspace and zero all fields */
 	cstate = (CopyStateData *) palloc0(sizeof(CopyStateData));
+
+	parseAndTransformAsGraph(NULL, stmt->relation);
 
 	/* Extract options from the statement node tree */
 	foreach(option, stmt->options)

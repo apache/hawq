@@ -933,6 +933,14 @@ include/catalog/pg_type.h
 include/catalog/pg_type_encoding.h
 include/catalog/pg_user_mapping.h
 include/catalog/pg_window.h
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_index.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
 include/catalog/toasting.h
 include/catalog/external/externalmd.h
 include/catalog/external/itemmd.h

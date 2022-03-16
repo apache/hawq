@@ -452,7 +452,9 @@ _bitmap_findbitmaps(IndexScanDesc scan, ScanDirection dir  __attribute__((unused
 								   scan->keyData[keyNo].sk_strategy,
 								   scan->keyData[keyNo].sk_subtype, 
 								   scan->keyData[keyNo].sk_func.fn_oid,
-								   scan->keyData[keyNo].sk_argument);
+								   scan->keyData[keyNo].sk_argument,
+								   InvalidAttrNumber,
+								   InvalidOid);
 		}
 
 		/* When there are no scan keys, all bitmap vectors are included,

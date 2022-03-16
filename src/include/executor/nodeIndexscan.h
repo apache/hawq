@@ -38,6 +38,7 @@ extern bool ExecIndexEvalArrayKeys(ExprContext *econtext,
 extern bool ExecIndexAdvanceArrayKeys(IndexArrayKeyInfo *arrayKeys, int numArrayKeys);
 
 extern TupleTableSlot *IndexNext(IndexScanState *node);
+extern TupleTableSlot *OrcIndexNext(IndexScanState *node);
 
 enum {
 	GPMON_INDEXSCAN_RESTOREPOS = GPMON_QEXEC_M_NODE_START,

@@ -67,6 +67,13 @@
 #include "cdb/cdbpartition.h"
 #include "cdb/cdbparquetstoragewrite.h"
 #include "cdb/cdbdatalocality.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph_elabel.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
 #include "commands/prepare.h"
@@ -229,6 +236,18 @@ static Query *transformCreateExternalStmt(ParseState *pstate,
                                           CreateExternalStmt *stmt,
                                           List **extras_before,
                                           List **extras_after);
+static Query *transformCreateVlabelStmt(ParseState *pstate,
+                                          CreateVlabelStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after);
+static Query *transformCreateElabelStmt(ParseState *pstate,
+                                          CreateElabelStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after);
+static Query *transformCreateGraphStmt(ParseState *pstate,
+                                          CreateGraphStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after);
 static Query *transformCreateForeignStmt(ParseState *pstate,
                                          CreateForeignStmt *stmt,
                                          List **extras_before,
@@ -322,6 +341,12 @@ static Node *make_prule_rulestmt(ParseState *pstate, CreateStmtContext *cxt,
 
 static List *transformAttributeEncoding(List *stenc, CreateStmt *stmt,
                                         CreateStmtContext cxt);
+
+extern char *graphVertexTableName(char *gname,char *vname);
+
+extern char *graphEdgeTableName(char *gname,char *ename);
+
+extern bool parseAndTransformAsGraph(ParseState *pstate, RangeVar *rangeVar);
 
 char *getDefaultFilespace();
 
@@ -648,6 +673,21 @@ static Query *transformStmt(ParseState *pstate, Node *parseTree,
           pstate, (CreateExternalStmt *)parseTree, extras_before, extras_after);
       break;
 
+    case T_CreateVlabelStmt:
+      result = transformCreateVlabelStmt(
+          pstate, (CreateVlabelStmt *)parseTree, extras_before, extras_after);
+      break;
+
+    case T_CreateElabelStmt:
+      result = transformCreateElabelStmt(
+          pstate, (CreateElabelStmt *)parseTree, extras_before, extras_after);
+      break;
+
+    case T_CreateGraphStmt:
+      result = transformCreateGraphStmt(
+                pstate, (CreateGraphStmt *)parseTree, extras_before, extras_after);
+      break;
+
     case T_CreateForeignStmt:
       result = transformCreateForeignStmt(
           pstate, (CreateForeignStmt *)parseTree, extras_before, extras_after);
@@ -741,7 +781,8 @@ static Query *transformStmt(ParseState *pstate, Node *parseTree,
         result = transformSelectStmt(pstate, n);
       else
         result = transformSetOperationStmt(pstate, n);
-    } break;
+    }
+    break;
 
     case T_DeclareCursorStmt:
       result =
@@ -763,6 +804,7 @@ static Query *transformStmt(ParseState *pstate, Node *parseTree,
   /* Mark as original query until we learn differently */
   result->querySource = QSRC_ORIGINAL;
   result->canSetTag = true;
+  result->graphEntry = pstate->graphEntry;
 
   /*
    * Check that we did not produce too many resnos; at the very least we
@@ -885,6 +927,9 @@ static Query *transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt) {
 
   /* setup database name for use of magma operations */
   MemoryContext oldContext = MemoryContextSwitchTo(MessageContext);
+
+  int isGraph = parseAndTransformAsGraph(pstate, stmt->relation);
+
   char *dbname = stmt->relation->catalogname;
   database =
       (dbname != NULL) ? pstrdup(dbname) : get_database_name(MyDatabaseId);
@@ -894,7 +939,9 @@ static Query *transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt) {
   qry->resultRelation = setTargetTable(
       pstate, stmt->relation, interpretInhOption(stmt->relation->inhOpt), true,
       ACL_DELETE);
-
+if(isGraph)
+  pstate->p_target_rangetblentry->graphName = stmt->relation->schemaname ?
+      pstrdup(stmt->relation->schemaname) : NULL;
   qry->distinctClause = NIL;
 
   /*
@@ -937,7 +984,6 @@ static Query *transformDeleteStmt(ParseState *pstate, DeleteStmt *stmt) {
 
   return qry;
 }
-
 /*
  * transformInsertStmt -
  *	  transform an Insert Statement
@@ -958,6 +1004,7 @@ static Query *transformInsertStmt(ParseState *pstate, InsertStmt *stmt,
   ListCell *icols;
   ListCell *attnos;
   ListCell *lc;
+  char *graphName;
 
   qry->commandType = CMD_INSERT;
   pstate->p_is_insert = true;
@@ -991,13 +1038,12 @@ static Query *transformInsertStmt(ParseState *pstate, InsertStmt *stmt,
     sub_varnamespace = NIL;
   }
 
-  if (stmt->relation->catalogname != NULL) {
-    if (database != NULL) {
-      pfree(database);
-      database = NULL;
-    }
-    database = pstrdup(stmt->relation->catalogname);
-  }
+  graphName = stmt->relation->schemaname ? pstrdup(stmt->relation->schemaname) : NULL;
+  int isGraph = parseAndTransformAsGraph(pstate, stmt->relation);
+  MemoryContext oldContext = MemoryContextSwitchTo(MessageContext);
+  database =
+      (stmt->relation->catalogname != NULL) ? pstrdup(stmt->relation->catalogname) : get_database_name(MyDatabaseId);
+  MemoryContextSwitchTo(oldContext);
   /*
    * Must get write lock on INSERT target table before scanning SELECT, else
    * we will grab the wrong kind of initial lock if the target table is also
@@ -1006,7 +1052,8 @@ static Query *transformInsertStmt(ParseState *pstate, InsertStmt *stmt,
    */
   qry->resultRelation =
       setTargetTable(pstate, stmt->relation, false, false, ACL_INSERT);
-
+  if(isGraph)
+    pstate->p_target_rangetblentry->graphName = graphName;
   /* Validate stmt->cols list, or build default list if no list given */
   icolumns = checkInsertTargets(pstate, stmt->cols, &attrnos);
   Assert(list_length(icolumns) == list_length(attrnos));
@@ -1794,6 +1841,13 @@ static List *transformAttributeEncoding(List *stenc, CreateStmt *stmt,
   return newenc;
 }
 
+Query *transformCreateStmtImpl(ParseState *pstate,
+                               CreateStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after) {
+  return transformCreateStmt(pstate, stmt, extras_before, extras_after);
+}
+
 /*
  * transformCreateStmt -
  *	  transforms the "create table" statement
@@ -2376,6 +2430,196 @@ void recognizeExternalRelationFormatterOptions(
   createExtStmt->base.options = newOpts;
 }
 
+static Query *transformCreateVlabelStmt(ParseState *pstate,
+                                          CreateVlabelStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after) {
+  CreateStmtContext cxt;
+  Query *q;
+
+  cxt.stmtType = "CREATE VERTEX";
+  cxt.relation = stmt->relation;
+  cxt.hasoids = false;
+  cxt.isalter = false;
+  cxt.columns = NIL;
+  cxt.ckconstraints = NIL;
+  cxt.fkconstraints = NIL;
+  cxt.ixconstraints = NIL;
+  cxt.inh_indexes = NIL;
+  cxt.pkey = NULL;
+
+  cxt.blist = NIL;
+  cxt.alist = NIL;
+
+  ListCell *elements;
+  foreach (elements, stmt->tableElts) {
+    Node *element = lfirst(elements);
+
+    switch (nodeTag(element)) {
+      case T_ColumnDef:
+        transformColumnDefinition(pstate, &cxt, (ColumnDef *)element);
+        ColumnDef *column = (ColumnDef *)element;
+        Type type = typenameType(NULL, column->typname);
+        column->typname->typid = typeTypeId(type);
+        ReleaseType(type);
+        break;
+
+      case T_Constraint:
+        transformExtTableConstraint(pstate, &cxt, (Constraint *)element);
+        break;
+
+      case T_FkConstraint:
+        /* should never happen. If it does fix gram.y */
+        elog(ERROR, "node type %d not supported for vlabel",
+             (int)nodeTag(element));
+        break;
+
+      default:
+        elog(ERROR, "unrecognized node type: %d", (int)nodeTag(element));
+        break;
+    }
+  }
+
+  /*
+   * transformIndexConstraints wants cxt.alist to contain only index
+   * statements, so transfer anything we already have into extras_after
+   * immediately.
+   */
+  *extras_after = list_concat(cxt.alist, *extras_after);
+  cxt.alist = NIL;
+
+  /*
+   * Output results.
+   */
+  q = makeNode(Query);
+  q->commandType = CMD_UTILITY;
+  q->utilityStmt = (Node *)stmt;
+  stmt->tableElts = cxt.columns;
+  stmt->constraints = cxt.ixconstraints;
+  *extras_before = list_concat(*extras_before, cxt.blist);
+  *extras_after = list_concat(cxt.alist, *extras_after);
+  return q;
+}
+
+static Query *transformCreateElabelStmt(ParseState *pstate,
+                                          CreateElabelStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after) {
+  CreateStmtContext cxt;
+  Query *q;
+
+  cxt.stmtType = "CREATE EDGE";
+  cxt.relation = stmt->relation;
+  cxt.hasoids = false;
+  cxt.isalter = false;
+  cxt.columns = NIL;
+  cxt.ckconstraints = NIL;
+  cxt.fkconstraints = NIL;
+  cxt.ixconstraints = NIL;
+  cxt.inh_indexes = NIL;
+  cxt.pkey = NULL;
+
+  cxt.blist = NIL;
+  cxt.alist = NIL;
+
+  ListCell *elements;
+  foreach (elements, stmt->tableElts) {
+    Node *element = lfirst(elements);
+
+    switch (nodeTag(element)) {
+      case T_ColumnDef:
+        transformColumnDefinition(pstate, &cxt, (ColumnDef *)element);
+        ColumnDef *column = (ColumnDef *)element;
+        Type type = typenameType(NULL, column->typname);
+        column->typname->typid = typeTypeId(type);
+        ReleaseType(type);
+        break;
+
+      case T_Constraint:
+        transformExtTableConstraint(pstate, &cxt, (Constraint *)element);
+        break;
+
+      case T_FkConstraint:
+        /* should never happen. If it does fix gram.y */
+        elog(ERROR, "node type %d not supported for vlabel",
+             (int)nodeTag(element));
+        break;
+
+      default:
+        elog(ERROR, "unrecognized node type: %d", (int)nodeTag(element));
+        break;
+    }
+  }
+
+  /*
+   * transformIndexConstraints wants cxt.alist to contain only index
+   * statements, so transfer anything we already have into extras_after
+   * immediately.
+   */
+  *extras_after = list_concat(cxt.alist, *extras_after);
+  cxt.alist = NIL;
+
+  /*
+   * Output results.
+   */
+  q = makeNode(Query);
+  q->commandType = CMD_UTILITY;
+  q->utilityStmt = (Node *)stmt;
+  stmt->tableElts = cxt.columns;
+  stmt->constraints = cxt.ixconstraints;
+  *extras_before = list_concat(*extras_before, cxt.blist);
+  *extras_after = list_concat(cxt.alist, *extras_after);
+  return q;
+}
+
+static Query *transformCreateGraphStmt(ParseState *pstate,
+                                          CreateGraphStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after) {
+  CreateStmtContext cxt;
+  Query *q;
+
+  cxt.stmtType = "CREATE GRAPH";
+  cxt.relation = stmt->graph;
+  cxt.hasoids = false;
+  cxt.isalter = false;
+  cxt.columns = NIL;
+  cxt.ckconstraints = NIL;
+  cxt.fkconstraints = NIL;
+  cxt.ixconstraints = NIL;
+  cxt.inh_indexes = NIL;
+  cxt.pkey = NULL;
+
+  cxt.blist = NIL;
+  cxt.alist = NIL;
+
+
+  /*
+   * transformIndexConstraints wants cxt.alist to contain only index
+   * statements, so transfer anything we already have into extras_after
+   * immediately.
+   */
+  *extras_after = list_concat(cxt.alist, *extras_after);
+  cxt.alist = NIL;
+
+  /*
+   * Output results.
+   */
+  q = makeNode(Query);
+  q->commandType = CMD_UTILITY;
+  q->utilityStmt = (Node *)stmt;
+  *extras_before = list_concat(*extras_before, cxt.blist);
+  *extras_after = list_concat(cxt.alist, *extras_after);
+  return q;
+}
+
+Query *transformCreateExternalStmtImpl(ParseState *pstate,
+                                          CreateExternalStmt *stmt,
+                                          List **extras_before,
+                                          List **extras_after) {
+  return transformCreateExternalStmt(pstate, stmt, extras_before, extras_after);
+}
+
 static Query *transformCreateExternalStmt(ParseState *pstate,
                                           CreateExternalStmt *stmt,
                                           List **extras_before,
@@ -2590,6 +2834,9 @@ static Query *transformCreateExternalStmt(ParseState *pstate,
           likeDistributedBy = getLikeDistributionPolicy((InhRelation *)element);
         }
       } break;
+
+      case T_String:
+        break;
 
       default:
         elog(ERROR, "unrecognized node type: %d", (int)nodeTag(element));
@@ -8084,6 +8331,181 @@ static Query *transformIndexStmt(ParseState *pstate, IndexStmt *stmt,
   qry = makeNode(Query);
   qry->commandType = CMD_UTILITY;
 
+  char *graph = stmt->relation->schemaname ? pstrdup(stmt->relation->schemaname) : NULL;
+  char *ele = stmt->relation->relname;
+  int isGraph = parseAndTransformAsGraph(pstate, stmt->relation);
+  if(isGraph) {
+    stmt->graphele = makeRangeVar(stmt->relation->schemaname, graph, ele, -1);
+    Oid dboid = GetCatalogId(stmt->relation->catalogname);
+    Oid namespaceId = LookupNamespaceId(stmt->relation->schemaname, dboid);
+    if(isGraph == 2 /* as edge*/) {
+      Oid relid = caql_getoid(
+          NULL,
+          cql("SELECT oid FROM pg_class "
+            " WHERE relname = :1 "
+            " AND relnamespace = :2 ",
+            CStringGetDatum(stmt->relation->relname),
+            ObjectIdGetDatum(namespaceId)));
+
+      Relation attrelation = heap_open(AttributeRelationId, RowExclusiveLock);
+      cqContext cqc;
+      int colNum = caql_getcount(
+          NULL,
+                cql("SELECT COUNT(*) FROM pg_attribute "
+                  " WHERE attrelid = :1 AND attnum > :2",
+                  ObjectIdGetDatum(relid), Int32GetDatum(0)));
+
+      cqContext *pcqCtx = caql_beginscan(
+          caql_addrel(cqclr(&cqc), attrelation),
+          cql("SELECT * FROM pg_attribute "
+            " WHERE attrelid = :1 AND attnum > :2",
+            ObjectIdGetDatum(relid), Int32GetDatum(0)));
+      HeapTuple attributeTuple;
+      char **colnames = palloc0(colNum * sizeof(char*));
+      while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))) {
+        Form_pg_attribute att = (Form_pg_attribute) GETSTRUCT(attributeTuple);
+        colnames[att->attnum - 1] = pstrdup(NameStr(att->attname));
+      }
+      caql_endscan(pcqCtx);
+      heap_close(attrelation, RowExclusiveLock);
+      Relation ElabelRelation = heap_open(ElabelRelationId, RowExclusiveLock);
+      HeapTuple elabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), ElabelRelation),
+                                           cql("SELECT * FROM skylon_elabel"
+          " WHERE elabelname = :1 AND schemaname = :2",
+          CStringGetDatum(ele), CStringGetDatum(stmt->relation->schemaname)));
+      Form_skylon_elabel elabel = (Form_skylon_elabel) GETSTRUCT(elabelTuple);
+      Relation VlabelAttRelation = heap_open(VlabelAttrRelationId, RowExclusiveLock);
+      int srcNum =
+          caql_getcount(
+          NULL,
+          cql("SELECT COUNT(*) FROM skylon_vlabel_attribute "
+             " WHERE vlabelname = :1 AND schemaname = :2 "
+             "AND primaryrank > :3",
+             CStringGetDatum(elabel->fromvlabel.data), CStringGetDatum(stmt->relation->schemaname), Int32GetDatum(0)));
+      int dstNum = caql_getcount(
+        NULL,
+        cql("SELECT COUNT(*) FROM skylon_vlabel_attribute "
+          " WHERE vlabelname = :1 AND schemaname = :2 "
+            "AND primaryrank > :3",
+          CStringGetDatum(elabel->tovlabel.data), CStringGetDatum(stmt->relation->schemaname), Int32GetDatum(0)));
+      int primaryNum = srcNum + dstNum;
+      heap_close(VlabelAttRelation, RowExclusiveLock);
+      heap_close(ElabelRelation, RowExclusiveLock);
+      Relation elabelAttRelation = heap_open(ElabelAttrRelationId, RowExclusiveLock);
+      int eattnum = caql_getcount(
+          NULL,
+              cql("SELECT COUNT(*) FROM skylon_elabel_attribute "
+                " WHERE elabelname = :1 AND schemaname = :2 "
+                  "AND rank > :3",
+                  CStringGetDatum(ele), CStringGetDatum(stmt->relation->schemaname), Int32GetDatum(0)));
+      char **attnames = palloc0(eattnum * sizeof(char*));
+      pcqCtx = caql_beginscan(
+          caql_addrel(cqclr(&cqc), elabelAttRelation),
+                        cql("SELECT * FROM skylon_elabel_attribute "
+                          " WHERE elabelname = :1 AND schemaname = :2 "
+                            "AND rank > :3",
+                            CStringGetDatum(ele), CStringGetDatum(stmt->relation->schemaname), Int32GetDatum(0)));
+      while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))) {
+        Form_skylon_elabel_attribute att = (Form_skylon_elabel_attribute) GETSTRUCT(attributeTuple);
+        attnames[att->rank - 1] = pstrdup(NameStr(att->attrname));
+      }
+      caql_endscan(pcqCtx);
+      heap_close(elabelAttRelation, RowExclusiveLock);
+      ListCell *cell;
+      foreach(cell, stmt->indexParams) {
+        IndexElem *ele = (IndexElem *)lfirst(cell);
+        for(int i = 0; i < eattnum; i++) {
+          if(strcmp(attnames[i], ele->name) == 0) {
+            Value *attnum = makeInteger(0);
+            attnum->val.ival = i + 1;
+            stmt->graphIndexAttnum = lappend(stmt->graphIndexAttnum, attnum);
+            break;
+          }
+        }
+      }
+      foreach(cell, stmt->indexIncludingParams) {
+        IndexElem *ele = (IndexElem *)lfirst(cell);
+        for(int i = 0; i < eattnum; i++) {
+          if(strcmp(attnames[i], ele->name) == 0) {
+            Value *attnum = makeInteger(0);
+            attnum->val.ival = i + 1;
+            stmt->graphIncludeAttnum = lappend(stmt->graphIncludeAttnum, attnum);
+            break;
+          }
+        }
+      }
+      List *newIndexParams = NIL;
+      if(!stmt->reverse) {
+        for(int i = 0; i < primaryNum; i++) {
+          IndexElem *indexele = makeNode(IndexElem);
+          indexele->name = colnames[i];
+          newIndexParams = lappend(newIndexParams, indexele);
+        }
+      }
+      else {
+        for(int i = 0; i < dstNum; i++) {
+          IndexElem *indexele = makeNode(IndexElem);
+          indexele->name = colnames[srcNum + i];
+          newIndexParams = lappend(newIndexParams, indexele);
+        }
+        for(int i = 0; i < srcNum; i++) {
+          IndexElem *indexele = makeNode(IndexElem);
+          indexele->name = colnames[i];
+          newIndexParams = lappend(newIndexParams, indexele);
+        }
+      }
+    stmt->indexParams = list_concat(newIndexParams, stmt->indexParams);
+    }
+    else {
+      Relation vlabelAttRelation = heap_open(VlabelAttrRelationId, RowExclusiveLock);
+      cqContext cqc;
+      int vattnum = caql_getcount(
+              NULL,
+              cql("SELECT COUNT(*) FROM skylon_vlabel_attribute "
+                " WHERE vlabelname = :1 AND schemaname = :2 "
+                  "AND rank > :3",
+                  CStringGetDatum(ele), CStringGetDatum(stmt->relation->schemaname), Int32GetDatum(0)));
+      char **attnames = palloc0(vattnum * sizeof(char*));
+      cqContext *pcqCtx = caql_beginscan(
+          caql_addrel(cqclr(&cqc), vlabelAttRelation),
+                        cql("SELECT * FROM skylon_vlabel_attribute "
+                          " WHERE vlabelname = :1 AND schemaname = :2 "
+                            "AND rank > :3",
+                            CStringGetDatum(ele), CStringGetDatum(stmt->relation->schemaname), Int32GetDatum(0)));
+      HeapTuple attributeTuple;
+      while (HeapTupleIsValid(attributeTuple = caql_getnext(pcqCtx))) {
+        Form_skylon_vlabel_attribute att = (Form_skylon_vlabel_attribute) GETSTRUCT(attributeTuple);
+        attnames[att->rank - 1] = pstrdup(NameStr(att->attrname));
+      }
+      caql_endscan(pcqCtx);
+      heap_close(vlabelAttRelation, RowExclusiveLock);
+      ListCell *cell;
+      foreach(cell, stmt->indexParams) {
+        IndexElem *ele = (IndexElem *)lfirst(cell);
+        for(int i = 0; i < vattnum; i++) {
+          if(strcmp(attnames[i], ele->name) == 0) {
+            Value *attnum = makeInteger(0);
+            attnum->val.ival = i + 1;
+            stmt->graphIndexAttnum = lappend(stmt->graphIndexAttnum, attnum);
+            break;
+          }
+        }
+      }
+      foreach(cell, stmt->indexIncludingParams) {
+        IndexElem *ele = (IndexElem *)lfirst(cell);
+        for(int i = 0; i < vattnum; i++) {
+          if(strcmp(attnames[i], ele->name) == 0) {
+            Value *attnum = makeInteger(0);
+            attnum->val.ival = i + 1;
+            stmt->graphIncludeAttnum = lappend(stmt->graphIncludeAttnum, attnum);
+            break;
+          }
+        }
+      }
+    }
+
+  }
+
   /*
    * If the table already exists (i.e., this isn't a create table time
    * expansion of primary key() or unique()) and we're the ultimate parent
@@ -10133,6 +10555,9 @@ static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt) {
 
   /* setup database name for use of magma operations */
   MemoryContext oldContext = MemoryContextSwitchTo(MessageContext);
+
+  int isGraph = parseAndTransformAsGraph(pstate, stmt->relation);
+
   char *dbname = stmt->relation->catalogname;
   database =
       (dbname != NULL) ? pstrdup(dbname) : get_database_name(MyDatabaseId);
@@ -10141,7 +10566,9 @@ static Query *transformUpdateStmt(ParseState *pstate, UpdateStmt *stmt) {
   qry->resultRelation = setTargetTable(
       pstate, stmt->relation, interpretInhOption(stmt->relation->inhOpt), true,
       ACL_UPDATE);
-
+  if(isGraph)
+    pstate->p_target_rangetblentry->graphName = stmt->relation->schemaname ?
+        pstrdup(stmt->relation->schemaname) : NULL;
   /*
    * the FROM clause is non-standard SQL syntax. We used to be able to do
    * this with REPLACE in POSTQUEL so we keep the feature.

@@ -21,10 +21,14 @@
 
 #include "access/orcsegfiles.h"
 
+#include "access/aomd.h"
 #include "access/filesplit.h"
 #include "access/genam.h"
+#include "catalog/catalog.h"
 #include "nodes/relation.h"
+#include "cdb/cdbmetadatacache.h"
 #include "cdb/cdbvars.h"
+#include "storage/fd.h"
 #include "utils/builtins.h"
 #include "utils/fmgroids.h"
 
@@ -105,7 +109,31 @@ void insertOrcSegnoEntry(AppendOnlyEntry *aoEntry, int segNo, float8 tupleCount,
   heap_close(segRel, RowExclusiveLock);
 }
 
-void deleteOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid)
+void deleteOrcIndexHdfsFiles(Relation rel, int32 segmentFileNum, int32 idx)
+{
+  RelFileNode rd_node = rel->rd_node;
+  char *basepath = relpath(rel->rd_node);
+  HdfsFileInfo *file_info;
+  char *path = (char*)palloc(MAXPGPATH + 1);
+
+  FormatAOSegmentIndexFileName(basepath, segmentFileNum, idx,  -1, 0, &segmentFileNum, path);
+
+  RemovePath(path, 0);
+
+  if (!IsLocalPath(path) && Gp_role == GP_ROLE_DISPATCH)
+  {
+    // Remove Hdfs block locations info in Metadata Cache
+    file_info = CreateHdfsFileInfo(rd_node, segmentFileNum);
+    LWLockAcquire(MetadataCacheLock, LW_EXCLUSIVE);
+    RemoveHdfsFileBlockLocations(file_info);
+    LWLockRelease(MetadataCacheLock);
+    DestroyHdfsFileInfo(file_info);
+  }
+
+  pfree(path);
+}
+
+void deleteOrcIndexFileInfo(Relation rel, AppendOnlyEntry *aoEntry, int idxOid)
 {
   if (aoEntry->blkdirrelid == 0) return;
   Relation segRel = heap_open(aoEntry->blkdirrelid, RowExclusiveLock);
@@ -118,6 +146,10 @@ void deleteOrcIndexFileInfo(AppendOnlyEntry *aoEntry, int idxOid)
   HeapTuple tuple;
   while ((tuple = systable_getnext(scan)))
   {
+    int segno = DatumGetInt32(fastgetattr(tuple, Anum_pg_orcseg_idx_segno, desc, NULL));
+    /* delete hdfs index files */
+    deleteOrcIndexHdfsFiles(rel, segno, idxOid);
+    /* delete catalog info */
     simple_heap_delete(segRel, &tuple->t_self);
   }
 

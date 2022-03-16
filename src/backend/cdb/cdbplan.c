@@ -393,9 +393,13 @@ plan_tree_mutator(Node *node,
 
 			FLATCOPY(newidxscan, idxscan, MagmaIndexScan);
 			SCANMUTATE(newidxscan, idxscan);
+
+			MUTATE(newidxscan->indexqual, idxscan->indexqual, List *);
 			MUTATE(newidxscan->indexqualorig, idxscan->indexqualorig, List *);
 			MUTATE(newidxscan->uriList, idxscan->uriList, List *);
 			MUTATE(newidxscan->fmtOpts, idxscan->fmtOpts, List *);
+			MUTATE(newidxscan->indexstrategy, idxscan->indexstrategy, List *);
+			MUTATE(newidxscan->indexsubtype, idxscan->indexsubtype, List *);
 			// MUTATE(newidxscan->indexname, idxscan->indexname, char*);
 			newidxscan->fmtType = idxscan->fmtType;
 			return (Node *) newidxscan;
@@ -409,9 +413,13 @@ plan_tree_mutator(Node *node,
 
 			FLATCOPY(newidxscan, idxscan, MagmaIndexOnlyScan);
 			SCANMUTATE(newidxscan, idxscan);
+
+			MUTATE(newidxscan->indexqual, idxscan->indexqual, List *);
 			MUTATE(newidxscan->indexqualorig, idxscan->indexqualorig, List *);
 			MUTATE(newidxscan->uriList, idxscan->uriList, List *);
 			MUTATE(newidxscan->fmtOpts, idxscan->fmtOpts, List *);
+			MUTATE(newidxscan->indexstrategy, idxscan->indexstrategy, List *);
+			MUTATE(newidxscan->indexsubtype, idxscan->indexsubtype, List *);
 			// MUTATE(newidxscan->indexname, idxscan->indexname, char*);
 			newidxscan->fmtType = idxscan->fmtType;
 			return (Node *) newidxscan;

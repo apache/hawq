@@ -26,6 +26,14 @@
  */
 
 
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_index.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
 #include "catalog/gp_configuration.h"
 #include "catalog/gp_global_sequence.h"
 #include "catalog/gp_master_mirroring.h"

@@ -134,7 +134,6 @@
 #include "resourcemanager/resourceenforcer/resourceenforcer.h"
 
 #include "storage/cwrapper/hdfs-file-system-c.h"
-#include "scheduler/cwrapper/scheduler-c.h"
 #include "magma/cwrapper/magma-client-c.h"
 
 #include "pg_stat_activity_history_process.h"
@@ -3479,9 +3478,6 @@ die(SIGNAL_ARGS)
 		MagmaClientC_CancelMagmaClient();
 		MagmaFormatC_CancelMagmaClient();
 
-		if (MyScheduler != NULL)
-		  SchedulerCancelQuery(MyScheduler);
-
 		if (MyNewExecutor != NULL)
 			MyExecutorSetCancelQuery(MyNewExecutor);
 
@@ -3557,9 +3553,6 @@ StatementCancelHandler(SIGNAL_ARGS)
 		 */
 		MagmaClientC_CancelMagmaClient();
 		MagmaFormatC_CancelMagmaClient();
-
-		if (MyScheduler != NULL)
-		  SchedulerCancelQuery(MyScheduler);
 
 		if (MyNewExecutor != NULL)
 			MyExecutorSetCancelQuery(MyNewExecutor);
@@ -5225,6 +5218,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 					else {
 						if (serializedCommonPlanLen > 0) {
 							exec_mpp_query_new(
+							    NULL,
 									serializedCommonPlan,
 									serializedCommonPlanLen,
 									localSlice, true, NULL, NULL);
@@ -5447,6 +5441,7 @@ PostgresMain(int argc, char *argv[], const char *username)
 
                     if (serializedCommonPlanLen > 0) {
                       exec_mpp_query_new(
+                          NULL,
                           serializedCommonPlan,
                           serializedCommonPlanLen,
                           currentSliceId, true, NULL, NULL);
@@ -5654,19 +5649,6 @@ PostgresMain(int argc, char *argv[], const char *username)
 					close_type = pq_getmsgbyte(&input_message);
 					close_target = pq_getmsgstring(&input_message);
 					pq_getmsgend(&input_message);
-
-					// stop scheduler
-					if (MyScheduler) {
-					  SchedulerEnd(MyScheduler);
-					  SchedulerCatchedError *err = SchedulerGetLastError(MyScheduler);
-					  if (err->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
-					    int errCode = err->errCode;
-					    SchedulerCleanUp(MyScheduler);
-					    ereport(WARNING, (errcode(errCode),
-					        errmsg("failed to stop scheduler. %s (%d)",
-					               err->errMessage, errCode)));
-					  }
-					}
 
 					switch (close_type)
 					{

@@ -57,6 +57,7 @@
 #include "catalog/pg_resqueue.h"
 #include "catalog/pg_authid.h"
 #include "catalog/pg_type.h"
+#include "catalog/skylon_index.h"
 #include "cdb/cdbpartition.h"
 #include "commands/dbcommands.h"
 #include "commands/defrem.h"
@@ -126,7 +127,8 @@ bool CDBCreateIndex(IndexStmt *stmt, Oid relationOid, Oid indexOid)
 		if (fstotal)
 		{
 			target_segment_num = fstotal->totalfilesegs;
-			if (target_segment_num == 0)
+			int tuplecount = fstotal->totaltuples;
+			if (target_segment_num == 0 || tuplecount == 0)
 			{
 				elog(LOG, "CDBCreateIndex need not to dispatch create index statement, for not data in orc files.\n");
 				relation_close(rel, AccessShareLock);
@@ -204,10 +206,7 @@ bool CDBCreateIndex(IndexStmt *stmt, Oid relationOid, Oid indexOid)
 		if (HeapTupleIsValid(atttuple))
 		{
 			Form_pg_attribute tuple = (Form_pg_attribute) GETSTRUCT(atttuple);
-			if (!tuple->attnotnull)
-			{
-				stmt->columnsToRead = lappend_int(stmt->columnsToRead, tuple->attnum);
-			}
+			stmt->columnsToRead = lappend_int(stmt->columnsToRead, tuple->attnum);
 		}
 		caql_endscan(attcqCtx);
 	}
@@ -229,6 +228,13 @@ bool CDBCreateIndex(IndexStmt *stmt, Oid relationOid, Oid indexOid)
 	DispatchDataResult result;
 	mainDispatchStmtNode(stmt, NULL, resource, &result);
 	DropQueryContextInfo(stmt->contextdisp);
+	/* free resource */
+	if (resource)
+	{
+		FreeResource(resource);
+		resource = NULL;
+		SetActiveQueryResource(savedResource);
+	}
 	return true;
 }
 
@@ -236,6 +242,15 @@ void CDBDefineIndex(IndexStmt *stmt)
 {
 	Relation rel = relation_open(stmt->relationOid, NoLock);
 	/* 1. get orc file infos belong to this qe */
+
+	/* there might be a situation where the number
+	 * of QE's is greater than the number of Index files
+	 */
+	if (GetQEIndex() >= list_length(stmt->allidxinfos))
+	{
+		relation_close(rel, NoLock);
+		return;
+	}
 	NativeOrcIndexFile *idxs = (NativeOrcIndexFile *)(list_nth(stmt->allidxinfos, GetQEIndex()));
 	/* 2. call native orc index interface to build index data */
 	int keyCount = list_length(stmt->indexParams) - list_length(stmt->indexIncludingParams);
@@ -349,6 +364,30 @@ DefineIndex(Oid relationId,
 	  ereport(ERROR,
 	          (errcode(ERRCODE_INVALID_OBJECT_DEFINITION),
 	              errmsg("included columns must not intersect with key columns")));
+
+	if(stmt->graphele) {
+	  int indexnum = list_length(stmt->graphIndexAttnum);
+	  int includenum = list_length(stmt->graphIncludeAttnum);
+	  int2 *attnums = palloc0(indexnum * sizeof(int));
+	  int2 *includeattnums = palloc0(includenum * sizeof(int));
+	  ListCell *cell;
+	  int i = 0;
+	  foreach(cell, stmt->graphIndexAttnum) {
+	    Value *num = (Value *) lfirst(cell);
+	    attnums[i] = (int2)num->val.ival;
+	    i++;
+	  }
+	  i = 0;
+    foreach(cell, stmt->graphIncludeAttnum) {
+      Value *num = (Value *) lfirst(cell);
+      includeattnums[i] = (int2)num->val.ival;
+      i++;
+    }
+	  char indexType = stmt->reverse ? 'r' : 'n';
+	  InsertSkylonIndexEntry(stmt->graphele->catalogname , stmt->graphele->schemaname,
+	                         stmt->graphele->relname, indexType, stmt->idxname,
+	                         attnums, indexnum, includeattnums, includenum);
+	}
 
 	/*
 	 * count key attributes in index
@@ -1714,6 +1753,37 @@ RemoveIndex(RangeVar *relation, DropBehavior behavior)
 	cqContext	*pcqCtx;
 
 	indOid = RangeVarGetRelid(relation, false, false /*allowHcatalog*/);
+
+	Relation pgclassrel = heap_open(RelationRelationId, RowExclusiveLock);
+	cqContext cqctmp;
+	HeapTuple pgclasstup = caql_getfirst(
+	    caql_addrel(cqclr(&cqctmp), pgclassrel),
+	    cql("SELECT * FROM pg_class "
+	        " WHERE oid = :1 ",
+	        ObjectIdGetDatum(indOid)));
+	Form_pg_class pgclassForm = (Form_pg_class) GETSTRUCT(pgclasstup);
+	Relation pgnmrel = heap_open(NamespaceRelationId, RowExclusiveLock);
+	HeapTuple pgnmtup = caql_getfirst(
+	    caql_addrel(cqclr(&cqctmp), pgnmrel),
+	    cql("SELECT * FROM pg_namespace "
+	        " WHERE oid = :1 ",
+	        ObjectIdGetDatum(pgclassForm->relnamespace)));
+	Form_pg_namespace pgnmForm = (Form_pg_namespace) GETSTRUCT(pgnmtup);
+
+	Relation  skylon_index_rel;
+	cqContext cqc;
+	skylon_index_rel = heap_open(SkylonIndexRelationId, RowExclusiveLock);
+	caql_getcount(
+	    caql_addrel(cqclr(&cqc), skylon_index_rel),
+	    cql("DELETE FROM skylon_index "
+	        " WHERE indexname = :1 AND schemaname = :2",
+	        CStringGetDatum(relation->relname), NameGetDatum(&pgnmForm->nspname)));
+	heap_close(skylon_index_rel, RowExclusiveLock);
+
+	heap_close(pgnmrel, RowExclusiveLock);
+	heap_freetuple(pgnmtup);
+	heap_close(pgclassrel, RowExclusiveLock);
+	heap_freetuple(pgclasstup);
 
 	if (Gp_role == GP_ROLE_DISPATCH)
 	{

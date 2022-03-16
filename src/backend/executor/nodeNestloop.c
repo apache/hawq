@@ -152,13 +152,13 @@ ExecNestLoop(NestLoopState *node)
 			 * iterations.
 			 */
 			node->nl_innerSideScanned = true;
-            /* CDB: Quit if empty inner implies no outer rows can match. */
+			/* CDB: Quit if empty inner implies no outer rows can match. */
 			/* See MPP-1146 and MPP-1694 */
 			if (node->nl_QuitIfEmptyInner)
-            {
-                ExecSquelchNode(outerPlan);
-                return NULL;
-            }
+			{
+			        ExecSquelchNode(outerPlan);
+			        return NULL;
+			}
 		}
 
 		if ((node->js.jointype == JOIN_LASJ_NOTIN) &&
@@ -200,10 +200,10 @@ ExecNestLoop(NestLoopState *node)
 		 */
 		if (node->nl_NeedNewOuter)
 		{
-            ENL1_printf("getting new outer tuple");
-            outerTupleSlot = ExecProcNode(outerPlan);
-            Gpmon_M_Incr(GpmonPktFromNLJState(node), GPMON_NLJ_OUTERTUPLE);
-            Gpmon_M_Incr(GpmonPktFromNLJState(node), GPMON_QEXEC_M_ROWSIN); 
+		        ENL1_printf("getting new outer tuple");
+		        outerTupleSlot = ExecProcNode(outerPlan);
+		        Gpmon_M_Incr(GpmonPktFromNLJState(node), GPMON_NLJ_OUTERTUPLE);
+		        Gpmon_M_Incr(GpmonPktFromNLJState(node), GPMON_QEXEC_M_ROWSIN);
 
 			/*
 			 * if there are no more outer tuples, then the join is complete..
@@ -308,18 +308,18 @@ ExecNestLoop(NestLoopState *node)
 					 */
 					ENL1_printf("qualification succeeded, projecting tuple");
 
-					Gpmon_M_Incr_Rows_Out(GpmonPktFromNLJState(node)); 
-                          	CheckSendPlanStateGpmonPkt(&node->js.ps);
+					Gpmon_M_Incr_Rows_Out(GpmonPktFromNLJState(node));
+					CheckSendPlanStateGpmonPkt(&node->js.ps);
 					return ExecProject(node->js.ps.ps_ProjInfo, NULL);
 				}
 			}
 
-            /* CDB: Quit if empty inner implies no outer rows can match. */
-            if (node->nl_QuitIfEmptyInner)
-            {
-                ExecSquelchNode(outerPlan);
-                return NULL;
-            }
+			/* CDB: Quit if empty inner implies no outer rows can match. */
+			if (node->nl_QuitIfEmptyInner)
+			{
+			        ExecSquelchNode(outerPlan);
+			        return NULL;
+			}
 
 			/*
 			 * Otherwise just return to top of loop for a new outer tuple.
@@ -327,7 +327,7 @@ ExecNestLoop(NestLoopState *node)
 			continue;
 		}
 
-        node->nl_QuitIfEmptyInner = false;  /*CDB*/
+		node->nl_QuitIfEmptyInner = false;  /*CDB*/
 
 		if ((node->js.jointype == JOIN_LASJ_NOTIN) &&
 				(!node->nl_innerSideScanned) &&
@@ -376,7 +376,7 @@ ExecNestLoop(NestLoopState *node)
 				ENL1_printf("qualification succeeded, projecting tuple");
 
 				Gpmon_M_Incr_Rows_Out(GpmonPktFromNLJState(node));
-                     	CheckSendPlanStateGpmonPkt(&node->js.ps);
+				CheckSendPlanStateGpmonPkt(&node->js.ps);
 				return ExecProject(node->js.ps.ps_ProjInfo, NULL);
 			}
 

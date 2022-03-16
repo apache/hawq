@@ -86,7 +86,6 @@
 #include "cdb/cdbmotion.h"
 #include "cdb/cdbsreh.h"
 #include "cdb/memquota.h"
-#include "cdb/scheduler.h"
 #include "cdb/cdbsrlz.h"
 #include "catalog/catalog.h" // isMasterOnly()
 #include "executor/spi.h"
@@ -331,7 +330,6 @@ InternalCreateExecutorState(MemoryContext qcontext, bool is_subquery)
 
 	estate->dispatch_data = NULL;
 	estate->mainDispatchData = NULL;
-	estate->scheduler_data = NULL;
 
 	estate->currentSliceIdInPlan = 0;
 	estate->currentExecutingSliceId = 0;
@@ -2196,6 +2194,8 @@ void mppExecutorFinishup(QueryDesc *queryDesc)
 		 */
 		TeardownInterconnect(estate->interconnect_context, estate->motionlayer_context, estate->cancelUnfinished);
 		estate->es_interconnect_is_setup = false;
+	} else if (queryDesc->newPlan) {
+	  teardownNewInterconnect();
 	}
 }
 
@@ -2259,12 +2259,7 @@ void mppExecutorCleanup(QueryDesc *queryDesc)
 		dispatch_catch_error(estate->dispatch_data);
 		estate->dispatch_data = NULL;
 	}
-	else if (estate->scheduler_data)
-	{
-	  scheduler_catch_error(estate->scheduler_data);
-	  scheduler_cleanup(estate->scheduler_data);
-	  estate->scheduler_data = NULL;
-	} else if (estate->mainDispatchData) {
+	else if (estate->mainDispatchData) {
 	  if (estate->es_interconnect_is_setup && !estate->es_got_eos)
 	    ExecSquelchNode(queryDesc->planstate);
 	  mainDispatchCatchError(&estate->mainDispatchData);
@@ -2275,6 +2270,8 @@ void mppExecutorCleanup(QueryDesc *queryDesc)
 	{
 		TeardownInterconnect(estate->interconnect_context, estate->motionlayer_context, true /* force EOS */);
 		estate->es_interconnect_is_setup = false;
+	} else if (queryDesc->newPlan) {
+	  teardownNewInterconnect();
 	}
 	
 	/**

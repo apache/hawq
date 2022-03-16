@@ -50,6 +50,14 @@
 #include "catalog/pg_type.h"
 #include "catalog/pg_type_encoding.h"
 #include "catalog/pg_user_mapping.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_graph_elabel.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_index.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
 #include "cdb/cdbpartition.h"
 #include "commands/comment.h"
 #include "commands/dbcommands.h"
@@ -1070,6 +1078,18 @@ doDeletion(const ObjectAddress *object)
 			elog(NOTICE, "dependency: not yet implemented!");
 			break;
 			
+		case OCLASS_GRAPH:
+      RemoveGraphByOid(object->objectId, false);
+      break;
+
+		case OCLASS_VLABEL:
+		  RemoveVlabelByOid(object->objectId);
+		  break;
+
+		case OCLASS_ELABEL:
+		  RemoveElabelByOid(object->objectId);
+		  break;
+
 		default:
 			elog(ERROR, "unrecognized object class: %u",
 				 object->classId);
@@ -1796,6 +1816,18 @@ getObjectClass(const ObjectAddress *object)
 		case CompressionRelationId:
 			Assert(object->objectSubId == 0);
 			return OCLASS_COMPRESSION;
+
+    case GraphRelationId:
+      Assert(object->objectSubId == 0);
+      return OCLASS_GRAPH;
+
+    case VlabelRelationId:
+      Assert(object->objectSubId == 0);
+      return OCLASS_VLABEL;
+
+    case ElabelRelationId:
+      Assert(object->objectSubId == 0);
+      return OCLASS_ELABEL;
 	}
 
 	/* shouldn't get here */
@@ -2197,6 +2229,24 @@ getObjectDescription(const ObjectAddress *object)
 				elog(NOTICE, "NOT YET IMPLEMENTED");
 				break;
 			}
+    case OCLASS_GRAPH:
+      {
+        appendStringInfo(&buffer, _("graph %s"),
+                         RelidGetName(object->objectId));
+        break;
+      }
+    case OCLASS_VLABEL:
+      {
+        appendStringInfo(&buffer, _("vertex %s"),
+                         RelidGetName(object->objectId));
+        break;
+      }
+    case OCLASS_ELABEL:
+      {
+        appendStringInfo(&buffer, _("edge %s"),
+                         RelidGetName(object->objectId));
+        break;
+      }
 		default:
 			appendStringInfo(&buffer, "unrecognized object %u %u %d",
 							 object->classId,

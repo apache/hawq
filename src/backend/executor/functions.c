@@ -539,13 +539,15 @@ postquel_getnext(execution_state *es, SQLFunctionCachePtr fcache)
 				if (count == 0L) {
 					result = NULL;
 					exec_mpp_query_new(
+					    es->qd->estate->mainDispatchData,
 							es->qd->newPlan->str, es->qd->newPlan->len,
 							currentSliceId, false, NULL, NULL);
 				} else {
 					es->qd->newExecutorState =
 							makeMyNewExecutorTupState(es->qd->tupDesc);
 
-					beginMyNewExecutor(es->qd->newPlan->str,
+					beginMyNewExecutor(es->qd->estate->mainDispatchData,
+					                   es->qd->newPlan->str,
 														 es->qd->newPlan->len,
 														 currentSliceId, NULL);
 					execMyNewExecutor(es->qd->newExecutorState);

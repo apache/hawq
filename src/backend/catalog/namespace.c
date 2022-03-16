@@ -34,6 +34,7 @@
 #include "catalog/pg_operator.h"
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
+#include "catalog/skylon_graph.h"
 #include "commands/dbcommands.h"
 #include "commands/schemacmds.h"
 #include "miscadmin.h"
@@ -224,6 +225,54 @@ bool RelationExists(const RangeVar *relation, Oid dboid)
 	Oid namespaceId = LookupExplicitNamespace(relation->schemaname, dboid);
 	Oid relId = get_relname_relid(relation->relname, namespaceId);
 	return OidIsValid(namespaceId) && OidIsValid(relId);
+}
+
+char *RelidGetName(Oid relid) {
+  Relation pgclassrel = heap_open(RelationRelationId, RowExclusiveLock);
+  cqContext cqctmp;
+  HeapTuple pgclasstup = caql_getfirst(
+      caql_addrel(cqclr(&cqctmp), pgclassrel),
+      cql("SELECT * FROM pg_class "
+          " WHERE oid = :1 ",
+          ObjectIdGetDatum(relid)));
+  if(!HeapTupleIsValid(pgclasstup))
+    return NULL;
+  Form_pg_class pgclassForm = (Form_pg_class) GETSTRUCT(pgclasstup);
+
+  char *name = pstrdup(NameStr(pgclassForm->relname));
+
+  heap_close(pgclassrel, RowExclusiveLock);
+  heap_freetuple(pgclasstup);
+  return name;
+}
+
+RangeVar *RelidGetRangeVar(Oid relid) {
+  Relation pgclassrel = heap_open(RelationRelationId, RowExclusiveLock);
+  cqContext cqctmp;
+  HeapTuple pgclasstup = caql_getfirst(
+      caql_addrel(cqclr(&cqctmp), pgclassrel),
+      cql("SELECT * FROM pg_class "
+          " WHERE oid = :1 ",
+          ObjectIdGetDatum(relid)));
+  Form_pg_class pgclassForm = (Form_pg_class) GETSTRUCT(pgclasstup);
+  Relation pgnmrel = heap_open(NamespaceRelationId, RowExclusiveLock);
+  HeapTuple pgnmtup = caql_getfirst(
+      caql_addrel(cqclr(&cqctmp), pgnmrel),
+      cql("SELECT * FROM pg_namespace "
+          " WHERE oid = :1 ",
+          ObjectIdGetDatum(pgclassForm->relnamespace)));
+  Form_pg_namespace pgnmForm = (Form_pg_namespace) GETSTRUCT(pgnmtup);
+
+  RangeVar *rangeVar = makeRangeVar(NULL,
+                                    pstrdup(NameStr(pgnmForm->nspname)),
+                                    pstrdup(NameStr(pgclassForm->relname)),
+                                    -1);
+
+  heap_close(pgnmrel, RowExclusiveLock);
+  heap_freetuple(pgnmtup);
+  heap_close(pgclassrel, RowExclusiveLock);
+  heap_freetuple(pgclasstup);
+  return rangeVar;
 }
 
 /*
@@ -2003,6 +2052,28 @@ FindDefaultConversionProc(int4 for_encoding, int4 to_encoding)
 	return InvalidOid;
 }
 
+char* findGraphSchema(char *graph) {
+  char *schema = NULL;
+  recomputeNamespacePath();
+  ListCell *l;
+  cqContext cqc;
+  Relation skylon_graph_rel = heap_open(GraphRelationId, RowExclusiveLock);
+  foreach(l, namespaceSearchPath)
+  {
+    Oid namespaceId = lfirst_oid(l);
+    char *thisschema = get_namespace_name(namespaceId);
+    if (0 < caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_graph_rel),
+          cql("SELECT COUNT(*) FROM skylon_graph "
+            " WHERE graphname = :1 AND schemaname = :2",
+            CStringGetDatum(graph), CStringGetDatum(thisschema)))){
+      schema = thisschema;
+      break;
+    }
+  }
+  heap_close(skylon_graph_rel, RowExclusiveLock);
+  return schema;
+}
 
 
 /*

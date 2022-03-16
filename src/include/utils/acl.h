@@ -203,6 +203,7 @@ typedef enum AclObjectKind
 	ACL_KIND_FDW,				/* pg_foreign_data_wrapper */
 	ACL_KIND_FOREIGN_SERVER,	/* pg_foreign_server */
 	ACL_KIND_EXTPROTOCOL,		/* pg_extprotocol */
+	ACL_KIND_CLASS_GRAPH,   /* pg_class_graph */
 	MAX_ACL_KIND				/* MUST BE LAST */
 } AclObjectKind;
 

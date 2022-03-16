@@ -775,8 +775,6 @@ void Explain_udf_plan(QueryDesc *qdesc)
 
 	if (qdesc->estate->dispatch_data)
 		dispatcher_print_statistics(buf, qdesc->estate->dispatch_data);
-	else if (qdesc->estate->scheduler_data)
-		scheduler_print_stats(qdesc->estate->scheduler_data, buf);
 	appendStringInfo(buf, "Data locality statistics:\n");
 	if (qdesc->plannedstmt->datalocalityInfo ==NULL){
 		appendStringInfo(buf, "  no data locality information in this query\n");
@@ -2365,7 +2363,8 @@ _SPI_pquery(QueryDesc * queryDesc, bool fire_triggers, long tcount)
         {
           queryDesc->newExecutorState = makeMyNewExecutorTupState(
               queryDesc->tupDesc);
-          beginMyNewExecutor(queryDesc->newPlan->str,
+          beginMyNewExecutor(queryDesc->estate->mainDispatchData,
+                             queryDesc->newPlan->str,
                              queryDesc->newPlan->len, currentSliceId,
                              queryDesc->planstate);
           (*queryDesc->dest->rStartup)(queryDesc->dest,

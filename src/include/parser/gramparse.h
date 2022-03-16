@@ -56,5 +56,10 @@ extern int	base_yyparse(void);
 extern List *SystemFuncName(char *name);
 extern TypeName *SystemTypeName(char *name);
 extern bool exprIsNullConstant(Node *arg);
-
+extern char *fromVlabelColName(char *vname);
+extern char *toVlabelColName(char *vname);
+extern char *vlabelName(char *vname);
+extern char *elabelName(char *ename);
+extern char *graphVertexName(char *gname);
+extern char *graphEdgeName(char *gname);
 #endif   /* GRAMPARSE_H */

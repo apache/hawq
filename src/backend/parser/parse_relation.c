@@ -2852,12 +2852,29 @@ ExecCheckRTEPerms(RangeTblEntry *rte)
 	 */
 	if (pg_class_aclmask(relOid, userid, requiredPerms, ACLMASK_ALL)
 			!= requiredPerms) {
+		bool isgraph = false;
 		/*
 		 * If the table is a partition, return an error message that includes
 		 * the name of the parent table.
 		 */
 		const char *rel_name = get_rel_name_partition(relOid);
-		aclcheck_error(ACLCHECK_NO_PRIV, ACL_KIND_CLASS, rel_name);
+		if (0 != caql_getcount(NULL,
+							cql("SELECT COUNT(*) FROM skylon_graph "
+							" WHERE graphname = :1 ",
+							CStringGetDatum(rel_name)))) {
+			isgraph = true;
+		}
+		else if (NULL != rte->graphName) {
+			if (0 != caql_getcount(NULL,
+								cql("SELECT COUNT(*) FROM skylon_graph "
+								" WHERE graphname = :1 ",
+								CStringGetDatum(rte->graphName)))) {
+				isgraph = true;
+				rel_name = rte->graphName;
+			}
+		}
+		aclcheck_error(ACLCHECK_NO_PRIV,
+									 isgraph ? ACL_KIND_CLASS_GRAPH : ACL_KIND_CLASS, rel_name);
 	}
 }
 

@@ -49,6 +49,13 @@
 #include "catalog/pg_proc.h"
 #include "catalog/pg_type.h"
 #include "catalog/pg_window.h"
+#include "catalog/skylon_vlabel.h"
+#include "catalog/skylon_vlabel_attribute.h"
+#include "catalog/skylon_elabel.h"
+#include "catalog/skylon_elabel_attribute.h"
+#include "catalog/skylon_graph.h"
+#include "catalog/skylon_graph_vlabel.h"
+#include "catalog/skylon_graph_elabel.h"
 #include "commands/defrem.h"
 #include "nodes/makefuncs.h"
 #include "nodes/print.h" /* XXX: remove after debugging !! */
@@ -86,6 +93,10 @@ static const char *clauseText[] = {
     "DISTINCT ON"
 };
 
+extern char *graphVertexTableName(char *gname,char *vname);
+
+extern char *graphEdgeTableName(char *gname,char *ename);
+
 static void extractRemainingColumns(List *common_colnames,
 						List *src_colnames, List *src_colvars,
 						List **res_colnames, List **res_colvars);
@@ -122,6 +133,8 @@ static List *transformRowExprToList(ParseState *pstate, RowExpr *rowexpr,
 static List *transformRowExprToGroupClauses(ParseState *pstate, RowExpr *rowexpr,
 											List *groupsets, List *targetList);
 static void freeGroupList(List *grouplist);
+
+extern char* findGraphSchema(char *graph);
 
 typedef struct grouping_rewrite_ctx
 {
@@ -1410,7 +1423,170 @@ transformRangeFunction(ParseState *pstate, RangeFunction *r)
 	return rte;
 }
 
+List *transformAsGraphName(ParseState *pstate, RangeVar *rangeVar) {
+  if(!rangeVar) return NULL;
+  char *catalog = rangeVar->catalogname;
+  char *schema = rangeVar->schemaname;
+  char *graph = rangeVar->relname;
 
+  if(schema) {
+    Relation skylon_graph_rel = heap_open(GraphRelationId, RowExclusiveLock);
+    cqContext cqc;
+    Oid dboid = GetCatalogId(catalog);
+    Oid namespaceId = LookupNamespaceId(schema, dboid);
+    if (0 == caql_getcount(
+          caql_addrel(cqclr(&cqc), skylon_graph_rel),
+          cql("SELECT COUNT(*) FROM skylon_graph "
+            " WHERE graphname = :1 AND schemaname = :2",
+            CStringGetDatum(graph), CStringGetDatum(schema)))){
+      heap_close(skylon_graph_rel, RowExclusiveLock);
+      return NULL;
+    }
+    heap_close(skylon_graph_rel, RowExclusiveLock);
+  }
+  else {
+    schema = findGraphSchema(graph);
+    if(!schema)
+      return NULL;
+  }
+  List *list = NIL;
+  {
+    Relation  skylon_graph_vlabel_rel;
+    cqContext cqc;
+
+    skylon_graph_vlabel_rel = heap_open(GraphVlabelRelationId, RowExclusiveLock);
+    cqContext *pcqCtx = caql_beginscan(
+        caql_addrel(cqclr(&cqc), skylon_graph_vlabel_rel),
+        cql("SELECT * FROM skylon_graph_vlabel "
+                        " WHERE graphname = :1 AND schemaname = :2",
+                        CStringGetDatum(graph), CStringGetDatum(schema)));
+    HeapTuple vlabelTuple = NULL;
+    while (HeapTupleIsValid(vlabelTuple = caql_getnext(pcqCtx))) {
+      Form_skylon_graph_vlabel tuple = (Form_skylon_graph_vlabel) GETSTRUCT(vlabelTuple);
+      RangeVar   *vlabel = makeRangeVar(NULL, NULL, NULL, -1);
+      char *vname = pstrdup(NameStr(tuple->vlabelname));
+      vlabel->catalogname = catalog;
+      vlabel->schemaname = schema;
+      vlabel->relname = graphVertexTableName(graph, vname);
+      list = lappend(list, vlabel);
+    }
+    caql_endscan(pcqCtx);
+    heap_close(skylon_graph_vlabel_rel, RowExclusiveLock);
+  }
+  {
+    Relation  skylon_graph_elabel_rel;
+    cqContext cqc;
+
+    skylon_graph_elabel_rel = heap_open(GraphElabelRelationId, RowExclusiveLock);
+    cqContext *pcqCtx = caql_beginscan(
+        caql_addrel(cqclr(&cqc), skylon_graph_elabel_rel),
+        cql("SELECT * FROM skylon_graph_elabel "
+                        " WHERE graphname = :1 AND schemaname = :2",
+                        CStringGetDatum(graph), CStringGetDatum(schema)));
+    HeapTuple elabelTuple = NULL;
+    while (HeapTupleIsValid(elabelTuple = caql_getnext(pcqCtx))) {
+      Form_skylon_graph_elabel tuple = (Form_skylon_graph_elabel) GETSTRUCT(elabelTuple);
+      RangeVar   *elabel = makeRangeVar(NULL, NULL, NULL, -1);
+      char *ename = pstrdup(NameStr(tuple->elabelname));
+      elabel->catalogname = catalog;
+      elabel->schemaname = schema;
+      elabel->relname = graphEdgeTableName(graph, ename);
+      list = lappend(list, elabel);
+    }
+    caql_endscan(pcqCtx);
+    heap_close(skylon_graph_elabel_rel, RowExclusiveLock);
+  }
+  return list;
+}
+
+int parseAndTransformAsGraph(ParseState *pstate, RangeVar *rangeVar) {
+  if(!rangeVar) return false;
+  if (rangeVar->schemaname == NULL)
+    return false;
+  char *catalog = NULL;
+  char *schema = rangeVar->catalogname;
+  char *graph = rangeVar->schemaname;
+  char *ele = rangeVar->relname;
+
+  Oid dboid = GetCatalogId(catalog);
+  Oid namespaceId = LookupNamespaceId(rangeVar->schemaname, dboid);
+  Oid relId=OidIsValid(namespaceId)
+      ? get_relname_relid(rangeVar->relname, namespaceId)
+      : InvalidOid;
+
+  int res = 0;
+  if(!OidIsValid(relId)){
+    RangeVar *tmpRel = makeNode(RangeVar);
+    tmpRel->schemaname = schema;
+    schema = get_namespace_name(RangeVarGetCreationNamespace(tmpRel));
+    cqContext cqc;
+    Relation VlabelRelation = heap_open(GraphVlabelRelationId, RowExclusiveLock);
+    HeapTuple vlabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), VlabelRelation),
+                                         cql("SELECT * FROM skylon_graph_vlabel"
+        " WHERE vlabelname = :1 "
+        "AND graphname = :2 AND schemaname = :3",
+        CStringGetDatum(ele),
+        CStringGetDatum(graph), CStringGetDatum(schema)));
+    if(HeapTupleIsValid(vlabelTuple)) {
+      rangeVar->catalogname = NULL;
+      rangeVar->schemaname = schema;
+      rangeVar->relname = graphVertexTableName(graph, ele);
+      res = 1;
+    }
+    else {
+      Relation ElabelRelation = heap_open(GraphElabelRelationId, RowExclusiveLock);
+      HeapTuple elabelTuple= caql_getfirst(caql_addrel(cqclr(&cqc), ElabelRelation),
+                                           cql("SELECT * FROM skylon_graph_elabel"
+          " WHERE elabelname = :1 "
+          "AND graphname = :2 AND schemaname = :3",
+          CStringGetDatum(ele),
+          CStringGetDatum(graph), CStringGetDatum(schema)));
+      if(!HeapTupleIsValid(elabelTuple)) {
+        heap_close(VlabelRelation, RowExclusiveLock);
+        heap_close(ElabelRelation, RowExclusiveLock);
+        return 0;
+      }
+      rangeVar->catalogname = NULL;
+      rangeVar->schemaname = schema;
+      rangeVar->relname = graphEdgeTableName(graph, ele);
+      res = 2;
+      heap_close(ElabelRelation, RowExclusiveLock);
+    }
+    heap_close(VlabelRelation, RowExclusiveLock);
+    Oid graphId = caql_getoid_only(
+        NULL,
+        NULL,
+        cql("SELECT oid FROM pg_class "
+          " WHERE relname = :1 and relnamespace = :2",
+          CStringGetDatum(graph),
+          ObjectIdGetDatum(LookupNamespaceId(schema, dboid))));
+    if(pstate) {
+      if(pstate->graphEntry) {
+        ListCell *cell;
+        bool hit = false;
+        foreach(cell, pstate->graphEntry)
+        {
+          GraphEntry *n = (GraphEntry*)lfirst(cell);
+          if(n->relid == graphId) {
+            hit = true;
+            break;
+          }
+        }
+        if(!hit) {
+          GraphEntry *node = makeNode(GraphEntry);
+          node->relid = graphId;
+          pstate->graphEntry = lappend(pstate->graphEntry, node);
+        }
+      }
+      else {
+        GraphEntry *node = makeNode(GraphEntry);
+        node->relid = graphId;
+        pstate->graphEntry = lappend(pstate->graphEntry, node);
+      }
+    }
+  }
+return res;
+}
 /*
  * transformFromClauseItem -
  *	  Transform a FROM-clause item, adding any required entries to the
@@ -1459,6 +1635,10 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		RangeTblEntry *rte = NULL;
 		int	rtindex;
 		RangeVar *rangeVar = (RangeVar *)n;
+		char *graph = rangeVar->schemaname ? pstrdup(rangeVar->schemaname) : NULL;
+
+//try to parse as graph
+		int isGraph = parseAndTransformAsGraph(pstate, rangeVar);
 
 		/*
 		 * If it is an unqualified name, it might be a CTE reference.
@@ -1480,7 +1660,8 @@ transformFromClauseItem(ParseState *pstate, Node *n,
 		{
 			rte = transformTableEntry(pstate, rangeVar);
 		}
-		
+		if(isGraph)
+		  rte->graphName = graph;
 		/* assume new rte is at end */
 		rtindex = list_length(pstate->p_rtable);
 		Assert(rte == rt_fetch(rtindex, pstate->p_rtable));

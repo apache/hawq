@@ -62,10 +62,6 @@ const char *new_executor_runtime_filter_mode;
 const char *new_executor_runtime_filter_mode_local = "local";
 const char *new_executor_runtime_filter_mode_global = "global";
 
-const char *new_scheduler_mode_on = "on";
-const char *new_scheduler_mode_off = "off";
-char *new_scheduler_mode;
-
 int new_interconnect_type;
 const char *show_new_interconnect_type() {
   switch (new_interconnect_type) {
@@ -90,6 +86,9 @@ static bool do_convert_targetlist_to_common_plan(Plan *node,
 static bool do_convert_quallist_to_common_plan(Plan *node,
                                                CommonPlanContext *ctx,
                                                bool isInsist);
+static bool do_convert_indexqualorig_to_common_plan(Plan *node,
+                                                    CommonPlanContext *ctx,
+                                                    bool isInsist);
 static bool do_convert_indexqual_to_common_plan(Plan *node,
                                                 CommonPlanContext *ctx,
                                                 bool isInsist);
@@ -369,6 +368,16 @@ void convert_extscan_to_common_plan(Plan *node, List *splits, Relation rel,
   }
 }
 
+void *convert_orcscan_indexqualorig_to_common_plan(Plan *node,
+                                                   CommonPlanContext *ctx,
+                                                   List *idxColumns) {
+  planner_init_common_plan_context(NULL, ctx);
+  ctx->idxColumns = idxColumns;
+  univPlanSeqScanNewInstance(ctx->univplan, -1);
+  do_convert_indexqualorig_to_common_plan(node, ctx, false);
+  return univPlanGetQualList(ctx->univplan);
+}
+
 void *convert_orcscan_qual_to_common_plan(Plan *node, CommonPlanContext *ctx) {
   planner_init_common_plan_context(NULL, ctx);
   univPlanSeqScanNewInstance(ctx->univplan, -1);
@@ -479,9 +488,6 @@ void planner_init_common_plan_context(PlannedStmt *stmt,
   ctx->convertible =
       pg_strcasecmp(new_executor_mode, new_executor_mode_off) != 0 ? true
                                                                    : false;
-  ctx->enforceNewScheduler =
-      pg_strcasecmp(new_scheduler_mode, new_scheduler_mode_on) == 0 ? true
-                                                                    : false;
   ctx->base.node = (Node *)stmt;
   ctx->querySelect = false;
   ctx->isMagma = false;
@@ -491,6 +497,8 @@ void planner_init_common_plan_context(PlannedStmt *stmt,
   ctx->parent = NULL;
   ctx->exprBufStack = NIL;
   ctx->rangeNum = 0;
+  ctx->isConvertingIndexQual = false;
+  ctx->idxColumns = NIL;
 }
 
 void planner_destroy_common_plan_context(CommonPlanContext *ctx, bool enforce) {
@@ -994,11 +1002,11 @@ bool do_convert_quallist_to_common_plan(Plan *node, CommonPlanContext *ctx,
   return true;
 }
 
-static bool do_convert_indexqual_to_common_plan(Plan *node,
-                                                CommonPlanContext *ctx,
-                                                bool isInsist) {
+static bool do_convert_indexqualorig_to_common_plan(Plan *node,
+                                                    CommonPlanContext *ctx,
+                                                    bool isInsist) {
   ListCell *lc;
-  foreach (lc, ((ExternalScan *)node)->indexqualorig) {
+  foreach (lc, ((IndexScan *)node)->indexqualorig) {
     Expr *expr = (Expr *)lfirst(lc);
     univPlanNewExpr(ctx->univplan);
     bool convert_ret = do_convert_expr_to_common_plan(-1, expr, ctx);
@@ -1007,8 +1015,32 @@ static bool do_convert_indexqual_to_common_plan(Plan *node,
     else if (!convert_ret && !isInsist)
       continue;
     else if (convert_ret)
+      univPlanQualListAddExpr(ctx->univplan);
+  }
+  return true;
+}
+
+static bool do_convert_indexqual_to_common_plan(Plan *node,
+                                                CommonPlanContext *ctx,
+                                                bool isInsist) {
+  /* Must set to false when this function exit. */
+  ctx->isConvertingIndexQual = true;
+
+  ListCell *lc;
+  foreach (lc, ((ExternalScan *)node)->indexqualorig) {
+    Expr *expr = (Expr *)lfirst(lc);
+    univPlanNewExpr(ctx->univplan);
+    bool convert_ret = do_convert_expr_to_common_plan(-1, expr, ctx);
+    if (!convert_ret && isInsist) {
+      ctx->isConvertingIndexQual = false;
+      return false;
+    } else if (!convert_ret && !isInsist)
+      continue;
+    else if (convert_ret)
       univPlanIndexQualListAddExpr(ctx->univplan);
   }
+
+  ctx->isConvertingIndexQual = false;
   return true;
 }
 
@@ -1623,6 +1655,10 @@ bool do_convert_expr_to_common_plan(int32_t pid, Expr *expr,
 
     case T_Var: {
       Var *var = (Var *)expr;
+      // deal with orc index
+      if (ctx->idxColumns != NIL) {
+        var->varattno = list_find_oid(ctx->idxColumns, var->varattno) + 1;
+      }
       // TODO(chiyang): support system attribute
       if (var->varattno < 0 &&
           !(var->varattno == SelfItemPointerAttributeNumber ||
@@ -1685,6 +1721,22 @@ bool do_convert_expr_to_common_plan(int32_t pid, Expr *expr,
 
     case T_OpExpr: {
       OpExpr *opExpr = (OpExpr *)expr;
+
+      // Disable parameterized index qual, not supported yet.
+      // The reason we do not disable it on Segment is because the old executor
+      // will also run here(called by convert_extscan_to_common_plan() in
+      // magma_beginscan()/magma_rescan()), which supports parameterized index
+      // qual.
+      if (AmIMaster() && ctx->isMagma && ctx->isConvertingIndexQual) {
+        Expr *leftop = (Expr *)get_leftop(opExpr);
+        if (leftop && IsA(leftop, RelabelType))
+          leftop = ((RelabelType *)leftop)->arg;
+        Expr *rightop = (Expr *)get_rightop(opExpr);
+        if (rightop && IsA(rightop, RelabelType))
+          rightop = ((RelabelType *)rightop)->arg;
+
+        if (IsA(leftop, Var) && IsA(rightop, Var)) goto end;
+      }
 
       old = parentExprSwitchTo(expr, ctx);
 

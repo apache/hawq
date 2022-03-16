@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -102,6 +102,9 @@ typedef struct HostnameIndexEntry {
  */
 typedef struct collect_scan_rangetable_context {
 	plan_tree_base_prefix base;
+	List *indexscan_range_tables;  // range table for index only scan
+	List *indexscan_indexs;  // index oid for range table
+	List *parquetscan_range_tables; // range table for parquet scan
 	List *range_tables; // range table for scan only
 	List *full_range_tables;  // full range table
 } collect_scan_rangetable_context;
@@ -428,10 +431,16 @@ static void AOGetSegFileDataLocation(Relation relation,
 		int* allblocks, GpPolicy *targetPolicy);
 
 static void ParquetGetSegFileDataLocation(Relation relation,
-		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
+		Oid segrelid, Snapshot metadataSnapshot, List *idx_scan_ids,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
 		int* allblocks, GpPolicy *targetPolicy);
+
+static void ParquetGetSegFileDataLocationWrapper(
+    Relation relation, AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
+    split_to_segment_mapping_context *context, int64 splitsize,
+    Relation_Data *rel_data, int *hitblocks, int *allblocks,
+    GpPolicy *targetPolicy);
 
 static void ExternalGetHdfsFileDataLocation(
     Relation relation, split_to_segment_mapping_context *context,
@@ -451,7 +460,7 @@ static void ExternalGetMagmaRangeDataLocation(
 Oid LookupCustomProtocolBlockLocationFunc(char *protoname);
 
 static BlockLocation *fetch_hdfs_data_block_location(char *filepath, int64 len,
-		int *block_num, RelFileNode rnode, uint32_t segno, double* hit_ratio);
+		int *block_num, RelFileNode rnode, uint32_t segno, double* hit_ratio, bool index_scan);
 
 static void free_hdfs_data_block_location(BlockLocation *locations,
 		int block_num);
@@ -614,6 +623,9 @@ static void init_datalocality_context(PlannedStmt *plannedstmt,
 
 	context->chsl_context.relations = NIL;
 	context->srtc_context.range_tables = NIL;
+	context->srtc_context.indexscan_indexs = NIL;
+	context->srtc_context.indexscan_range_tables = NIL;
+	context->srtc_context.parquetscan_range_tables = NIL;
 	context->srtc_context.full_range_tables = plannedstmt->rtable;
 	context->srtc_context.base.node = (Node *)plannedstmt;
 
@@ -671,27 +683,40 @@ static void init_datalocality_context(PlannedStmt *plannedstmt,
 	return;
 }
 
-bool collect_scan_rangetable(Node *node,
-		collect_scan_rangetable_context *cxt) {
-	if (NULL == node) return false;
+bool collect_scan_rangetable(Node *node, collect_scan_rangetable_context *cxt) {
+  if (NULL == node) return false;
 
-	switch (nodeTag(node)) {
-	case T_ExternalScan:
-	case T_MagmaIndexScan:
-	case T_MagmaIndexOnlyScan:
-	case T_OrcIndexScan:
-	case T_OrcIndexOnlyScan:
-	case T_AppendOnlyScan:
-	case T_ParquetScan: {
-		RangeTblEntry  *rte = rt_fetch(((Scan *)node)->scanrelid,
-											   cxt->full_range_tables);
-		cxt->range_tables = lappend(cxt->range_tables, rte);
-	}
-	default:
-		break;
-	}
+  switch (nodeTag(node)) {
+    case T_OrcIndexScan:  // Same as T_OrcIndexOnlyScan
+    case T_OrcIndexOnlyScan: {
+      RangeTblEntry *rte =
+          rt_fetch(((Scan *)node)->scanrelid, cxt->full_range_tables);
+      cxt->indexscan_range_tables =
+          lappend_oid(cxt->indexscan_range_tables, rte->relid);
+      cxt->indexscan_indexs =
+          lappend_oid(cxt->indexscan_indexs, ((IndexScan *)node)->indexid);
+      cxt->range_tables = lappend(cxt->range_tables, rte);
+      break;
+    }
+    // FIXME(sxwang): Should we append relid to parquetscan_range_tables for all
+    // these kind of scan?
+    case T_ExternalScan:        // Fall to ParquetScan
+    case T_MagmaIndexScan:      // Fall to ParquetScan
+    case T_MagmaIndexOnlyScan:  // Fall to ParquetScan
+    case T_AppendOnlyScan:      // Fall to ParquetScan
+    case T_ParquetScan: {
+      RangeTblEntry *rte =
+          rt_fetch(((Scan *)node)->scanrelid, cxt->full_range_tables);
+      cxt->parquetscan_range_tables =
+          lappend_oid(cxt->parquetscan_range_tables, rte->relid);
+      cxt->range_tables = lappend(cxt->range_tables, rte);
+      break;
+    }
+    default:
+      break;
+  }
 
-	return plan_tree_walker(node, collect_scan_rangetable, cxt);
+  return plan_tree_walker(node, collect_scan_rangetable, cxt);
 }
 
 /*
@@ -1019,7 +1044,7 @@ int64 get_block_locations_and_calculate_table_size(split_to_segment_mapping_cont
 				} else {
 				  // for orc table, we just reuse the parquet logic here
 					rel_data->type = DATALOCALITY_PARQUET;
-					ParquetGetSegFileDataLocation(rel, aoEntry, ActiveSnapshot, context,
+					ParquetGetSegFileDataLocationWrapper(rel, aoEntry, ActiveSnapshot, context,
 							context->split_size, rel_data, &hitblocks,
 							&allblocks, targetPolicy);
 				}
@@ -1436,7 +1461,7 @@ search_host_in_stat_context(split_to_segment_mapping_context *context,
  */
 static BlockLocation *
 fetch_hdfs_data_block_location(char *filepath, int64 len, int *block_num,
-		RelFileNode rnode, uint32_t segno, double* hit_ratio) {
+		RelFileNode rnode, uint32_t segno, double* hit_ratio, bool index_scan) {
 	// for fakse test, the len of file always be zero
 	if(len == 0  && !debug_fake_datalocality){
 		*hit_ratio = 0.0;
@@ -1448,7 +1473,7 @@ fetch_hdfs_data_block_location(char *filepath, int64 len, int *block_num,
 	uint64_t beginTime;
 	beginTime = gettime_microsec();
 
-	if (metadata_cache_enable) {
+	if (metadata_cache_enable && !index_scan) {
 		file_info = CreateHdfsFileInfo(rnode, segno);
 		if (metadata_cache_testfile && metadata_cache_testfile[0]) {
 			locations = GetHdfsFileBlockLocationsForTest(filepath, len, block_num);
@@ -1663,7 +1688,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
 				double hit_ratio=0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
-						&block_num, relation->rd_node, segno, &hit_ratio);
+						&block_num, relation->rd_node, segno, &hit_ratio, false);
 				*allblocks += block_num;
 				*hitblocks += block_num * hit_ratio;
 				//fake data locality need to recalculate logic length
@@ -1737,7 +1762,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
 				double hit_ratio = 0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
-						&block_num, relation->rd_node, segno, &hit_ratio);
+						&block_num, relation->rd_node, segno, &hit_ratio, false);
 				*allblocks += block_num;
 				*hitblocks += block_num * hit_ratio;
 				//fake data locality need to recalculate logic length
@@ -1822,7 +1847,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
 				double hit_ratio = 0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
-						&block_num, relation->rd_node, segno, &hit_ratio);
+						&block_num, relation->rd_node, segno, &hit_ratio, false);
 				*allblocks += block_num;
 				*hitblocks += block_num * hit_ratio;
 				if ((locations != NULL) && (block_num > 0)) {
@@ -1883,7 +1908,7 @@ static void AOGetSegFileDataLocation(Relation relation,
 				FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
 				double hit_ratio = 0.0;
 				locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
-						&block_num, relation->rd_node, segno, &hit_ratio);
+						&block_num, relation->rd_node, segno, &hit_ratio, false);
 				*allblocks += block_num;
 				*hitblocks += block_num * hit_ratio;
 				//fake data locality need to recalculate logic length
@@ -1959,15 +1984,37 @@ static void AOGetSegFileDataLocation(Relation relation,
 	return;
 }
 
+static List *GetAllIdxScanIds(collect_scan_rangetable_context *context,
+                              Oid rd_id) {
+  List *ret = NULL;
+
+  ListCell *table;
+  ListCell *id;
+  for (table = list_head(context->indexscan_range_tables),
+      id = list_head(context->indexscan_indexs);
+       table != NULL; table = lnext(table), id = lnext(id)) {
+    if (lfirst_oid(table) == rd_id) {
+      if (ret == NULL) {
+        ret = list_make1_oid(lfirst_oid(id));
+      } else {
+        ret = lappend_oid(ret, lfirst_oid(id));
+      }
+    }
+  }
+
+  return ret;
+}
+
 /*
  * ParquetGetSegFileDataLocation: fetch the data location of the
  * segment files of the Parquet relation.
  */
 static void ParquetGetSegFileDataLocation(Relation relation,
-		AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
+		Oid segrelid, Snapshot metadataSnapshot, List* idx_scan_ids,
 		split_to_segment_mapping_context *context, int64 splitsize,
 		Relation_Data *rel_data, int* hitblocks,
 		int* allblocks, GpPolicy *targetPolicy) {
+	bool index_scan = idx_scan_ids != NULL;
 	char *basepath;
 	char *segfile_path;
 	int filepath_maxlen;
@@ -1979,10 +2026,10 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 	SysScanDesc parquetscan;
 
 	basepath = relpath(relation->rd_node);
-	filepath_maxlen = strlen(basepath) + 9;
+	filepath_maxlen = strlen(basepath) + 25;
 	segfile_path = (char *) palloc0(filepath_maxlen);
 
-	pg_parquetseg_rel = heap_open(aoEntry->segrelid, AccessShareLock);
+	pg_parquetseg_rel = heap_open(segrelid, AccessShareLock);
 	pg_parquetseg_dsc = RelationGetDescr(pg_parquetseg_rel);
 	parquetscan = systable_beginscan(pg_parquetseg_rel, InvalidOid, FALSE,
 			metadataSnapshot, 0, NULL);
@@ -1991,22 +2038,38 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 		BlockLocation *locations;
 		int block_num = 0;
 		Relation_File *file;
-
-		int segno = DatumGetInt32(
-				fastgetattr(tuple, Anum_pg_parquetseg_segno, pg_parquetseg_dsc, NULL));
-		int64 logic_len = (int64) DatumGetFloat8(
-				fastgetattr(tuple, Anum_pg_parquetseg_eof, pg_parquetseg_dsc, NULL));
+		int segno = 0;
+		int64 logic_len = 0;
+		Oid idx_scan_id = InvalidOid;
+		if (index_scan){
+		  idx_scan_id = DatumGetObjectId(
+		      fastgetattr(tuple, Anum_pg_orcseg_idx_idxoid, pg_parquetseg_dsc, NULL));
+		 if  (!list_member_oid(idx_scan_ids, idx_scan_id)) continue;
+		  segno = DatumGetInt32(
+		      fastgetattr(tuple, Anum_pg_orcseg_idx_segno, pg_parquetseg_dsc, NULL));
+		  logic_len = (int64) DatumGetFloat8(
+		      fastgetattr(tuple, Anum_pg_orcseg_idx_eof, pg_parquetseg_dsc, NULL));
+		} else {
+		  segno = DatumGetInt32(
+		      fastgetattr(tuple, Anum_pg_parquetseg_segno, pg_parquetseg_dsc, NULL));
+		  logic_len = (int64) DatumGetFloat8(
+		      fastgetattr(tuple, Anum_pg_parquetseg_eof, pg_parquetseg_dsc, NULL));
+		}
 		context->total_metadata_logic_len += logic_len;
 		bool isRelationHash = true;
 		if (targetPolicy->nattrs == 0) {
 			isRelationHash = false;
 		}
 
+		if (index_scan) {
+		  FormatAOSegmentIndexFileName(basepath, segno, idx_scan_id, -1, 0, &segno, segfile_path);
+		} else {
+		  FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
+		}
 		if (!context->keep_hash || !isRelationHash) {
-			FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
 			double hit_ratio = 0.0;
 			locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
-					&block_num, relation->rd_node, segno, &hit_ratio);
+					&block_num, relation->rd_node, segno, &hit_ratio, index_scan);
 			*allblocks += block_num;
 			*hitblocks += block_num * hit_ratio;
 			//fake data locality need to recalculate logic length
@@ -2044,7 +2107,8 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 					splits[realSplitNum].host = -1;
 					splits[realSplitNum].is_local_read = true;
 					splits[realSplitNum].range_id = -1;
-					splits[realSplitNum].replicaGroup_id = -1;
+					// XXX(sxwang): hack way to pass idx_scan_id.
+					splits[realSplitNum].replicaGroup_id = idx_scan_id;
 					splits[realSplitNum].offset = offset;
 					splits[realSplitNum].length = file->locations[realSplitNum].length;
 					splits[realSplitNum].logiceof = logic_len;
@@ -2064,10 +2128,9 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 				rel_data->files = lappend(rel_data->files, file);
 			}
 		} else {
-			FormatAOSegmentFileName(basepath, segno, -1, 0, &segno, segfile_path);
 			double hit_ratio = 0.0;
 			locations = fetch_hdfs_data_block_location(segfile_path, logic_len,
-					&block_num, relation->rd_node, segno, &hit_ratio);
+					&block_num, relation->rd_node, segno, &hit_ratio, index_scan);
 			*allblocks += block_num;
 			*hitblocks += block_num * hit_ratio;
 			File_Split *split = (File_Split *) palloc(sizeof(File_Split));
@@ -2075,7 +2138,8 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 			file->segno = segno;
 			split->offset = 0;
 			split->range_id = -1;
-			split->replicaGroup_id = -1;
+			// XXX(sxwang): hack way to pass idx_scan_id.
+			split->replicaGroup_id = idx_scan_id;
 			split->length = logic_len;
 			split->logiceof = logic_len;
 			split->host = -1;
@@ -2117,6 +2181,30 @@ static void ParquetGetSegFileDataLocation(Relation relation,
 	rel_data->total_size = total_size;
 
 	return;
+}
+
+static void ParquetGetSegFileDataLocationWrapper(
+    Relation relation, AppendOnlyEntry *aoEntry, Snapshot metadataSnapshot,
+    split_to_segment_mapping_context *context, int64 splitsize,
+    Relation_Data *rel_data, int *hitblocks, int *allblocks,
+    GpPolicy *targetPolicy) {
+  // ParquetScan
+  if (list_member_oid(context->srtc_context.parquetscan_range_tables,
+                      relation->rd_id)) {
+    ParquetGetSegFileDataLocation(relation, aoEntry->segrelid, metadataSnapshot,
+                                  NULL, context, splitsize, rel_data, hitblocks,
+                                  allblocks, targetPolicy);
+  }
+  // IndexScan
+  if (list_member_oid(context->srtc_context.indexscan_range_tables,
+                      relation->rd_id)) {
+    List *idx_scan_ids =
+        GetAllIdxScanIds(&(context->srtc_context), relation->rd_id);
+    ParquetGetSegFileDataLocation(
+        relation, aoEntry->blkdirrelid, metadataSnapshot, idx_scan_ids, context,
+        splitsize, rel_data, hitblocks, allblocks, targetPolicy);
+    list_free(idx_scan_ids);
+  }
 }
 
 static void InvokeHDFSProtocolBlockLocation(Oid    procOid,
@@ -5976,8 +6064,8 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 	uint64_t run_datalocality = 0;
 	run_datalocality = gettime_microsec();
 	int dl_overall_time = run_datalocality - before_run_allocation;
-    
-    context->cal_datalocality_time_us = dl_overall_time; 
+
+    context->cal_datalocality_time_us = dl_overall_time;
 
 	if(debug_datalocality_time){
 		elog(LOG, "datalocality overall execution time: %d us. \n", dl_overall_time);
@@ -5985,7 +6073,7 @@ run_allocation_algorithm(SplitAllocResult *result, List *virtual_segments, Query
 
     result->datalocalityTime = (double)(context->metadata_cache_time_us + context->alloc_resource_time_us + context->cal_datalocality_time_us)/ 1000;
     appendStringInfo(result->datalocalityInfo, "DFS metadatacache: %.3f ms; resource allocation: %.3f ms; datalocality calculation: %.3f ms.",
-            (double)context->metadata_cache_time_us/1000, (double)context->alloc_resource_time_us/1000, (double)context->cal_datalocality_time_us/1000);  
+            (double)context->metadata_cache_time_us/1000, (double)context->alloc_resource_time_us/1000, (double)context->cal_datalocality_time_us/1000);
 
 	return alloc_result;
 }
@@ -6396,7 +6484,7 @@ calculate_planner_segment_num(PlannedStmt *plannedstmt, Query *query,
 			}
 			uint64_t after_rm_allocate_resource = gettime_microsec();
 			int eclaspeTime = after_rm_allocate_resource - before_rm_allocate_resource;
-        
+
             context.alloc_resource_time_us = eclaspeTime;
 
 			if(debug_datalocality_time){
@@ -6824,4 +6912,3 @@ char *search_hostname_by_ipaddr(const char *ipaddr) {
   }
   return entry->hostname;
 }
-

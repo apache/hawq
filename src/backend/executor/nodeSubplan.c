@@ -1129,18 +1129,10 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 			 */
 		  CommonPlanContext ctx;
 		  bool newPlanner = can_convert_common_plan(queryDesc, &ctx);
-       if (newPlanner && ctx.enforceNewScheduler && scheduler_plan_support_check(queryDesc)) {
-		   	const char *queryId = palloc0(sizeof(int) + sizeof(int) + 5);
-		   	sprintf(queryId, "QID%d_%d", gp_session_id, gp_command_count);
-		   	scheduler_prepare_for_new_query(queryDesc, queryId, subplan->plan_id);
-		   	pfree(queryId);
-		   	scheduler_run(queryDesc->estate->scheduler_data, &ctx);
-		  } else {
-		    queryDesc->estate->mainDispatchData = mainDispatchInit(queryDesc->resource);
-		    queryDesc->estate->dispatch_data = NULL;
-		    mainDispatchPrepare(queryDesc->estate->mainDispatchData, queryDesc, newPlanner);
-		    mainDispatchRun(queryDesc->estate->mainDispatchData, &ctx, newPlanner);
-		  }
+      queryDesc->estate->mainDispatchData = mainDispatchInit(queryDesc->resource);
+      queryDesc->estate->dispatch_data = NULL;
+      mainDispatchPrepare(queryDesc->estate->mainDispatchData, queryDesc, newPlanner);
+      mainDispatchRun(queryDesc->estate->mainDispatchData, &ctx, newPlanner);
 
 			// decide if the query is supported by new executor
 			if (queryDesc && queryDesc->newPlan)
@@ -1179,7 +1171,8 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 		  Plan *plan = exec_subplan_get_plan(gbl_queryDesc->plannedstmt, subplan);
 		  TupleDesc cleanTupDesc = ExecCleanTypeFromTL(plan->targetlist, false);
 		  queryDesc->newExecutorState = makeMyNewExecutorTupState(cleanTupDesc);
-		  beginMyNewExecutor(queryDesc->newPlan->str, queryDesc->newPlan->len,
+		  beginMyNewExecutor(queryDesc->estate->mainDispatchData,
+		                     queryDesc->newPlan->str, queryDesc->newPlan->len,
 		                     subplan->qDispSliceId, planstate);
 		}
 
@@ -1360,20 +1353,6 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
              * report it and exit to our error handler (below) via PG_THROW.
              */
             mainDispatchCleanUp(&queryDesc->estate->mainDispatchData);
-        } else if (shouldDispatch &&
-            queryDesc && queryDesc->estate &&
-            queryDesc->estate->scheduler_data) {
-          scheduler_wait(queryDesc->estate->scheduler_data);
-          queryDesc->estate->scheduler_data = NULL;
-          if (planstate->instrument && queryDesc->estate->scheduler_data &&
-              queryDesc->estate->scheduler_data->state != SS_ERROR) {
-            scheduler_receive_computenode_stats(
-                queryDesc->estate->scheduler_data, planstate);
-            cdbexplain_recvSchedulerExecStats(
-                planstate, queryDesc->estate->scheduler_data, 0,
-                econtext->ecxt_estate->showstatctx);
-          }
-          scheduler_cleanup(queryDesc->estate->scheduler_data);
         }
 
 		/* teardown the sequence server */
@@ -1387,6 +1366,8 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 	        TeardownInterconnect(queryDesc->estate->interconnect_context, 
 								 queryDesc->estate->motionlayer_context,
 								 false); /* following success on QD */	
+		} else if (newExecutor) {
+		  teardownNewInterconnect();
 		}
 
     }
@@ -1410,12 +1391,6 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
                   econtext->ecxt_estate->showstatctx,
                   mainDispatchGetSegNum(queryDesc->estate->mainDispatchData));
             }
-          } else if (planstate->state->scheduler_data){
-            scheduler_receive_computenode_stats(
-                queryDesc->estate->scheduler_data, planstate);
-            cdbexplain_recvSchedulerExecStats(
-                planstate, queryDesc->estate->scheduler_data, 0,
-                econtext->ecxt_estate->showstatctx);
           }
         }
 
@@ -1429,24 +1404,23 @@ ExecSetParamPlan(SubPlanState *node, ExprContext *econtext, QueryDesc *gbl_query
 		 */
         if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->mainDispatchData) {
           mainDispatchCatchError(&queryDesc->estate->mainDispatchData);
-        } else if (shouldDispatch && queryDesc && queryDesc->estate && queryDesc->estate->scheduler_data) {
-          scheduler_catch_error(queryDesc->estate->scheduler_data);
-          scheduler_cleanup(queryDesc->estate->scheduler_data);
-          queryDesc->estate->scheduler_data = NULL;
         }
 		
 		/* teardown the sequence server */
 		TeardownSequenceServer();
-		
-        /*
-         * Clean up the interconnect.
-         * CDB TODO: Is this needed following failure on QD?
-         */
-        if (shouldTeardownInterconnect)
-			TeardownInterconnect(queryDesc->estate->interconnect_context,
-								 queryDesc->estate->motionlayer_context,
-								 true);
-		PG_RE_THROW();
+
+    /*
+     * Clean up the interconnect.
+     * CDB TODO: Is this needed following failure on QD?
+     */
+    if (shouldTeardownInterconnect)
+      TeardownInterconnect(queryDesc->estate->interconnect_context,
+                           queryDesc->estate->motionlayer_context,
+                           true);
+    else if (newExecutor) {
+      teardownNewInterconnect();
+    }
+    PG_RE_THROW();
 	}
 	PG_END_TRY();
 

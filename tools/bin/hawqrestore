@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+# 
+#   http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+try:
+    import os, sys, re
+    from optparse import Option, OptionParser
+    from hawqpylib.hawqlib import HawqXMLParser, parse_hosts_file, remove_property_xml, update_xml_property, local_ssh
+    from gppylib.commands.unix import getLocalHostname, getUserName
+    from gppylib.db import dbconn
+    from pygresql.pg import DatabaseError
+    from gppylib.gplog import setup_hawq_tool_logging, quiet_stdout_logging, enable_verbose_logging
+    from gppylib.gpsqlUtil import GpsqlUtil
+except ImportError, e:
+    sys.exit('ERROR: Cannot import modules.  Please check that you '
+                 'have sourced greenplum_path.sh.  Detail: ' + str(e))
+
+logger, log_filename = setup_hawq_tool_logging('hawq_config',getLocalHostname(),getUserName())
+
+def parseargs():
+    parser = OptionParser(usage="HAWQ restore options.")
+    parser.add_option('-s', '--source_snapshot', type='string',
+                      help="Source Backup Snapshot Name.")
+    parser.add_option('-m', '--source_mdd', type='string',
+                      help="Source Master Data Directory.")
+    parser.add_option('-d', '--source_hdfs_url', type='string',
+                      help="Target Backup HDFS URL.")
+
+    (options, args) = parser.parse_args()
+
+    return (options, args)
+
+
+def restore_metadata(hawq_site, source_snapshot, source_mdd):
+    logger.info("Restoring metadata ...")
+    mdd = hawq_site.hawq_dict['hawq_master_directory']
+    url = "hdfs://" + hawq_site.hawq_dict['hawq_dfs_url'] + "/"
+
+    mdd_parent = os.path.abspath(os.path.join(mdd, os.pardir))
+    cmd = "tar -xzf %s/%s.tar.gz -C %s" % (source_mdd, source_snapshot, mdd_parent)
+    result = local_ssh(cmd, logger)
+    if result != 0:
+        logger.error("Failed to restore master data directory")
+        sys.exit(1)
+
+    logger.info("Done with metadata restore")
+
+
+def restore_userdata(hawq_site, source_snapshot, source_hdfs_url):
+    logger.info("Restoring user data ...")
+    source_hdfs_url += "/"
+    target_hdfs_url = "hdfs://" + hawq_site.hawq_dict['hawq_dfs_url'] + "/"
+
+    if os.environ['HADOOP_HOME'] is None:
+        logger.error("Failed to get Hadoop home directory")
+        sys.exit(1)
+
+    cmd = "%s/bin/hadoop distcp %s/.snapshot/%s %s" % (os.environ['HADOOP_HOME'], source_hdfs_url, source_snapshot, target_hdfs_url)
+    result = local_ssh(cmd, logger)
+    if result != 0:
+        logger.error("Failed to copy user data from source to target HDFS cluster")
+        sys.exit(1)
+
+    logger.info("Done with user data restore")
+    logger.info("Restore OushuDB metadata and user data successfully.")
+
+
+
+if __name__ == '__main__':
+    options, args = parseargs()
+
+    GPHOME = os.getenv('GPHOME')
+    if not GPHOME:
+        sys.exit("GPHOME environment variable not set, exit")
+    hawq_site = HawqXMLParser(GPHOME)
+    hawq_site.get_all_values()
+
+    database_port = hawq_site.hawq_dict['hawq_master_address_port']
+    database_name = "template1"
+    try:
+        dburl = dbconn.DbURL(port=database_port, dbname=database_name)
+        conn = dbconn.connect(dburl, True)
+        query = "select datname from pg_database order by datname;"
+        rows = dbconn.execSQL(conn, query)
+        conn.close()
+        logger.error("Failed to restore data as database is online")
+        sys.exit(1)
+    except DatabaseError, ex:
+        logger.info("About to restore OushuDB as database is offline")
+
+    restore_metadata(hawq_site, options.source_snapshot, options.source_mdd)
+    restore_userdata(hawq_site, options.source_snapshot, options.source_hdfs_url)

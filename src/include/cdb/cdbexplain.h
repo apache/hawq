@@ -29,7 +29,6 @@
 
 #include "executor/instrument.h"        /* instr_time */
 #include "cdb/cdbpublic.h"              /* CdbExplain_Agg */
-#include "cdb/scheduler.h"
 #include "postmaster/identity.h"
 
 #include "dbcommon/utils/instrument.h"
@@ -211,9 +210,5 @@ cdbexplain_showExecStatsEnd(struct PlannedStmt *stmt,
 							struct CdbExplain_ShowStatCtx  *showstatctx,
                             struct StringInfoData          *str,
                             struct EState                  *estate);
-
-void cdbexplain_recvSchedulerExecStats(
-    struct PlanState *planstate, struct SchedulerData *scheduler_data,
-    int stageNo, struct CdbExplain_ShowStatCtx *showstatctx);
 
 #endif   /* CDBEXPLAIN_H */

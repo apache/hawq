@@ -81,6 +81,9 @@ extern char *getTaskConnMsg(struct MyDispatchTask *task);
 extern struct CdbDispatchResults *getDispatchResults(
     struct MyDispatchTask *task);
 
+// for udp interconnect
+extern void checkQdError(void *dispatchData);
+
 // for debug
 extern const char *taskIdToString(struct MyDispatchTask *task);
 extern const char *taskSegToString(struct MyDispatchTask *task);

@@ -32,6 +32,7 @@
 #include "executor/executor.h"
 #include "miscadmin.h"
 #include "nodes/execnodes.h"
+#include "nodes/plannodes.h"
 #include "optimizer/newPlanner.h"
 #include "storage/cwrapper/hdfs-file-system-c.h"
 #include "storage/cwrapper/orc-format-c.h"
@@ -76,6 +77,54 @@ typedef struct OrcFormatData {
   TimestampType *colTimestamp;
   struct varlena **colFixedLenUDT;
 } OrcFormatData;
+
+static void initOrcFormatIndexUserData(TupleDesc tup_desc,
+                                       OrcFormatData *orcFormatData,
+                                       bool *colToReads, List *columnsInIndex,
+                                       bool *colToReadInIndex) {
+  int natts = list_length(columnsInIndex) + 1;
+  orcFormatData->numberOfColumns = natts;
+  orcFormatData->colNames = palloc0(sizeof(char *) * natts);
+  orcFormatData->colDatatypes = palloc0(sizeof(int) * natts);
+  orcFormatData->colDatatypeMods = palloc0(sizeof(uint64) * natts);
+  orcFormatData->colRawValues = palloc0(sizeof(char *) * natts);
+  orcFormatData->colValLength = palloc0(sizeof(uint64) * natts);
+  orcFormatData->colTimestamp = palloc0(sizeof(TimestampType) * natts);
+  orcFormatData->colFixedLenUDT = palloc0(sizeof(struct varlena *) * natts);
+  int count = 0;
+  for (int i = 0; i < tup_desc->natts; ++i) {
+    for (int j = 0; j < list_length(columnsInIndex); j++) {
+      if ((int)list_nth_oid(columnsInIndex, j) - 1 == i) {
+        // allocate memory for colFixedLenUDT[i] of fixed-length type in advance
+        bool isFixedLengthType = tup_desc->attrs[i]->attlen > 0 ? true : false;
+        if (isFixedLengthType) {
+          orcFormatData->colFixedLenUDT[count] = (struct valena *)palloc0(
+              tup_desc->attrs[i]->attlen + sizeof(uint32_t));
+        }
+        orcFormatData->colNames[count] = palloc0(NAMEDATALEN);
+        strcpy(orcFormatData->colNames[count],
+               tup_desc->attrs[i]->attname.data);
+        orcFormatData->colDatatypes[count] =
+            map_hawq_type_to_common_plan((int)(tup_desc->attrs[i]->atttypid));
+        orcFormatData->colDatatypeMods[count] = tup_desc->attrs[i]->atttypmod;
+        if (orcFormatData->colDatatypes[count] == CHARID &&
+            tup_desc->attrs[i]->atttypmod == -1) {
+          // XXX(chiyang): From orc.c to determine BPCHAR's typemod
+          orcFormatData->colDatatypeMods[count] =
+              strlen(tup_desc->attrs[i]->attname.data) + VARHDRSZ;
+        }
+        if (colToReads[i]) {
+          colToReadInIndex[count] = true;
+        }
+        count++;
+      }
+    }
+  }
+  orcFormatData->colNames[count] = palloc0(NAMEDATALEN);
+  strcpy(orcFormatData->colNames[count], "tid");
+  orcFormatData->colDatatypes[count] = BIGINTID;
+  orcFormatData->colDatatypeMods[count] = -1;
+}
 
 static void initOrcFormatUserData(TupleDesc tup_desc,
                                   OrcFormatData *orcFormatData) {
@@ -128,7 +177,7 @@ static freeOrcFormatUserData(OrcFormatData *orcFormatData) {
   pfree(orcFormatData->colNames);
 }
 
-static void checkOrcError(OrcFormatData *orcFormatData) {
+void checkOrcError(OrcFormatData *orcFormatData) {
   ORCFormatCatchedError *e = ORCFormatGetErrorORCFormatC(orcFormatData->fmt);
   if (e->errCode != ERRCODE_SUCCESSFUL_COMPLETION) {
     ORCFormatCatchedError errBuf = *e;
@@ -152,6 +201,85 @@ static void addFilesystemCredential(const char *uri) {
   }
 }
 
+void constructOrcFormatOptionString(StringInfoData *option, Relation rel,
+                                    ResultRelSegFileInfo *segfileinfo,
+                                    AppendOnlyEntry *aoentry) {
+  initStringInfo(option);
+  appendStringInfoChar(option, '{');
+
+  // neglect for UPDATE/DELETE
+  if (segfileinfo) {
+    appendStringInfo(option, "\"logicEof\": %" PRId64, segfileinfo->eof[0]);
+    appendStringInfo(option, ", \"uncompressedEof\": %lld, ",
+                     segfileinfo->uncompressed_eof[0]);
+  }
+
+  appendStringInfo(
+      option, "\"stripeSize\": %" PRId64,
+      ((StdRdOptions *)(rel->rd_options))->stripesize * 1024 * 1024);
+  appendStringInfo(option, ", \"rowIndexStride\": %" PRId64,
+                   ((StdRdOptions *)(rel->rd_options))->rowindexstride);
+  appendStringInfo(option, ", \"blockSize\": %" PRId64,
+                   ((StdRdOptions *)(rel->rd_options))->compressblocksize);
+  if (aoentry->compresstype)
+    appendStringInfo(option, ", %s", aoentry->compresstype);
+
+  // transform bloomfilter option from column names to column indexes.
+  if (((StdRdOptions *)(rel->rd_options))->bloomfilter) {
+    TupleDesc tupDesc = rel->rd_att;
+    int attrNum = tupDesc->natts;
+    char **attrNames = palloc0(attrNum * sizeof(char *));
+    for (int i = 0; i < attrNum; ++i) {
+      int nameLen =
+          strlen(((Form_pg_attribute)(tupDesc->attrs[i]))->attname.data);
+      char *attribute = palloc0(nameLen + 1);
+      strncpy(attribute, ((Form_pg_attribute)(tupDesc->attrs[i]))->attname.data,
+              nameLen);
+      attrNames[i] = attribute;
+    }
+
+    StringInfoData bloomFilterOptsStr;
+    initStringInfo(&bloomFilterOptsStr);
+    char *token = strtok(((StdRdOptions *)(rel->rd_options))->bloomfilter, ",");
+    while (token) {
+      for (int attrIdx = 0; attrIdx < attrNum; ++attrIdx) {
+        if (strncasecmp(token, attrNames[attrIdx],
+                        strlen(attrNames[attrIdx])) == 0) {
+          appendStringInfo(&bloomFilterOptsStr, "%d", attrIdx + 1);
+          appendStringInfoChar(&bloomFilterOptsStr, ',');
+          break;
+        }
+      }
+      token = strtok(NULL, ",");
+    }
+    if (bloomFilterOptsStr.data[bloomFilterOptsStr.len - 1] == ',')
+      bloomFilterOptsStr.data[bloomFilterOptsStr.len - 1] = '\0';
+    appendStringInfo(option, ", \"bloomfilter\": [%s]",
+                     pstrdup(bloomFilterOptsStr.data));
+  }
+
+  appendStringInfoChar(option, '}');
+}
+
+// FIXME(sxwang): In fact, upstream logic should ensure that FileSplit are all
+// valid.
+static bool IsValidFileSplit(FileSplit split, Oid idxId) {
+  return split->replicaGroup_id == idxId;
+}
+
+// Filter invalid fileSplit.
+static int32 GetSplitCount(List *fileSplits, Oid idxId) {
+  int32 splitCount = list_length(fileSplits);
+  int32 ret = 0;
+  for (int32 i = 0; i < splitCount; ++i) {
+    if (IsValidFileSplit(list_nth(fileSplits, i), idxId)) {
+      ++ret;
+    }
+  }
+  return ret;
+}
+
+>>>>>>> 7910d663d... step2
 OrcInsertDescData *orcBeginInsert(Relation rel,
                                   ResultRelSegFileInfo *segfileinfo) {
   OrcInsertDescData *insertDesc =
@@ -367,6 +495,14 @@ void orcReScan(ScanState *scanState) {
 OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot, TupleDesc desc,
                               List *fileSplits, bool *colToReads,
                               void *pushDown) {
+  return orcBeginReadWithOptionsStr(rel, snapshot, desc, fileSplits, colToReads,
+                                    pushDown, "{}");
+}
+
+OrcScanDescData *orcBeginReadWithOptionsStr(Relation rel, Snapshot snapshot,
+                                            TupleDesc desc, List *fileSplits,
+                                            bool *colToReads, void *pushDown,
+                                            const char *optsStr) {
   OrcScanDescData *scanDesc = palloc0(sizeof(OrcScanDescData));
   OrcFormatData *orcFormatData = scanDesc->orcFormatData =
       palloc0(sizeof(OrcFormatData));
@@ -377,20 +513,30 @@ OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot, TupleDesc desc,
     desc = RelationGetDescr(rel);
 
   scanDesc->rel = rel;
-  orcFormatData->fmt = ORCFormatNewORCFormatC("{}", 0);
+  orcFormatData->fmt = ORCFormatNewORCFormatC(optsStr, 0);
   initOrcFormatUserData(desc, orcFormatData);
 
-  int32 splitCount = list_length(fileSplits);
+  int32 splitCount = GetSplitCount(fileSplits, InvalidOid);
   ORCFormatFileSplit *splits = palloc0(sizeof(ORCFormatFileSplit) * splitCount);
   int32 filePathMaxLen = AOSegmentFilePathNameLen(rel) + 1;
-  for (int32 i = 0; i < splitCount; ++i) {
+  int32 orgSplitCount = list_length(fileSplits);
+  for (int32 i = 0, j = 0; i < orgSplitCount; ++i) {
     FileSplit split = (FileSplitNode *)list_nth(fileSplits, i);
-    splits[i].start = split->offsets;
-    splits[i].len = split->lengths;
-    splits[i].eof = split->logiceof;
-    splits[i].fileName = palloc0(filePathMaxLen);
-    MakeAOSegmentFileName(rel, split->segno, -1, dummyPlaceholder,
-                          splits[i].fileName);
+    if (IsValidFileSplit(split, InvalidOid)) {
+      splits[j].start = split->offsets;
+      splits[j].len = split->lengths;
+      splits[j].eof = split->logiceof;
+
+      if (split->ext_file_uri_string) {
+        // XXX(chiyang): hack way to manage split info manually
+        splits[j].fileName = split->ext_file_uri_string;
+      } else {
+        splits[j].fileName = palloc0(filePathMaxLen);
+        MakeAOSegmentFileName(rel, split->segno, -1, dummyPlaceholder,
+                              splits[j].fileName);
+      }
+      ++j;
+    }
   }
 
   if (splitCount > 0)
@@ -417,6 +563,108 @@ OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot, TupleDesc desc,
   pfree(splits);
 
   return scanDesc;
+}
+
+void orcIndexReadNext(OrcScanDescData *scanData, TupleTableSlot *slot,
+                      List *columnsInIndex) {
+  OrcFormatData *orcFormatData = scanData->orcFormatData;
+  bool *nulls = slot_get_isnull(slot);
+  bool *idxnulls = palloc0(sizeof(bool) * orcFormatData->numberOfColumns);
+  memset(idxnulls, true, orcFormatData->numberOfColumns);
+  Datum *values = slot_get_values(slot);
+  TupleDesc tupleDesc = slot->tts_tupleDescriptor;
+  int natts = tupleDesc->natts;
+  memset(nulls, true, natts);
+
+  uint64_t rowId;
+  bool res = ORCFormatNextORCFormatWithRowIdC(
+      orcFormatData->fmt, orcFormatData->colRawValues,
+      orcFormatData->colValLength, idxnulls, &rowId);
+
+  checkOrcError(orcFormatData);
+  int idx = 0;
+  if (res) {
+    for (int32_t i = 0; i < natts; ++i) {
+      // can't find the column in columnsInIndex
+      if (!list_member_oid(columnsInIndex, i + 1)) continue;
+      // index data is null
+      if (idxnulls[idx]) {
+        idx++;
+        continue;
+      }
+      nulls[i] = false;
+      switch (tupleDesc->attrs[i]->atttypid) {
+        case HAWQ_TYPE_BOOL: {
+          values[i] = BoolGetDatum(*(bool *)(orcFormatData->colRawValues[idx]));
+          break;
+        }
+        case HAWQ_TYPE_INT2: {
+          values[i] =
+              Int16GetDatum(*(int16_t *)(orcFormatData->colRawValues[idx]));
+          break;
+        }
+        case HAWQ_TYPE_INT4: {
+          values[i] =
+              Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[idx]));
+          break;
+        }
+        case HAWQ_TYPE_INT8:
+        case HAWQ_TYPE_TIME:
+        case HAWQ_TYPE_TIMESTAMP:
+        case HAWQ_TYPE_TIMESTAMPTZ: {
+          values[i] =
+              Int64GetDatum(*(int64_t *)(orcFormatData->colRawValues[idx]));
+          break;
+        }
+        case HAWQ_TYPE_FLOAT4: {
+          values[i] =
+              Float4GetDatum(*(float *)(orcFormatData->colRawValues[idx]));
+          break;
+        }
+        case HAWQ_TYPE_FLOAT8: {
+          values[i] =
+              Float8GetDatum(*(double *)(orcFormatData->colRawValues[idx]));
+          break;
+        }
+        case HAWQ_TYPE_DATE: {
+          values[i] =
+              Int32GetDatum(*(int32_t *)(orcFormatData->colRawValues[idx]) -
+                            POSTGRES_EPOCH_JDATE + UNIX_EPOCH_JDATE);
+          break;
+        }
+        default: {
+          // Check whether value[i] is fixed length udt.
+          bool isFixedLengthType =
+              tupleDesc->attrs[i]->attlen > 0 ? true : false;
+          bool isPassByVal = tupleDesc->attrs[i]->attbyval;
+          if (isFixedLengthType) {
+            if (isPassByVal) {  // pass by val
+              struct varlena *var =
+                  (struct varlena *)(orcFormatData->colRawValues[idx]);
+              uint32 valLen = *(uint32 *)(var->vl_len_);
+              memcpy((void *)&values[i], var->vl_dat, valLen);
+            } else {  // pass by pointer
+              SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[idx]),
+                          orcFormatData->colValLength[idx]);
+              values[i] = PointerGetDatum(orcFormatData->colRawValues[idx] +
+                                          sizeof(uint32_t));
+            }
+          } else {
+            SET_VARSIZE((struct varlena *)(orcFormatData->colRawValues[idx]),
+                        orcFormatData->colValLength[idx]);
+            values[i] = PointerGetDatum(orcFormatData->colRawValues[idx]);
+          }
+          break;
+        }
+      }
+      idx++;
+    }
+    TupSetVirtualTupleNValid(slot, slot->tts_tupleDescriptor->natts);
+    ItemPointerSetRowIdToFakeCtid(&scanData->cdb_fake_ctid, rowId);
+    slot_set_ctid(slot, &scanData->cdb_fake_ctid);
+  } else {
+    ExecClearTuple(slot);
+  }
 }
 
 void orcReadNext(OrcScanDescData *scanData, TupleTableSlot *slot) {
@@ -914,7 +1162,7 @@ uint64 orcEndUpdate(OrcUpdateDescData *updateDesc) {
   return callback.processedTupleCount;
 }
 
-int64_t *orcCreateIndex(Relation rel, int idxId, List *segno, int64 *eof,
+int64_t *orcCreateIndex(Relation rel, Oid idxId, List *segno, int64 *eof,
                         List *columnsToRead, int sortIdx) {
   checkOushuDbExtensiveFeatureSupport("ORC INDEX");
   OrcScanDescData *scanDesc = palloc0(sizeof(OrcScanDescData));
@@ -939,6 +1187,10 @@ int64_t *orcCreateIndex(Relation rel, int idxId, List *segno, int64 *eof,
   for (int i = 0; i < sortIdx; i++) {
     sortIdxList[i] = list_nth_int(columnsToRead, i) - 1;
   }
+  int *segnoList = palloc0(sizeof(int) * splitCount);
+  for (int i = 0; i < splitCount; i++) {
+    segnoList[i] = list_nth_int(segno, i);
+  }
 
   ORCFormatFileSplit *splits = palloc0(sizeof(ORCFormatFileSplit) * splitCount);
   int32 filePathMaxLen = AOSegmentFilePathNameLen(rel) + 1;
@@ -954,7 +1206,148 @@ int64_t *orcCreateIndex(Relation rel, int idxId, List *segno, int64 *eof,
       idxId, splits, splitCount, eof, columnsToReadList, sortIdxList, sortIdx,
       orcFormatData->colNames, orcFormatData->colDatatypes,
       orcFormatData->colDatatypeMods, orcFormatData->numberOfColumns,
-      gp_session_id, rm_seg_tmp_dirs);
+      gp_session_id, rm_seg_tmp_dirs, segnoList);
+}
+
+static int OrcoidComparator(const void *arg1, const void *arg2) {
+  Oid oid1 = *(const Oid *)arg1;
+  Oid oid2 = *(const Oid *)arg2;
+
+  if (oid1 > oid2) return 1;
+  if (oid1 < oid2) return -1;
+  return 0;
+}
+
+void orcBeginIndexOnlyScan(ScanState *scanState, Oid idxId,
+                           List *columnsInIndex) {
+  Assert(scanState->scan_state == SCAN_INIT ||
+         scanState->scan_state == SCAN_DONE);
+  Assert(length(columnsInIndex) > 0);
+
+  Relation rel = scanState->ss_currentRelation;
+  int natts = rel->rd_att->natts;
+  bool *colToReads = palloc0(sizeof(bool) * natts);
+  GetNeededColumnsForScan((Node *)scanState->ps.plan->targetlist, colToReads,
+                          natts);
+  OrcIndexOnlyScan *plan =
+      (OrcIndexOnlyScan *)(((IndexScanState *)scanState)->ss.ps.plan);
+  GetNeededColumnsForScan((Node *)(plan->indexqualorig), colToReads, natts);
+
+  GetNeededColumnsForScan((Node *)scanState->ps.plan->qual, colToReads, natts);
+
+  ((IndexScanState *)scanState)->scandesc = orcBeginIndexOnlyRead(
+      rel, idxId, columnsInIndex, scanState->ps.state->es_snapshot, NULL,
+      scanState->splits, colToReads, scanState->ps.plan);
+
+  pfree(colToReads);
+  scanState->scan_state = SCAN_SCAN;
+}
+
+TupleTableSlot *orcIndexOnlyScanNext(ScanState *scanState) {
+  orcIndexReadNext(
+      ((IndexScanState *)scanState)->scandesc, scanState->ss_ScanTupleSlot,
+      ((IndexScan *)(((IndexScanState *)scanState)->ss.ps.plan))->idxColummns);
+  return scanState->ss_ScanTupleSlot;
+}
+
+void orcEndIndexOnlyScan(ScanState *scanState) {
+  if ((((IndexScanState *)scanState)->ss.scan_state & SCAN_SCAN) != 0) {
+    OrcScanDescData *scanDesc = ((IndexScanState *)scanState)->scandesc;
+
+    orcEndRead(scanDesc);
+
+    pfree(scanDesc);
+    scanState->scan_state = SCAN_INIT;
+  }
+}
+
+void orcIndexOnlyReScan(ScanState *scanState) {
+  orcResetRead(((IndexScanState *)scanState)->scandesc);
+}
+
+OrcScanDescData *orcBeginIndexOnlyRead(Relation rel, Oid idxId,
+                                       List *columnsInIndex, Snapshot snapshot,
+                                       TupleDesc desc, List *fileSplits,
+                                       bool *colToReads, void *pushDown) {
+  OrcScanDescData *scanDesc = palloc0(sizeof(OrcScanDescData));
+  OrcFormatData *orcFormatData = scanDesc->orcFormatData =
+      palloc0(sizeof(OrcFormatData));
+
+  RelationIncrementReferenceCount(rel);
+
+  if (desc == NULL) desc = RelationGetDescr(rel);
+
+  scanDesc->rel = rel;
+  orcFormatData->fmt = ORCFormatNewORCFormatC("{}", 0);
+  ORCFormatSetIndexFlag(orcFormatData->fmt);
+  bool *colToReadInIndex =
+      palloc0(sizeof(bool) * (list_length(columnsInIndex) + 1));
+  initOrcFormatIndexUserData(desc, orcFormatData, colToReads, columnsInIndex,
+                             colToReadInIndex);
+
+  int32 splitCount = GetSplitCount(fileSplits, idxId);
+  ORCFormatFileSplit *splits = palloc0(sizeof(ORCFormatFileSplit) * splitCount);
+  int lenOfIdxId = 0;
+  Oid idxCount = idxId;
+  while (idxCount) {
+    lenOfIdxId++;
+    idxCount /= 10;
+  }
+  if (lenOfIdxId == 0) lenOfIdxId = 1;
+  int32 filePathMaxLen = AOSegmentFilePathNameLen(rel) + lenOfIdxId + 2;
+  int32 orgSplitCount = list_length(fileSplits);
+  for (int32 i = 0, j = 0; i < orgSplitCount; ++i) {
+    FileSplit split = (FileSplitNode *)list_nth(fileSplits, i);
+    if (IsValidFileSplit(split, idxId)) {
+      splits[j].start = split->offsets;
+      splits[j].len = split->lengths;
+      splits[j].eof = split->logiceof;
+      splits[j].fileName = palloc0(filePathMaxLen);
+      MakeAOSegmentIndexFileName(rel, idxId, split->segno, -1, dummyPlaceholder,
+                                 splits[j].fileName);
+      ++j;
+    }
+  }
+
+  if (splitCount > 0) addFilesystemCredential(splits[0].fileName);
+
+  void *qualList = NULL;
+  CommonPlanContext ctx;
+  ctx.univplan = NULL;
+  Plan *plan = (Plan *)pushDown;
+
+  /*
+   * 1. the varattno of indexqualorig consistent with table columns info
+   * 2. the varattno of indexqualorig does not match the index file
+   * 3. adjust the "columnsInIndex" order
+   * 4. fix indexqualorig varattno utilization "columnsInIndex" in
+   * do_convert_expr_to_common_plan to be consistent with index file
+   */
+  int len = length(columnsInIndex);
+  Oid *value = palloc(len * sizeof(Oid));
+  for (int i = 0; i < len; ++i) {
+    value[i] = list_nth_oid(columnsInIndex, i);
+  }
+  qsort(value, len, sizeof(Oid), OrcoidComparator);
+  List *colIdxs = NIL;
+  for (int i = 0; i < len; ++i) {
+    colIdxs = lappend_oid(colIdxs, value[i]);
+  }
+  pfree(value);
+  qualList = convert_orcscan_indexqualorig_to_common_plan(plan, &ctx, colIdxs);
+
+  ORCFormatBeginORCFormatC(
+      orcFormatData->fmt, splits, splitCount, colToReadInIndex,
+      orcFormatData->colNames, orcFormatData->colDatatypes,
+      orcFormatData->colDatatypeMods, orcFormatData->numberOfColumns, qualList);
+  checkOrcError(orcFormatData);
+
+  ItemPointerSetInvalid(&scanDesc->cdb_fake_ctid);
+
+  for (int32 i = 0; i < splitCount; ++i) pfree(splits[i].fileName);
+  pfree(splits);
+
+  return scanDesc;
 }
 
 bool isDirectDispatch(Plan *plan) {

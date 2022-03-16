@@ -33,7 +33,8 @@ typedef struct _FuncCandidateList
 	Oid			args[1];		/* arg types --- VARIABLE LENGTH ARRAY */
 }	*FuncCandidateList;	/* VARIABLE LENGTH STRUCT */
 
-
+extern char *RelidGetName(Oid relid);
+extern RangeVar *RelidGetRangeVar(Oid relid);
 extern Oid GetCatalogId(const char *catalogname);
 extern Oid	RangeVarGetRelid(const RangeVar *relation, bool failOK, bool allowHcatalog);
 extern Oid	RangeVarGetCreationNamespace(const RangeVar *newRelation);

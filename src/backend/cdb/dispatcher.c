@@ -1167,7 +1167,6 @@ static void dispatcher_serialize_common_plan(DispatchData *data, CommonPlanConte
                    new_executor_enable_partitioned_hashjoin_mode);
     univPlanAddGuc(ctx->univplan, "enable_external_sort",
                    new_executor_enable_external_sort_mode);
-    univPlanAddGuc(ctx->univplan, "new_scheduler", "off");
     univPlanAddGuc(ctx->univplan, "filter_pushdown", orc_enable_filter_pushdown);
     univPlanAddGuc(ctx->univplan, "magma_enable_shm", magma_enable_shm);
     sprintf(numberStrBuf, "%d", magma_shm_limit_per_block * 1024);

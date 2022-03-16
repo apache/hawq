@@ -79,17 +79,20 @@ extern Oid orcInsertValues(OrcInsertDescData *insertDesc, Datum *values,
 extern void orcEndInsert(OrcInsertDescData *insertDesc);
 
 // scan
-extern void orcBeginScan(struct ScanState *scanState);
-extern TupleTableSlot *orcScanNext(struct ScanState *scanState);
-extern void orcEndScan(struct ScanState *scanState);
-extern void orcReScan(struct ScanState *scanState);
+extern void orcBeginScan(struct ScanState* scanState);
+extern TupleTableSlot* orcScanNext(struct ScanState* scanState);
+extern void orcEndScan(struct ScanState* scanState);
+extern void orcReScan(struct ScanState* scanState);
 
-extern OrcScanDescData *orcBeginRead(Relation rel, Snapshot snapshot,
-                                     TupleDesc desc, List *fileSplits,
-                                     bool *colToReads, void *pushDown);
-extern void orcReadNext(OrcScanDescData *scanData, TupleTableSlot *slot);
-extern void orcEndRead(OrcScanDescData *scanData);
-extern void orcResetRead(OrcScanDescData *scanData);
+extern OrcScanDescData* orcBeginReadWithOptionsStr(
+    Relation rel, Snapshot snapshot, TupleDesc desc, List* fileSplits,
+    bool* colToReads, void* pushDown, const char*);
+extern OrcScanDescData* orcBeginRead(Relation rel, Snapshot snapshot,
+                                     TupleDesc desc, List* fileSplits,
+                                     bool* colToReads, void* pushDown);
+extern void orcReadNext(OrcScanDescData* scanData, TupleTableSlot* slot);
+extern void orcEndRead(OrcScanDescData* scanData);
+extern void orcResetRead(OrcScanDescData* scanData);
 
 // delete
 extern OrcDeleteDescData *orcBeginDelete(Relation rel, List *fileSplits,
@@ -110,8 +113,41 @@ extern uint64 orcEndUpdate(OrcUpdateDescData *updateDesc);
 // utils
 extern bool isDirectDispatch(Plan *plan);
 
+void checkOrcError(OrcFormatData* orcFormatData);
+
 // index
-extern int64_t* orcCreateIndex(Relation rel, int idxId, List* segno, int64* eof,
+extern int64_t* orcCreateIndex(Relation rel, Oid idxId, List* segno, int64* eof,
                                List* columnsToRead, int sortIdx);
+extern void orcBeginIndexOnlyScan(struct ScanState* scanState, Oid idxId,
+                                  List* columnsInIndex);
+extern void orcIndexReadNext(OrcScanDescData* scanData, TupleTableSlot* slot,
+                             List* columnsInIndex);
+
+extern TupleTableSlot* orcIndexOnlyScanNext(struct ScanState* scanState);
+
+extern void orcEndIndexOnlyScan(struct ScanState* scanState);
+
+extern void orcIndexOnlyReScan(struct ScanState* scanState);
+
+extern OrcScanDescData* orcBeginIndexOnlyRead(Relation rel, Oid idxId,
+                                              List* columnsInIndex,
+                                              Snapshot snapshot, TupleDesc desc,
+                                              List* fileSplits,
+                                              bool* colToReads, void* pushDown);
+
+extern void orcBeginIndexOnlyScan(struct ScanState* scanState, Oid idxId,
+                                  List* columnsInIndex);
+
+extern TupleTableSlot* orcIndexOnlyScanNext(struct ScanState* scanState);
+
+extern void orcEndIndexOnlyScan(struct ScanState* scanState);
+
+extern void orcIndexOnlyReScan(struct ScanState* scanState);
+
+extern OrcScanDescData* orcBeginIndexOnlyRead(Relation rel, Oid idxId,
+                                              List* columnsInIndex,
+                                              Snapshot snapshot, TupleDesc desc,
+                                              List* fileSplits,
+                                              bool* colToReads, void* pushDown);
 
 #endif /* ORCAM_H_ */

@@ -14,6 +14,8 @@
  *
  *-------------------------------------------------------------------------
  */
+
+#include <string.h>
 #include "postgres.h"
 #include "port.h"
 
@@ -678,6 +680,21 @@ ProcessDropStatement(DropStmt *stmt)
 				ereport(ERROR,
 						(errcode(ERRCODE_CDB_FEATURE_NOT_YET), errmsg("Cannot support drop foreign table statement yet") ));
 
+			case OBJECT_VLABEL:
+			  rel = makeRangeVarFromNameList(names);
+			  RemoveVlabel(rel, stmt->missing_ok);
+			  break;
+
+			case OBJECT_ELABEL:
+        rel = makeRangeVarFromNameList(names);
+        RemoveElabel(rel, stmt->missing_ok);
+        break;
+
+      case OBJECT_GRAPH:
+        rel = makeRangeVarFromNameList(names);
+        RemoveGraph(rel, stmt->missing_ok, true);
+        break;
+
 			case OBJECT_TABLE:
 			case OBJECT_EXTTABLE:
 
@@ -1058,6 +1075,18 @@ ProcessUtility(Node *parsetree,
 		case T_CreateExternalStmt:
 			DefineExternalRelation((CreateExternalStmt *) parsetree);
 			break;
+
+		case T_CreateVlabelStmt:
+      DefineVlabel((CreateVlabelStmt *) parsetree);
+      break;
+
+		case T_CreateElabelStmt:
+      DefineElabel((CreateElabelStmt *) parsetree);
+      break;
+
+    case T_CreateGraphStmt:
+      DefineGraph((CreateGraphStmt *) parsetree);
+      break;
 
 		case T_CreateForeignStmt:
 			ereport(ERROR,
@@ -1831,6 +1860,9 @@ ProcessUtility(Node *parsetree,
 					case OBJECT_INDEX:
 						ReindexIndex(stmt);
 						break;
+		      case OBJECT_VLABEL:
+		      case OBJECT_ELABEL:
+		      case OBJECT_GRAPH:
 					case OBJECT_TABLE:
 						ReindexTable(stmt);
 						break;
@@ -2157,6 +2189,18 @@ CreateCommandTag(Node *parsetree)
 			}
 			break;
 
+    case T_CreateVlabelStmt:
+      tag = "CREATE VERTEX";
+      break;
+
+    case T_CreateElabelStmt:
+      tag = "CREATE EDGE";
+      break;
+
+    case T_CreateGraphStmt:
+      tag = "CREATE GRAPH";
+      break;
+
 		case T_CreateForeignStmt:
 			tag = "CREATE FOREIGN TABLE";
 			break;
@@ -2208,6 +2252,15 @@ CreateCommandTag(Node *parsetree)
 		case T_DropStmt:
 			switch (((DropStmt *) parsetree)->removeType)
 			{
+			  case OBJECT_VLABEL:
+          tag = "DROP VERTEX";
+          break;
+			  case OBJECT_ELABEL:
+          tag = "DROP EDGE";
+          break;
+        case OBJECT_GRAPH:
+          tag = "DROP GRAPH";
+          break;
 				case OBJECT_TABLE:
 					tag = "DROP TABLE";
 					break;
@@ -2802,6 +2855,9 @@ GetCommandLogLevel(Node *parsetree)
 			lev = LOGSTMT_DDL;
 			break;
 
+		case T_CreateVlabelStmt:
+		case T_CreateElabelStmt:
+		case T_CreateGraphStmt:
 		case T_CreateExternalStmt:
 		case T_CreateForeignStmt:
 			lev = LOGSTMT_DDL;

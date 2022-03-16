@@ -26,7 +26,6 @@
 #include "executor/cwrapper/executor-c.h"
 #include "executor/cwrapper/cached-result.h"
 #include "magma/cwrapper/magma-client-c.h"
-#include "scheduler/cwrapper/scheduler-c.h"
 
 ProtocolVersion FrontendProtocol = PG_PROTOCOL_LATEST;
 
@@ -167,5 +166,4 @@ const char *sql_text;
 bool is_qtype_sql = false;
 
 ExecutorC	*MyNewExecutor;
-SchedulerC *MyScheduler = NULL;
 CachedResultC *MyCachedResult = NULL;

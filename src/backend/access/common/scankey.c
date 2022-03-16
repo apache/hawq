@@ -33,21 +33,28 @@ ScanKeyEntryInitialize(ScanKey entry,
 					   AttrNumber attributeNumber,
 					   StrategyNumber strategy,
 					   Oid subtype,
-					   RegProcedure procedure,
-					   Datum argument)
+					   RegProcedure opProcedure,
+					   Datum argument,
+					   AttrNumber attributeNumberOld,
+					   RegProcedure outputProcedure)
 {
 	entry->sk_flags = flags;
 	entry->sk_attno = attributeNumber;
 	entry->sk_strategy = strategy;
 	entry->sk_subtype = subtype;
 	entry->sk_argument = argument;
-	if (RegProcedureIsValid(procedure))
-		fmgr_info(procedure, &entry->sk_func);
+	if (RegProcedureIsValid(opProcedure))
+		fmgr_info(opProcedure, &entry->sk_func);
 	else
 	{
 		Assert(flags & SK_SEARCHNULL);
 		MemSet(&entry->sk_func, 0, sizeof(entry->sk_func));
 	}
+	entry->sk_attnoold = attributeNumberOld;
+	if (RegProcedureIsValid(outputProcedure))
+		fmgr_info(outputProcedure, &entry->sk_out_func);
+	else
+	        MemSet(&entry->sk_out_func, 0, sizeof(entry->sk_out_func));
 }
 
 /*

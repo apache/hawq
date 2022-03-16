@@ -41,6 +41,7 @@
 #include "catalog/pg_opclass.h"
 #include "catalog/pg_operator.h"
 #include "catalog/pg_type.h"
+#include "catalog/pg_exttable.h"
 #include "nodes/makefuncs.h"
 #include "optimizer/clauses.h"
 #include "optimizer/cost.h"
@@ -1662,6 +1663,8 @@ best_inner_indexscan(PlannerInfo *root, RelOptInfo *rel,
 	List	   *indexpaths;
 	List	   *bitindexpaths;
 	ListCell   *l;
+	ListCell   *nextcell = NULL;
+	ListCell   *prevcell = NULL;
 	InnerIndexscanInfo *info;
 	MemoryContext oldcontext;
 	RangeTblEntry *rte;
@@ -1789,17 +1792,100 @@ best_inner_indexscan(PlannerInfo *root, RelOptInfo *rel,
 	relstorage = get_rel_relstorage(rte->relid);
 	Assert(relstorage != '\0');
 
-    /* Exclude plain index paths if user doesn't want them. */
-    if (!root->config->enable_indexscan && !root->config->mpp_trying_fallback_plan)
-        indexpaths = NIL;
+	if (RelationIsMagmaTable2(rte->relid))
+	{
+	        bool        del = false;
+	        Expr       *clause;
+	        Expr	   *leftop;	/* expr on lhs of operator */
+	        Expr	   *rightop;	/* expr on rhs ... */
+	        ListCell   *qual;
+	        Path       *path;
 
-	/* Exclude plain index paths if the relation is an append-only relation. */
-	if (relstorage_is_ao(relstorage) ||
-		/* disable inner join index scan for magma
-		 * because magma index scan cant support dynamic filter
-		 */
-		relstorage == RELSTORAGE_EXTERNAL)
-		indexpaths = NIL;
+	        /* Exclude plain index paths if user doesn't want them. */
+	        if ((!root->config->enable_magma_indexscan || !root->config->enable_magma_indexonlyscan)
+	                && !root->config->mpp_trying_fallback_plan)
+	        {
+	                for (l = list_head(indexpaths); l; l = nextcell)
+	                {
+	                        nextcell = lnext(l);
+	                        path = (Path *) lfirst(l);
+	                        if ((path->pathtype == T_MagmaIndexScan && !root->config->enable_magma_indexscan)
+	                                || (path->pathtype == T_MagmaIndexOnlyScan && !root->config->enable_magma_indexonlyscan))
+	                                indexpaths = list_delete_cell(indexpaths, l, prevcell);
+	                        else
+	                                prevcell = l;
+	                }
+	        }
+
+	        /*
+	         * Exclude plain index paths if there is an expression that magma deos not support.
+	         * So far, we only support (Var op Const), (Const op Var), (Var eq Var).
+	         */
+	        prevcell = NULL;
+	        for (l = list_head(indexpaths); l; l = nextcell)
+	        {
+	                nextcell = lnext(l);
+	                path = (Path *) lfirst(l);
+
+	                foreach(qual, ((IndexPath *) path)->indexquals)
+	                {
+	                        clause = ((RestrictInfo *) lfirst(qual))->clause;
+	                        /* e.g., RowCompareExpr */
+	                        if (!IsA(clause, OpExpr))
+	                        {
+	                                del = true;
+	                                break;
+	                        }
+
+	                        Assert(list_length(((OpExpr *) clause)->args) == 2);
+
+	                        leftop = (Expr *) get_leftop(clause);
+	                        if (leftop && IsA(leftop, RelabelType))
+	                                leftop = ((RelabelType *) leftop)->arg;
+	                        rightop = (Expr *) get_rightop(clause);
+	                        if (rightop && IsA(rightop, RelabelType))
+	                                rightop = ((RelabelType *) rightop)->arg;
+
+	                        /* e.g., (Var op FuncExpr), (FuncExpr op Var) */
+	                        if (!(IsA(leftop, Var) || IsA(leftop, Const))
+	                                || !(IsA(rightop, Var) || IsA(rightop, Const)))
+	                        {
+	                                del = true;
+	                                break;
+	                        }
+	                        if (IsA(leftop, Var) && IsA(rightop, Var))
+	                        {
+	                                if (((Var *) leftop)->vartype != ((Var *) rightop)->vartype
+	                                        /* If not satisfy (Var eq Var). */
+	                                        || pg_strcasecmp(get_opname(((OpExpr *) clause)->opno), "=") != 0)
+	                                {
+	                                        del = true;
+	                                        break;
+	                                }
+	                        }
+	                }
+
+	                if (del)
+	                {
+	                        indexpaths = list_delete_cell(indexpaths, l, prevcell);
+	                        del = false;
+	                }
+	                else
+	                        prevcell = l;
+	        }
+	}
+	else
+	{
+	        if (
+	                /* Exclude plain index paths if user doesn't want them. */
+	                (!root->config->enable_indexscan && !root->config->mpp_trying_fallback_plan)
+	                /* ... if the relation is an append-only relation. */
+	                || relstorage_is_ao(relstorage)
+	                /* ... if the relation is an external relation and not magma. */
+	                || relstorage_is_external(relstorage)
+	        )
+	                indexpaths = NIL;
+	}
 
 	/*
 	 * If we found anything usable, generate a BitmapHeapPath for the most
