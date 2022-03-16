@@ -789,9 +789,46 @@ RelationParseRelOptions(Relation relation, HeapTuple tuple)
 		case RELKIND_AOSEGMENTS:
 		case RELKIND_AOBLOCKDIR:
 		case RELKIND_UNCATALOGED:
+		{
+			// check for bloom filter here because
+			// we could not get tupledesc in default_reloptions.
+			const char *const keywords[] =
+			{ "bloomfilter" };
+			const int32_t keywords_size = 1;
+			char *values[keywords_size];
+			char *bloomfilter = NULL;
+			char *key = "bloomfilter";
+
+			parseRelOptions(datum, keywords_size, keywords, values, false);
+			if (values[0] != NULL)
+			{
+				TupleDesc tup_desc = relation->rd_att;
+				int attnum = tup_desc->natts;
+				char **attribute_names = palloc0(attnum * sizeof(char*));
+				for (int i = 0; i < attnum; ++i)
+				{
+					int name_len =
+							strlen(
+									((Form_pg_attribute) (tup_desc->attrs[i]))->attname.data);
+					char *attribute = palloc0(name_len + 1);
+					strncpy(attribute, ((Form_pg_attribute )
+					(tup_desc->attrs[i]))->attname.data, name_len);
+					attribute_names[i] = attribute;
+				}
+				char *dup_val = pstrdup(values[0]);
+				char *token = strtok(dup_val, ",");
+				while (token)
+				{
+					checkPlugStorageFormatOption(&bloomfilter, key, token, true,
+							attnum, attribute_names);
+					bloomfilter = NULL;
+					token = strtok(NULL, ",");
+				}
+			}
 			options = heap_reloptions(relation->rd_rel->relkind, datum,
 									  false);
 			break;
+		}
 		case RELKIND_INDEX:
 			options = index_reloptions(relation->rd_am->amoptions, datum,
 									   false);

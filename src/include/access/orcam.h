@@ -26,6 +26,13 @@
 #include "cdb/cdbquerycontextdispatching.h"
 #include "nodes/relation.h"
 
+#define DEFAULT_ORC_ROW_GROUP_SIZE 65536
+#define MIN_ORC_ROW_GROUP_SIZE 1000
+#define MAX_ORC_ROW_GROUP_SIZE 1024 * 1024 * 1024
+// here we use orc block size in Bytes
+#define DEFAULT_ORC_COMPRESS_BLOCK_SIZE 256 * 1024
+#define MIN_ORC_COMPRESS_BLOCK_SIZE 1
+#define MAX_ORC_COMPRESS_BLOCK_SIZE 1024 * 1024 * 1024
 // here we use orc stripe size in MBytes
 #define DEFAULT_ORC_STRIPE_SIZE 64
 #define MIN_ORC_STRIPE_SIZE 1

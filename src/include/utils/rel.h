@@ -285,7 +285,6 @@ typedef struct StdRdOptions
 	int			blocksize;		/* max varblock size (AO rels only) */
 	int			pagesize;		/* page size(Parquet rels only) */
 	int			rowgroupsize;	/* row group size (Parquet rels only)*/
-	int     stripesize;  /* stripe size (ORC rels only) */
 	int			compresslevel;  /* compression level (AO rels only) */
 	char*		compresstype;   /* compression type (AO rels only) */
 	bool		checksum;		/* checksum (AO rels only) */
@@ -293,6 +292,10 @@ typedef struct StdRdOptions
 	bool		forceHeap;		/* specified appendonly=false */
 	bool		errorTable;		/* skip GOH tablespace checking. */
 	int 		bucket_num;		/* default init segment num for random/hash/external table */
+	char*		bloomfilter;	/* columns using bloomfilter (ORC rels only) */
+	int 		stripesize; 	/* stripe size (ORC rels only) */
+	int 		rowindexstride;	/* row index stride (ORC rels only) */
+	int 		compressblocksize;  /* compressblocksize in native orc, different from blocksize (ORC rels only) */
 } StdRdOptions;
 
 #define HEAP_MIN_FILLFACTOR			10

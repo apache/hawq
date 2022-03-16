@@ -279,7 +279,6 @@ static int32 GetSplitCount(List *fileSplits, Oid idxId) {
   return ret;
 }
 
->>>>>>> 7910d663d... step2
 OrcInsertDescData *orcBeginInsert(Relation rel,
                                   ResultRelSegFileInfo *segfileinfo) {
   OrcInsertDescData *insertDesc =
@@ -299,17 +298,7 @@ OrcInsertDescData *orcBeginInsert(Relation rel,
   AppendOnlyEntry *aoentry =
       GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
   StringInfoData option;
-  initStringInfo(&option);
-  appendStringInfoChar(&option, '{');
-  appendStringInfo(&option, "\"logicEof\": %" PRId64, segfileinfo->eof[0]);
-  appendStringInfo(&option, ", \"uncompressedEof\": %" PRId64,
-                   segfileinfo->uncompressed_eof[0]);
-  appendStringInfo(
-      &option, ", \"stripeSize\": %" PRId64,
-      ((StdRdOptions *)(rel->rd_options))->stripesize * 1024 * 1024);
-  if (aoentry->compresstype)
-    appendStringInfo(&option, ", %s", aoentry->compresstype);
-  appendStringInfoChar(&option, '}');
+  constructOrcFormatOptionString(&option, rel, segfileinfo, aoentry);
 
   insertDesc->orcFormatData = palloc0(sizeof(OrcFormatData));
   insertDesc->orcFormatData->fmt =
@@ -929,11 +918,7 @@ OrcDeleteDescData *orcBeginDelete(Relation rel, List *fileSplits,
   AppendOnlyEntry *aoentry =
       GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
   StringInfoData option;
-  initStringInfo(&option);
-  appendStringInfoChar(&option, '{');
-  if (aoentry->compresstype)
-    appendStringInfo(&option, "%s", aoentry->compresstype);
-  appendStringInfoChar(&option, '}');
+  constructOrcFormatOptionString(&option, rel, NULL, aoentry);
 
   int hdfsPathMaxLen = AOSegmentFilePathNameLen(rel) + 1;
   char *hdfsPath = (char *)palloc0(hdfsPathMaxLen);
@@ -1047,11 +1032,7 @@ OrcUpdateDescData *orcBeginUpdate(Relation rel, List *fileSplits,
   AppendOnlyEntry *aoentry =
       GetAppendOnlyEntry(RelationGetRelid(rel), SnapshotNow);
   StringInfoData option;
-  initStringInfo(&option);
-  appendStringInfoChar(&option, '{');
-  if (aoentry->compresstype)
-    appendStringInfo(&option, "%s", aoentry->compresstype);
-  appendStringInfoChar(&option, '}');
+  constructOrcFormatOptionString(&option, rel, NULL, aoentry);
 
   int hdfsPathMaxLen = AOSegmentFilePathNameLen(rel) + 1;
   char *hdfsPath = (char *)palloc0(hdfsPathMaxLen);
