@@ -5045,25 +5045,36 @@ format_opt:
 format_opt_list:
 			format_opt_item2
 			{
-				$$ = list_make1($1);
+			        $$ = list_make1($1);
 			}
 			| format_opt_item2 '=' format_opt_item2
 			{
-				$$ = list_make2($1,$3);
+			        $$ = list_make2($1, $3);
+			}
+			| format_opt_item2 AS format_opt_item2
+			{
+			        $$ = list_make2($1, $3);
 			}
 			| format_opt_list format_opt_item2
 			{
-				$$ = lappend($1, $2);
+			        $$ = lappend($1, $2);
 			}
 			| format_opt_list format_opt_item2 '=' format_opt_item2
 			{
-				$$ = lappend(lappend($1, $2),$4);
+			        $$ = lappend(lappend($1, $2), $4);
+			}
+			| format_opt_list format_opt_item2 AS format_opt_item2
+			{
+			        $$ = lappend(lappend($1, $2), $4);
+			}
+			| format_opt_list ',' format_opt_item2 '=' format_opt_item2
+			{
+			        $$ = lappend(lappend($1, $3), $5);
 			}
 			;
 
 format_opt_keyword:
-			  AS
-			| DELIMITER
+			DELIMITER
 			| NULL_P
 			| CSV
 			| HEADER_P
@@ -5094,11 +5105,12 @@ format_opt_item2:
 			{
 				$$ = makeDefElem("#ident", (Node *)makeString($1));
 			}
-			| columnListPlus
+			| '(' columnListPlus ')'
 			{
-				$$ = makeDefElem("#collist", (Node *)$1);
+				$$ = makeDefElem("#collist", (Node *)$2);
 			}
 			;
+
 /*			
 format_opt_item:
 			DELIMITER opt_as Sconst
