@@ -765,20 +765,15 @@ class HawqStart:
             query = "select summary_state, detail_state from gp_master_mirroring;"
             rows = dbconn.execSQL(conn, query)
             conn.close()
+            for row in rows:
+                if row[0] != 'Synchronized':
+                    if row[1].find('Standby master too far behind') != -1:
+                        return 3
+                    return 2
+                else:
+                    return 0
         except DatabaseError, ex:
             logger.error("Failed to connect to database, this script can only be run when the database is up")
-
-        cmd = '%s/bin/psql -p %s -d template1 -c \
-                  "select summary_state, detail_state from gp_master_mirroring;"' % (self.GPHOME, self.master_port)
-        (resutl, stdout, stderr) = local_ssh_output(cmd)
-        if stdout.find('Standby master too far behind') != -1:
-            return 3
-
-        for row in rows:
-            if row[0] != 'Synchronized':
-                return 2
-            else:
-                return 0
 
     def _start_segment_cmd(self):
         logger.info("Start segment service")
