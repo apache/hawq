@@ -155,6 +155,7 @@ makeConst(Oid consttype,
 	Const	   *cnst = makeNode(Const);
 
 	cnst->consttype = consttype;
+	cnst->consttypmod = consttypmod;
 	cnst->constlen = constlen;
 	cnst->constvalue = constvalue;
 	cnst->constisnull = constisnull;

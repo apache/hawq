@@ -1834,6 +1834,9 @@ eval_const_expressions_mutator(Node *node,
 		 */
 		simple = simplify_function(expr->funcid, expr->funcresulttype, args,
 								   true, context);
+		if (simple && IsA(simple, Const)) {
+			((Const*)simple)->consttypmod = exprTypmod(expr);
+		}
 		if (simple)				/* successfully simplified it */
 			return (Node *) simple;
 

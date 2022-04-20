@@ -1375,6 +1375,7 @@ _copyConst(Const *from)
 	Const	   *newnode = makeNode(Const);
 
 	COPY_SCALAR_FIELD(consttype);
+	COPY_SCALAR_FIELD(consttypmod);
 	COPY_SCALAR_FIELD(constlen);
 
 	if (from->constbyval || from->constisnull)

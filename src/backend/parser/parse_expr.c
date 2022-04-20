@@ -2579,6 +2579,7 @@ exprTypmod(Node *expr)
 						}
 						break;
 					default:
+						return con->consttypmod;
 						break;
 				}
 			}

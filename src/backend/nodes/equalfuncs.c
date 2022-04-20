@@ -195,6 +195,7 @@ static bool
 _equalConst(Const *a, Const *b)
 {
 	COMPARE_SCALAR_FIELD(consttype);
+	COMPARE_SCALAR_FIELD(consttypmod);
 	COMPARE_SCALAR_FIELD(constlen);
 	COMPARE_SCALAR_FIELD(constisnull);
 	COMPARE_SCALAR_FIELD(constbyval);
