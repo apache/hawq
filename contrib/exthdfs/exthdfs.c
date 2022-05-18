@@ -528,7 +528,7 @@ Datum hdfsprotocol_validate(PG_FUNCTION_ARGS)
 		}
 
 		/* Clean up temporarily created instances */
-		pfree(uri);
+		FreeExternalTableUri(uri);
 		if (nnaddr != NULL)
 		{
 			pfree(nnaddr);

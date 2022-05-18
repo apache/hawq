@@ -76,7 +76,7 @@ Datum hiveprotocol_blocklocation(PG_FUNCTION_ARGS) {
   }
 
   /* Clean up uri instance as we don't need it any longer */
-  pfree(uri);
+  FreeExternalTableUri(uri);
 
   /* Check all locations to get files to fetch location. */
   ListCell *lc = NULL;
@@ -201,7 +201,7 @@ Datum hiveprotocol_blocklocation(PG_FUNCTION_ARGS) {
     }
 
     /* Clean up URI instance in loop as we don't need it any longer */
-    pfree(uri);
+    FreeExternalTableUri(uri);
 
     /* Clean up file info array created by the lib for this location. */
     FscHdfsFreeFileInfoArrayC(&fiarray);
