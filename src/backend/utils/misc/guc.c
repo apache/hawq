@@ -8805,7 +8805,7 @@ static struct config_string ConfigureNamesString[] =
 			NULL
 		},
 		&rm_stmt_vseg_mem_str,
-		"128mb", assign_hawq_rm_stmt_vseg_memory, NULL
+		"256mb", assign_hawq_rm_stmt_vseg_memory, NULL
 	},
 
 	{
