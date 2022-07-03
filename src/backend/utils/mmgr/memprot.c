@@ -454,7 +454,7 @@ void *gp_realloc(void *ptr, int64 sz, int64 newsz)
 		}
 #endif
 
-		if(!ret)
+		if(newsz && !ret)
 		{
 			Assert(0 < size_diff);
 			VmemTracker_ReleaseVmem(size_diff);

@@ -62,24 +62,27 @@ GRANT EXECUTE ON FUNCTION session_state_memory_entries_f() TO public;
 --        List of memory usage entries for sessions
 --        
 --------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION create_segment_proxy() RETURNS text AS
+$$
+DECLARE
+    segCount   int;
+    cmd       text;
+BEGIN
+    SELECT count(*) from gp_segment_configuration where role = 'p' and status = 'u'
+           into segCount;
+    cmd := 'create readable external web table segments(t int)
+            execute ''echo $GP_SEGMENT_ID'' on ' || segCount || ' format ''text''';
+    EXECUTE cmd;
+    RETURN cmd;
+END;
+$$ LANGUAGE PLPGSQL;
+SELECT create_segment_proxy();
+
 
 CREATE VIEW session_level_memory_consumption AS
 WITH all_entries AS (
-   SELECT C.*
-          FROM gp_toolkit.__gp_localid, session_state_memory_entries_f() AS C (
-            segid int,
-            sessionid int,
-            vmem_mb int,
-            runaway_status int,
-            qe_count int, 
-            active_qe_count int, 
-            dirty_qe_count int,
-            runaway_vmem_mb int, 
-            runaway_command_cnt int
-          )
-    UNION ALL
     SELECT C.*
-          FROM gp_toolkit.__gp_masterid, session_state_memory_entries_f() AS C (
+          FROM session_state.segments, session_state_memory_entries_f() AS C (
             segid int,
             sessionid int,
             vmem_mb int,
