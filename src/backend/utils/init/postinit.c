@@ -478,7 +478,8 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 
 #ifdef USE_ORCA
 	/* Initialize GPOPT */
-	InitGPOPT();
+	if (!bootstrap && Gp_role == GP_ROLE_DISPATCH)
+	  InitGPOPT();
 #endif
 
 	/*
