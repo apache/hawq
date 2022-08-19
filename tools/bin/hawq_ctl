@@ -767,7 +767,7 @@ class HawqStart:
             conn.close()
             for row in rows:
                 if row[0] != 'Synchronized':
-                    if row[1].find('Standby master too far behind') != -1:
+                    if row[1] == 'Standby master too far behind':
                         return 3
                     return 2
                 else:
