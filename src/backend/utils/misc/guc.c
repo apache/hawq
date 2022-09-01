@@ -11800,9 +11800,9 @@ bool ResetPGVariable(const char *name) {
     shouldDispatch = true;
   } else {
     struct config_generic *record = find_option(name, ERROR);
-    if (record->flags & (GUC_GPDB_ADDOPT | GUC_NEW_DISP)) shouldDispatch = true;
     set_config_option(name, NULL, (superuser() ? PGC_SUSET : PGC_USERSET),
                       PGC_S_SESSION, false, true);
+    if (record->flags & (GUC_GPDB_ADDOPT | GUC_NEW_DISP)) shouldDispatch = true;
   }
   return shouldDispatch;
 }
