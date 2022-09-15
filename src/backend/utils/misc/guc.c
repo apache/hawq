@@ -5178,6 +5178,16 @@ static struct config_int ConfigureNamesInt[] =
 	},
 
 	{
+    {"gp_max_plan_slice", PGC_USERSET, RESOURCES_MEM,
+      gettext_noop("Sets the maximum slice number of a plan to be dispatched."),
+      gettext_noop("Use 0 for no limit."),
+      NULL
+    },
+    &gp_max_plan_slice,
+    0, 0, INT_MAX, NULL, NULL
+  },
+
+	{
 		{"gp_max_partition_level", PGC_SUSET, PRESET_OPTIONS,
 		 	gettext_noop("Sets the maximum number of levels allowed when creating a partitioned table."),
 		 	gettext_noop("Use 0 for no limit."),

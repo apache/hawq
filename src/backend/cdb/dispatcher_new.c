@@ -1036,6 +1036,17 @@ void mainDispatchPrepare(struct MainDispatchData *data,
   }
   Assert(splan != NULL && splan_len > 0 && splan_len_uncompressed > 0);
 
+  // limit plan slice number
+  if (0 < gp_max_plan_slice && num_slices > gp_max_plan_slice) {
+    ereport(
+        ERROR,
+        (errcode(ERRCODE_STATEMENT_TOO_COMPLEX),
+         (errmsg("Query plan slice number limit exceeded, current: " UINT64_FORMAT
+                 ", max allowed: %d",
+                 num_slices, gp_max_plan_slice),
+          errhint("Slice number controlled by gp_max_plan_slice"))));
+  }
+
   char *sparams;
   int sparams_len;
   if (queryDesc->params != NULL && queryDesc->params->numParams > 0) {

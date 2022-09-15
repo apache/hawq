@@ -438,6 +438,8 @@ int gp_segworker_relative_priority = PRIO_MAX;
 /* Max size of dispatched plans; 0 if no limit */
 int			gp_max_plan_size = 0;
 
+int gp_max_plan_slice = 0;
+
 /* Disable setting of tuple hints while reading */
 bool		gp_disable_tuple_hints = false;
 int		gp_hashagg_compress_spill_files = 0;
