@@ -3444,6 +3444,18 @@ int gpfdist_init(int argc, const char* const argv[]) {
       pthread_create(&watchdog, 0, watchdog_thread, 0);
     }
   }
+
+  char* aprMemStr = getenv("GPFDIST_APR_MEM_MAX_SIZE");
+  long aprMemSize = 0;
+  if (aprMemStr != NULL) {
+    aprMemSize = strtol(aprMemStr, &endptr, 10);
+
+    if (endptr != aprMemStr + strlen(aprMemStr) || aprMemSize > INT_MAX) {
+      fprintf(stderr, "incorrect GPFDIST_APR_MEM_MAX_SIZE: %s\n", aprMemStr);
+      return -1;
+    }
+    apr_allocator_max_free_set(apr_pool_allocator_get(gcb.pool), aprMemSize);
+  }
 #endif
   return 0;
 }
