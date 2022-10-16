@@ -550,7 +550,7 @@ static void usage_error(const char* msg, int print_usage) {
 }
 
 static void print_version(void) {
-  printf("gpfdist version \"%s\"\n", GP_VERSION);
+  printf("gpfdist version \"%s\"\n", PG_VERSION_STR);
   exit(0);
 }
 
