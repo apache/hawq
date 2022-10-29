@@ -5184,7 +5184,7 @@ static struct config_int ConfigureNamesInt[] =
       NULL
     },
     &gp_max_plan_slice,
-    0, 0, INT_MAX, NULL, NULL
+    36, 0, INT_MAX, NULL, NULL
   },
 
 	{
