@@ -311,8 +311,31 @@ PlannedStmt *refineCachedPlan(PlannedStmt * plannedstmt,
   SplitAllocResult *allocResult = NULL;
   Query *my_parse = copyObject(parse);
 
-  /* If this is a parallel plan. request resource and allocate split again*/
-  if (my_parse->commandType != CMD_UTILITY && plannedstmt->planTree->dispatch == DISPATCH_PARALLEL)
+  // The conditions for re-allocating resource are complicated:
+  // 1. It is not a CMD_UTILITY
+  // 2. It is a parallel plan or a previously inherited resource
+  //
+  // We want to replace pre-allocated inherited resource forcefully because the
+  // life cycle of PlannedStmt is inconsistent with its resource.
+  //
+  // There is a cache mechanism for plan in plpgsql, which means that executing
+  // the same statement will access the same 'plan' object, and the resource for
+  // executing is stored in this object. The problem occurs after the first
+  // execution, the resource will be actively freed, but the cached plan still
+  // retains the freed resource, which means that when the same
+  // statement is executed the second time, an illegal address will be accessed
+  // (of course the occurrence of the problem depends on whether the memory
+  // address is polluted. In addition, we can forcibly set the address of pfree
+  // to 0 to increase the possibility of the problem).
+  //
+  // Although it is difficult for us to fundamentally control the life cycle of
+  // PlannedStmt and its resource to be consistent, we can avoid the problem
+  // through a tricky way: inheritating resource from ActiveQueryResource when
+  // fetching PlannedStmt.
+
+  if (my_parse->commandType != CMD_UTILITY && // not a CMD_UTILITY
+      (plannedstmt->planTree->dispatch == DISPATCH_PARALLEL || // parallel paln
+       (plannedstmt->resource && plannedstmt->resource->life == QRL_INHERIT))) // replace pre-allocated inherited resource forcefully
   {
     /*
      * Now, we want to allocate resource.

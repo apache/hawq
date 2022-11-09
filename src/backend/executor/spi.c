@@ -1963,17 +1963,21 @@ _SPI_execute_plan(_SPI_plan * plan, Datum *Values, const char *Nulls,
           originalStmt =
               refineCachedPlan(lfirst(plan_list_item),
                                queryTree, 0, NULL);
-          stmt = copyObject(originalStmt);
-          if (Debug_udf_plan &&
-              originalStmt->datalocalityInfo) {
-            stmt->datalocalityTime =
-                originalStmt->datalocalityTime;
-            stmt->datalocalityInfo = makeStringInfo();
-            stmt->datalocalityInfo->cursor =
-                originalStmt->datalocalityInfo->cursor;
-            appendStringInfoString(
-                stmt->datalocalityInfo,
-                originalStmt->datalocalityInfo->data);
+          if (lfirst(plan_list_item) == originalStmt) {
+            stmt = copyObject(originalStmt);
+            if (Debug_udf_plan &&
+                originalStmt->datalocalityInfo) {
+              stmt->datalocalityTime =
+                  originalStmt->datalocalityTime;
+              stmt->datalocalityInfo = makeStringInfo();
+              stmt->datalocalityInfo->cursor =
+                  originalStmt->datalocalityInfo->cursor;
+              appendStringInfoString(
+                  stmt->datalocalityInfo,
+                  originalStmt->datalocalityInfo->data);
+            }
+          } else {
+            stmt = originalStmt;
           }
         }
 
@@ -2648,17 +2652,6 @@ _SPI_copy_plan(SPIPlanPtr plan, int location)
 					                       ((PlannedStmt*)lfirst(lc))->datalocalityInfo->data);
 				}
 				ps->qdContext = plancxt;
-				if (ps->resource) {
-					List *prevSegList = ps->resource->segments;
-					ps->resource->segments = NULL;
-					ListCell *lc = NULL;
-					foreach (lc, prevSegList) {
-						Segment *seg = (Segment *)lfirst(lc);
-						ps->resource->segments =
-								lappend(ps->resource->segments,
-												CopySegment(seg, plancxt));
-					}
-				}
 			}
 			newplan->ptlist = lappend(newplan->ptlist, node);
 		}
