@@ -630,7 +630,7 @@ SetupSequenceServer(const char *host, int port)
 		 * See MPP-10162: certain PL/PGSQL functions may call us multiple
 		 * times without an intervening Teardown.
 		 */
-		if (savedSeqServerHost != NULL)
+		if (savedSeqServerHost != NULL && savedSeqServerHost != host)
 		{
 			free(savedSeqServerHost);
 			savedSeqServerHost = NULL;
@@ -641,7 +641,9 @@ SetupSequenceServer(const char *host, int port)
 		 * Don't use MemoryContexts -- they make error handling
 		 * difficult here.
 		 */
-		savedSeqServerHost = strdup(host);
+		if (savedSeqServerHost != host) {
+			savedSeqServerHost = strdup(host);
+		}
 
 		if (savedSeqServerHost == NULL)
 		{
