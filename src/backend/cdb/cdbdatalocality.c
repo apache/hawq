@@ -6142,8 +6142,8 @@ bool udf_collector_walker(Node *node,
 	if(IsA(node,FuncExpr)){
 		if(!IsBuildInFunction(((FuncExpr *) node)->funcid)){
 			context->udf_exist = true;
+			return true;
 		}
-		return false;
 	}
 
 	return expression_tree_walker(node, udf_collector_walker,
