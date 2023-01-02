@@ -64,6 +64,43 @@ static inline uint32_t _mm_crc32_u8(uint32_t crc, uint8_t value) {
 #include <nmmintrin.h>
 
 #endif
+#elif (defined(__aarch64__) && defined(__ARM_FEATURE_CRC32))
+namespace Hdfs {
+namespace Internal {
+
+#if defined(__LP64__)
+static inline uint64_t _mm_crc32_u64(uint64_t crc, uint64_t value) {
+    __asm__ __volatile__("crc32cx %w[c], %w[c], %x[v]\n\t"
+                         : [c] "+r"(crc)
+                         : [v] "r"(value));
+    return crc;
+}
+#endif
+
+static inline uint32_t _mm_crc32_u16(uint32_t crc, uint16_t value) {
+    __asm__ __volatile__("crc32ch %w[c], %w[c], %w[v]\n\t"
+                         : [c] "+r"(crc)
+                         : [v] "r"(value));
+    return crc;
+}
+
+static inline uint32_t _mm_crc32_u32(uint32_t crc, uint32_t value) {
+    __asm__ __volatile__("crc32cw %w[c], %w[c], %w[v]\n\t"
+                         : [c] "+r"(crc)
+                         : [v] "r"(value));
+    return crc;
+}
+
+static inline uint32_t _mm_crc32_u8(uint32_t crc, uint8_t value) {
+    __asm__ __volatile__("crc32cb %w[c], %w[c], %w[v]\n\t"
+                         : [c] "+r"(crc)
+                         : [v] "r"(value));
+    return crc;
+}
+
+}
+}
+#endif
 
 namespace Hdfs {
 namespace Internal {
@@ -77,6 +114,8 @@ bool HWCrc32c::available() {
      */
     __get_cpuid(1, &eax, &ebx, &ecx, &edx);
     return (ecx & (1 << 20)) != 0;
+#elif (defined(__aarch64__) && defined(__ARM_FEATURE_CRC32))
+    return true;
 #else
     return false;
 #endif
@@ -156,4 +195,3 @@ void HWCrc32c::updateInt64(const char * b, int len) {
 }
 }
 
-#endif /* _HDFS_LIBHDFS3_COMMON_HWCHECKSUM_H_ */
