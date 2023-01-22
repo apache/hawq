@@ -1254,6 +1254,13 @@ typedef struct AlterDomainStmt {
  *		Grant|Revoke Statement
  * ----------------------
  */
+typedef enum GrantTargetType
+{
+  ACL_TARGET_OBJECT,      /* grant on specific named object(s) */
+  ACL_TARGET_ALL_IN_SCHEMA, /* grant on all objects in given schema(s) */
+  ACL_TARGET_DEFAULTS     /* ALTER DEFAULT PRIVILEGES */
+} GrantTargetType;
+
 typedef enum GrantObjectType {
   ACL_OBJECT_RELATION,       /* table, view */
   ACL_OBJECT_SEQUENCE,       /* sequence */
@@ -1271,6 +1278,7 @@ typedef enum GrantObjectType {
 typedef struct GrantStmt {
   NodeTag type;
   bool is_grant;           /* true = GRANT, false = REVOKE */
+  GrantTargetType targtype; /* type of the grant target */
   GrantObjectType objtype; /* kind of object being operated on */
   List *objects;           /* list of RangeVar nodes, FuncWithArgs nodes,
                                                     * or plain names (as Value strings) */
@@ -1301,6 +1309,7 @@ typedef struct FuncWithArgs {
 /* This is only used internally in gram.y. */
 typedef struct PrivTarget {
   NodeTag type;
+  GrantTargetType targtype;
   GrantObjectType objtype;
   List *objs;
 } PrivTarget;

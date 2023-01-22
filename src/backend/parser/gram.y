@@ -523,7 +523,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	EXCHANGE EXCLUDE EXCLUDING EXCLUSIVE EXECUTE EXISTS EXPLAIN EXTERNAL EXTRACT EDGE
 
 	FALSE_P FETCH FIELDS FILESPACE FILESYSTEM FILL FILTER FIRST_P FLOAT_P FOLLOWING FOR 
-    	FORCE FOREIGN FORMAT FORMATTER FORWARD FREEZE FROM FULL FUNCTION
+    	FORCE FOREIGN FORMAT FORMATTER FORWARD FREEZE FROM FULL FUNCTION FUNCTIONS
 
 	GB GLOBAL GRANT GRANTED GREATEST GROUP_P GROUP_ID GROUPING GRAPH
 
@@ -567,7 +567,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	ROLE ROLLBACK ROLLUP ROOTPARTITION ROW ROWS RULE
 
 	SAVEPOINT SCATTER SCHEMA SCROLL SEARCH SECOND_P 
-    SECURITY SEGMENT SELECT SEQUENCE
+    SECURITY SEGMENT SELECT SEQUENCE SEQUENCES
 	SERIALIZABLE SERVER SESSION SESSION_USER SET SETOF SETS SHARE
 	SHOW SIMILAR SIMPLE SMALLINT SOME SPLIT SQL STABLE START STATEMENT
 	STATISTICS STDIN STDOUT STORAGE STRICT_P 
@@ -575,7 +575,7 @@ static Node *makeIsNotDistinctFromNode(Node *expr, int position);
 	SUBSTRING SUPERUSER_P SYMMETRIC
 	SYSID SYSTEM_P
 
-	TABLE TABLESPACE TB TEMP TEMPLATE TEMPORARY THEN THRESHOLD TIES TIME TIMESTAMP
+	TABLE  TABLES TABLESPACE TB TEMP TEMPLATE TEMPORARY THEN THRESHOLD TIES TIME TIMESTAMP
 	TO TRAILING TRANSACTION TREAT TRIGGER TRIM TRUE_P
 	TRUNCATE TRUSTED TYPE_P
 
@@ -6839,6 +6839,7 @@ GrantStmt:	GRANT privileges ON privilege_target TO grantee_list
 					GrantStmt *n = makeNode(GrantStmt);
 					n->is_grant = true;
 					n->privileges = $2;
+					n->targtype = ($4)->targtype;
 					n->objtype = ($4)->objtype;
 					n->objects = ($4)->objs;
 					n->grantees = $6;
@@ -6855,6 +6856,7 @@ RevokeStmt:
 					n->is_grant = false;
 					n->grant_option = false;
 					n->privileges = $2;
+					n->targtype = ($4)->targtype;
 					n->objtype = ($4)->objtype;
 					n->objects = ($4)->objs;
 					n->grantees = $6;
@@ -6868,6 +6870,7 @@ RevokeStmt:
 					n->is_grant = false;
 					n->grant_option = true;
 					n->privileges = $5;
+					n->targtype = ($7)->targtype;
 					n->objtype = ($7)->objtype;
 					n->objects = ($7)->objs;
 					n->grantees = $9;
@@ -6915,6 +6918,7 @@ privilege_target:
 			qualified_name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_RELATION;
 					n->objs = $1;
 					$$ = n;
@@ -6922,6 +6926,7 @@ privilege_target:
 			| TABLE qualified_name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_RELATION;
 					n->objs = $2;
 					$$ = n;
@@ -6929,6 +6934,7 @@ privilege_target:
 			| SEQUENCE qualified_name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_SEQUENCE;
 					n->objs = $2;
 					$$ = n;
@@ -6936,6 +6942,7 @@ privilege_target:
 			| FOREIGN DATA_P WRAPPER name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_FDW;
 					n->objs = $4;
 					$$ = n;
@@ -6943,6 +6950,7 @@ privilege_target:
 			| FOREIGN SERVER name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_FOREIGN_SERVER;
 					n->objs = $3;
 					$$ = n;
@@ -6950,6 +6958,7 @@ privilege_target:
 			| FUNCTION function_with_argtypes_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_FUNCTION;
 					n->objs = $2;
 					$$ = n;
@@ -6957,6 +6966,7 @@ privilege_target:
 			| DATABASE name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_DATABASE;
 					n->objs = $2;
 					$$ = n;
@@ -6964,6 +6974,7 @@ privilege_target:
 			| LANGUAGE name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_LANGUAGE;
 					n->objs = $2;
 					$$ = n;
@@ -6971,6 +6982,7 @@ privilege_target:
 			| SCHEMA name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_NAMESPACE;
 					n->objs = $2;
 					$$ = n;
@@ -6978,6 +6990,7 @@ privilege_target:
 			| TABLESPACE name_list
 				{
 					PrivTarget *n = makeNode(PrivTarget);
+					n->targtype = ACL_TARGET_OBJECT;
 					n->objtype = ACL_OBJECT_TABLESPACE;
 					n->objs = $2;
 					$$ = n;
@@ -6988,7 +7001,31 @@ privilege_target:
 					n->objtype = ACL_OBJECT_EXTPROTOCOL;
 					n->objs = $2;
 					$$ = n;
-				}			
+				}
+						| ALL TABLES IN_P SCHEMA name_list
+				{
+					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
+					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
+					n->objtype = ACL_OBJECT_RELATION;
+					n->objs = $5;
+					$$ = n;
+				}
+			| ALL SEQUENCES IN_P SCHEMA name_list
+				{
+					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
+					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
+					n->objtype = ACL_OBJECT_SEQUENCE;
+					n->objs = $5;
+					$$ = n;
+				}
+			| ALL FUNCTIONS IN_P SCHEMA name_list
+				{
+					PrivTarget *n = (PrivTarget *) palloc(sizeof(PrivTarget));
+					n->targtype = ACL_TARGET_ALL_IN_SCHEMA;
+					n->objtype = ACL_OBJECT_FUNCTION;
+					n->objs = $5;
+					$$ = n;
+				}
 		;
 
 
@@ -13030,6 +13067,7 @@ unreserved_keyword:
 			| FORMATTER
 			| FORWARD
 			| FUNCTION
+			| FUNCTIONS
 			| GB
 			| GLOBAL
 			| GRANTED
@@ -13166,6 +13204,7 @@ unreserved_keyword:
 			| SECURITY
 			| SEGMENT
 			| SEQUENCE
+			| SEQUENCES
 			| SERIALIZABLE
 			| SESSION
 			| SET
@@ -13187,6 +13226,7 @@ unreserved_keyword:
 			| SUPERUSER_P
 			| SYSID
 			| SYSTEM_P
+			| TABLES
 			| TABLESPACE
 			| TB
 			| TEMP

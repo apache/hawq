@@ -75,6 +75,8 @@ static void ExecGrant_Tablespace(InternalGrant *grantStmt);
 static void ExecGrant_ExtProtocol(InternalGrant *grantstmt);
 
 static List *objectNamesToOids(GrantObjectType objtype, List *objnames);
+static List *objectsInSchemaToOids(GrantObjectType objtype, List *nspnames);
+static List *getRelationsInNamespace(Oid namespaceId, char relkind);
 static AclMode string_to_privilege(const char *privname);
 static const char *privilege_to_string(AclMode privilege);
 static AclMode restrict_and_check_grant(bool is_grant, AclMode avail_goptions,
@@ -335,7 +337,21 @@ ExecuteGrantStmt(GrantStmt *stmt)
 	 */
 	istmt.is_grant = stmt->is_grant;
 	istmt.objtype = stmt->objtype;
-	istmt.objects = objectNamesToOids(stmt->objtype, stmt->objects);
+
+	/* Collect the OIDs of the target objects */
+	switch (stmt->targtype)
+	{
+	  case ACL_TARGET_OBJECT:
+	    istmt.objects = objectNamesToOids(stmt->objtype, stmt->objects);
+	    break;
+	  case ACL_TARGET_ALL_IN_SCHEMA:
+	    istmt.objects = objectsInSchemaToOids(stmt->objtype, stmt->objects);
+	    break;
+	    /* ACL_TARGET_DEFAULTS should not be seen here */
+	  default:
+	    elog(ERROR, "unrecognized GrantStmt.targtype: %d",
+	         (int) stmt->targtype);
+	}
 
 	/*
 	 * Don't allow GRANT/REVOKE for objects managed by Ranger
@@ -837,6 +853,112 @@ objectNamesToOids(GrantObjectType objtype, List *objnames)
 
 	return objects;
 }
+
+/*
+ * objectsInSchemaToOids
+ *
+ * Find all objects of a given type in specified schemas, and make a list
+ * of their Oids.  We check USAGE privilege on the schemas, but there is
+ * no privilege checking on the individual objects here.
+ */
+static List *
+objectsInSchemaToOids(GrantObjectType objtype, List *nspnames)
+{
+  List     *objects = NIL;
+  ListCell   *cell;
+
+  foreach(cell, nspnames)
+  {
+    char     *nspname = strVal(lfirst(cell));
+    Oid     namespaceId;
+    List     *objs;
+
+    namespaceId = LookupExplicitNamespace(nspname, NSPDBOID_CURRENT);
+
+    switch (objtype)
+    {
+      case ACL_OBJECT_RELATION:
+        /* Process both regular tables and views */
+        objs = getRelationsInNamespace(namespaceId, RELKIND_RELATION);
+        objects = list_concat(objects, objs);
+        objs = getRelationsInNamespace(namespaceId, RELKIND_VIEW);
+        objects = list_concat(objects, objs);
+        break;
+      case ACL_OBJECT_SEQUENCE:
+        objs = getRelationsInNamespace(namespaceId, RELKIND_SEQUENCE);
+        objects = list_concat(objects, objs);
+        break;
+      case ACL_OBJECT_FUNCTION:
+        {
+          ScanKeyData key[1];
+          Relation  rel;
+          HeapScanDesc scan;
+          HeapTuple tuple;
+
+          ScanKeyInit(&key[0],
+                Anum_pg_proc_pronamespace,
+                BTEqualStrategyNumber, F_OIDEQ,
+                ObjectIdGetDatum(namespaceId));
+
+          rel = heap_open(ProcedureRelationId, AccessShareLock);
+          scan = heap_beginscan(rel, SnapshotNow, 1, key);
+
+          while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+          {
+            objects = lappend_oid(objects, HeapTupleGetOid(tuple));
+          }
+
+          heap_endscan(scan);
+          heap_close(rel, AccessShareLock);
+        }
+        break;
+      default:
+        /* should not happen */
+        elog(ERROR, "unrecognized GrantStmt.objtype: %d",
+           (int) objtype);
+    }
+  }
+
+  return objects;
+}
+
+/*
+ * getRelationsInNamespace
+ *
+ * Return Oid list of relations in given namespace filtered by relation kind
+ */
+static List *
+getRelationsInNamespace(Oid namespaceId, char relkind)
+{
+  List     *relations = NIL;
+  ScanKeyData key[2];
+  Relation  rel;
+  HeapScanDesc scan;
+  HeapTuple tuple;
+
+  ScanKeyInit(&key[0],
+        Anum_pg_class_relnamespace,
+        BTEqualStrategyNumber, F_OIDEQ,
+        ObjectIdGetDatum(namespaceId));
+  ScanKeyInit(&key[1],
+        Anum_pg_class_relkind,
+        BTEqualStrategyNumber, F_CHAREQ,
+        CharGetDatum(relkind));
+
+  rel = heap_open(RelationRelationId, AccessShareLock);
+  scan = heap_beginscan(rel, SnapshotNow, 2, key);
+
+  while ((tuple = heap_getnext(scan, ForwardScanDirection)) != NULL)
+  {
+    relations = lappend_oid(relations, HeapTupleGetOid(tuple));
+  }
+
+  heap_endscan(scan);
+  heap_close(rel, AccessShareLock);
+
+  return relations;
+}
+
 
 /*
  *	This processes both sequences and non-sequences.
