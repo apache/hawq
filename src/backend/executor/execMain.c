@@ -2168,7 +2168,26 @@ InitPlan(QueryDesc *queryDesc, int eflags)
 	estate->es_evTupleNull = NULL;
 	estate->es_evTuple = NULL;
 	estate->es_useEvalPlan = false;
-
+	
+	/*
+	 * In QD, we need to initialize the variable database before 
+	 * ExecInitNode(), that makes us can access the database 
+	 * correctly in places such as magma_beginscan(), 
+	 * magma_insertinit().
+	 * 
+	 * In contrast, if we are in QE, we don't need to do this since
+	 * RebuildDatabase() ensures that the database is initialized.
+	 * 
+	 * An example of the uninitialized database:
+	 *     prepare select_by_id(int) as select * from t where id = 1;
+	 *     execute select_by_id(1);  <- uninitialized when we are in 
+	 *                                  magma_beginscan()
+	 */
+        if (Gp_role == GP_ROLE_DISPATCH)
+        {
+                database = get_database_name(MyDatabaseId);
+        }
+        
 	/*
 	 * Initialize the private state information for all the nodes in the query
 	 * tree.  This opens files, allocates storage and leaves us ready to start
