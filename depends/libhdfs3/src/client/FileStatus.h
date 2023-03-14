@@ -33,7 +33,7 @@ class FileStatus {
 public:
     FileStatus() :
         isdir(false), atime(0), blocksize(0), length(0), mtime(
-            0), permission(0644), replications(0) {
+            0), permission(0644), replications(0), fileid(0) {
     }
 
     int64_t getAccessTime() const {
@@ -159,6 +159,18 @@ public:
         return fileEncryption.getKey().length() > 0 && fileEncryption.getKeyName().length() > 0;
     }
 
+    /**
+     * Get FileID of hdfs file/directory
+     * @return fileid of file if present, else 0
+     */
+    int64_t getFileid() const {
+        return fileid;
+    }
+
+    void setFileid(int64_t fileid) {
+        this->fileid = fileid;
+    }
+
 private:
     bool isdir;
     int64_t atime;
@@ -172,6 +184,7 @@ private:
     std::string path;
     std::string symlink;
     FileEncryptionInfo fileEncryption;
+    int64_t fileid;
 };
 
 }
