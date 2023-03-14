@@ -75,6 +75,16 @@ ParquetRowGroupReader_ScanNextTuple(
 	RuntimeFilterState		*rfState,
 	TupleTableSlot 			*slot);
 
+/* Get specified attributes of a tuple into slot*/
+void
+ParquetRowGroupReader_ScanNextTupleColumns(
+	TupleDesc 				pqs_tupDesc,
+	ParquetRowGroupReader 	*rowGroupReader,
+	int						*hawqAttrToParquetColNum,
+	bool 					*projs,
+	TupleTableSlot 			*slot,
+	List					*attsList);
+
 /* Finish scanning current row group*/
 void
 ParquetRowGroupReader_FinishedScanRowGroup(
