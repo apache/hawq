@@ -112,7 +112,7 @@ msgstr "  --help                       显示此帮助信息, 然后退出\n"
 #: createdb.c:228
 #, c-format
 msgid "  --version                    output version information, then exit\n"
-msgstr "  --versoin                    输出版本信息, 然后退出\n"
+msgstr "  --version                    输出版本信息, 然后退出\n"
 
 #: createdb.c:229 createuser.c:255 clusterdb.c:244 vacuumdb.c:273
 #, c-format
@@ -254,7 +254,7 @@ msgstr "  -L, --pglib=DIRECTORY     在 DIRECTORY 目录中查找语言翻译文件\n"
 #: dropuser.c:153 clusterdb.c:245 vacuumdb.c:274
 #, c-format
 msgid "  -h, --host=HOSTNAME       database server host or socket directory\n"
-msgstr "  -h, --host=HOSTNAM        数据库服务器所在机器的主机名或套接字目录\n"
+msgstr "  -h, --host=HOSTNAME        数据库服务器所在机器的主机名或套接字目录\n"
 
 #: createlang.c:307 createuser.c:257 dropdb.c:154 droplang.c:287
 #: dropuser.c:154 clusterdb.c:246 vacuumdb.c:275
@@ -618,7 +618,7 @@ msgstr "  -f, --full                      完全清理\n"
 #: vacuumdb.c:267
 #, c-format
 msgid "  -z, --analyze                   update optimizer hints\n"
-msgstr "  -z, --anaylze                   更新优化器信息\n"
+msgstr "  -z, --analyze                   更新优化器信息\n"
 
 #: vacuumdb.c:268
 #, c-format
@@ -646,7 +646,7 @@ msgstr "  --help                          显示此帮助信息, 然后退出\n"
 #, c-format
 msgid ""
 "  --version                       output version information, then exit\n"
-msgstr "  --versoin                       输出版本信息, 然后退出\n"
+msgstr "  --version                       输出版本信息, 然后退出\n"
 
 #: vacuumdb.c:278
 #, c-format
