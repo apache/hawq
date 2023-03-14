@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+       Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+  -->
+<process name="drSync" xmlns="uri:falcon:process:0.1">
+    <tags>_falcon_mirroring_type=HDFS</tags>
+    <clusters>
+        <cluster name="idpDev">
+            <validity start="2016-08-24T14:23Z" end="2046-01-01T14:23Z"/>
+        </cluster>
+    </clusters>
+    <parallel>1</parallel>
+    <order>LAST_ONLY</order>
+    <frequency>months(1)</frequency>
+    <timezone>GMT-07:00</timezone>
+    <properties>
+        <property name="oozie.wf.subworkflow.classpath.inheritance" value="true"/>
+        <property name="distcpMaxMaps" value="100"/>
+        <property name="distcpMapBandwidth" value="1000"/>
+        <property name="drSourceDir" value="/hawq_default"/>
+        <property name="drTargetDir" value="/hawq_default"/>
+        <property name="drTargetClusterFS" value="hdfs://source:8020"/>
+        <property name="drSourceClusterFS" value="hdfs://target:8020"/>
+        <property name="drNotificationReceivers" value="NA"/>
+        <property name="targetCluster" value="idpDR"/>
+        <property name="sourceCluster" value="idpDev"/>
+    </properties>
+    <workflow name="drSync-WF" engine="oozie" path="/apps/data-mirroring/workflows/hawqsync-oozie-workflow.xml" lib=""/>
+    <retry policy="periodic" delay="minutes(30)" attempts="3"/>
+    <ACL owner="gpadmin" group="users" permission="0777"/>
+</process>
