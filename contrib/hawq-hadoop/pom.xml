@@ -33,7 +33,7 @@ under the License.
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<hadoop.version>2.0.5-alpha</hadoop.version>
+		<hadoop.version>3.2.3</hadoop.version>
 	</properties>
 
 	<modules>
