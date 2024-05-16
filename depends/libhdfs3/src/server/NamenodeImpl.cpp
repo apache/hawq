@@ -862,7 +862,9 @@ bool NamenodeImpl::listEncryptionZones(const int64_t id, std::vector<EncryptionZ
         UnWrapper < FileNotFoundException,
                   UnresolvedLinkException, HdfsIOException > unwrapper(e);
         unwrapper.unwrap(__FILE__, __LINE__);
+        return false;
     }
+    return true;
 }
 
 }
